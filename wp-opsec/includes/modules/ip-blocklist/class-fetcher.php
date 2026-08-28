@@ -9,33 +9,80 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class WPOpsec_IP_Blocklist_Fetcher {
 
+	/**
+	 * Source registry. 'type' selects the parser:
+	 *   ip_list    - one bare IPv4 per line, '#' comments
+	 *   range_list - "start end ..." whitespace-delimited per line, '#' comments
+	 *   cidr_list  - CIDR or bare IPv4 per line, '#' full-line or ';' inline comments
+	 */
 	const SOURCES = array(
-		'cins'    => 'https://cinsscore.com/list/ci-badguys.txt',
-		'dshield' => 'https://feeds.dshield.org/block.txt',
+		'cins'           => array(
+			'label' => 'CINS Army (poor-reputation IPs)',
+			'url'   => 'https://cinsscore.com/list/ci-badguys.txt',
+			'type'  => 'ip_list',
+		),
+		'dshield'        => array(
+			'label' => 'DShield (top attacker /24s)',
+			'url'   => 'https://feeds.dshield.org/block.txt',
+			'type'  => 'range_list',
+		),
+		'spamhaus_drop'  => array(
+			'label' => 'Spamhaus DROP (hijacked/spammer netblocks)',
+			'url'   => 'https://www.spamhaus.org/drop/drop.txt',
+			'type'  => 'cidr_list',
+		),
+		'firehol_level1' => array(
+			'label' => 'FireHOL level1 (DShield+Spamhaus DROP+bogons+Feodo, merged, low-FP)',
+			'url'   => 'https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset',
+			'type'  => 'cidr_list',
+		),
+		'firehol_level2' => array(
+			'label' => 'FireHOL level2 (48h recent-attacker feed, large & volatile)',
+			'url'   => 'https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level2.netset',
+			'type'  => 'cidr_list',
+		),
 	);
 
+	const DEFAULT_ENABLED = array( 'cins', 'dshield' );
+
 	/**
+	 * @param string[] $enabled source ids from self::SOURCES to fetch
 	 * @return array<int, array{0:int,1:int,2:string}> ranges as [start, end, source]
 	 */
-	public static function fetch_all() {
+	public static function fetch_all( array $enabled ) {
 		$ranges = array();
 
-		foreach ( self::SOURCES as $source => $url ) {
-			$body = self::download( $url );
+		foreach ( self::SOURCES as $id => $source ) {
+			if ( ! in_array( $id, $enabled, true ) ) {
+				continue;
+			}
+
+			$body = self::download( $source['url'] );
 			if ( false === $body ) {
 				continue;
 			}
 
-			$parsed = 'cins' === $source
-				? self::parse_ip_list( $body )
-				: self::parse_range_list( $body );
+			$parsed = self::parse( $source['type'], $body );
 
 			foreach ( $parsed as $range ) {
-				$ranges[] = array( $range[0], $range[1], $source );
+				$ranges[] = array( $range[0], $range[1], $id );
 			}
 		}
 
 		return $ranges;
+	}
+
+	private static function parse( $type, $body ) {
+		switch ( $type ) {
+			case 'ip_list':
+				return self::parse_ip_list( $body );
+			case 'range_list':
+				return self::parse_range_list( $body );
+			case 'cidr_list':
+				return self::parse_cidr_list( $body );
+			default:
+				return array();
+		}
 	}
 
 	private static function download( $url ) {
@@ -92,6 +139,41 @@ class WPOpsec_IP_Blocklist_Fetcher {
 			if ( false !== $start && false !== $end && $end >= $start ) {
 				$ranges[] = array( $start, $end );
 			}
+		}
+
+		return $ranges;
+	}
+
+	/**
+	 * CIDR or bare IPv4 per line. '#' marks a full-line comment (FireHOL);
+	 * ';' marks a trailing inline comment (Spamhaus DROP), stripped first.
+	 */
+	private static function parse_cidr_list( $body ) {
+		$ranges = array();
+
+		foreach ( preg_split( '/\r\n|\r|\n/', $body ) as $line ) {
+			$line = trim( preg_replace( '/;.*/', '', $line ) );
+			if ( '' === $line || '#' === $line[0] ) {
+				continue;
+			}
+
+			$parts  = explode( '/', $line, 2 );
+			$long   = ip2long( $parts[0] );
+			$prefix = isset( $parts[1] ) ? (int) $parts[1] : 32;
+
+			if ( false === $long || $prefix < 0 || $prefix > 32 ) {
+				continue;
+			}
+
+			if ( 32 === $prefix ) {
+				$ranges[] = array( $long, $long );
+				continue;
+			}
+
+			$mask  = ( 0xFFFFFFFF << ( 32 - $prefix ) ) & 0xFFFFFFFF;
+			$start = $long & $mask;
+			$end   = $start | ( ~$mask & 0xFFFFFFFF );
+			$ranges[] = array( $start, $end );
 		}
 
 		return $ranges;

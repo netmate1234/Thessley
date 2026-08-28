@@ -46,8 +46,9 @@ class WPOpsec_Module_IP_Blocklist {
 	}
 
 	public static function refresh() {
-		$ranges = WPOpsec_IP_Blocklist_Fetcher::fetch_all();
-		$stats  = WPOpsec_IP_Blocklist_Compiler::compile( $ranges );
+		$enabled = get_option( 'wpopsec_ip_blocklist_sources', WPOpsec_IP_Blocklist_Fetcher::DEFAULT_ENABLED );
+		$ranges  = WPOpsec_IP_Blocklist_Fetcher::fetch_all( $enabled );
+		$stats   = WPOpsec_IP_Blocklist_Compiler::compile( $ranges );
 
 		$stats['updated_at'] = time();
 		update_option( 'wpopsec_ip_blocklist_stats', $stats, false );
@@ -105,14 +106,19 @@ class WPOpsec_Module_IP_Blocklist {
 		} ) );
 		update_option( 'wpopsec_ip_allowlist', $allowlist );
 
+		$posted_sources = isset( $_POST['sources'] ) ? (array) wp_unslash( $_POST['sources'] ) : array();
+		$sources        = array_values( array_intersect( $posted_sources, array_keys( WPOpsec_IP_Blocklist_Fetcher::SOURCES ) ) );
+		update_option( 'wpopsec_ip_blocklist_sources', $sources );
+
 		wp_safe_redirect( add_query_arg( 'saved', '1', wp_get_referer() ) );
 		exit;
 	}
 
 	public static function render_settings_page() {
-		$stats     = get_option( 'wpopsec_ip_blocklist_stats', array() );
-		$mode      = get_option( 'wpopsec_ip_blocklist_mode', 'log' );
-		$allowlist = get_option( 'wpopsec_ip_allowlist', array() );
+		$stats            = get_option( 'wpopsec_ip_blocklist_stats', array() );
+		$mode             = get_option( 'wpopsec_ip_blocklist_mode', 'log' );
+		$allowlist        = get_option( 'wpopsec_ip_allowlist', array() );
+		$enabled_sources  = get_option( 'wpopsec_ip_blocklist_sources', WPOpsec_IP_Blocklist_Fetcher::DEFAULT_ENABLED );
 		?>
 		<div class="wrap">
 			<h1>WP Opsec — IP Blocklist</h1>
@@ -132,7 +138,8 @@ class WPOpsec_Module_IP_Blocklist {
 					<tr><th>Last updated</th><td><?php echo esc_html( date( 'Y-m-d H:i:s', $stats['updated_at'] ) ); ?></td></tr>
 					<tr><th>Ranges (merged)</th><td><?php echo esc_html( $stats['count_merged'] ); ?></td></tr>
 					<?php foreach ( $stats['by_source'] as $src => $count ) : ?>
-						<tr><th><?php echo esc_html( ucfirst( $src ) ); ?> entries</th><td><?php echo esc_html( $count ); ?></td></tr>
+						<?php $label = WPOpsec_IP_Blocklist_Fetcher::SOURCES[ $src ]['label'] ?? ucfirst( $src ); ?>
+						<tr><th><?php echo esc_html( $label ); ?> entries</th><td><?php echo esc_html( $count ); ?></td></tr>
 					<?php endforeach; ?>
 				</table>
 			<?php endif; ?>
@@ -149,6 +156,18 @@ class WPOpsec_Module_IP_Blocklist {
 				<input type="hidden" name="action" value="wpopsec_save_settings">
 
 				<table class="form-table">
+					<tr>
+						<th>Sources</th>
+						<td>
+							<?php foreach ( WPOpsec_IP_Blocklist_Fetcher::SOURCES as $id => $source ) : ?>
+								<label>
+									<input type="checkbox" name="sources[]" value="<?php echo esc_attr( $id ); ?>" <?php checked( in_array( $id, $enabled_sources, true ) ); ?>>
+									<?php echo esc_html( $source['label'] ); ?>
+								</label><br>
+							<?php endforeach; ?>
+							<p class="description">Changes take effect on the next refresh (cron or "Refresh now" below).</p>
+						</td>
+					</tr>
 					<tr>
 						<th>Mode</th>
 						<td>
