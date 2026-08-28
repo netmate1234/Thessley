@@ -182,11 +182,6 @@ class WPOpsec_Module_Query_Guard {
 								<?php endif; ?>
 								For other providers, add their IPs to the trusted networks file on the <a href="<?php echo esc_url( admin_url( 'admin.php?page=wp-opsec-ip-blocklist' ) ); ?>">IP Blocklist</a> page — that list is exempt here too.
 							</p>
-							<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-								<?php wp_nonce_field( 'wpopsec_qg_refresh_xmlrpc_allow' ); ?>
-								<input type="hidden" name="action" value="wpopsec_qg_refresh_xmlrpc_allow">
-								<?php submit_button( 'Refresh Jetpack IP list now', 'secondary', 'submit', false ); ?>
-							</form>
 						</td>
 					</tr>
 					<tr>
@@ -200,6 +195,12 @@ class WPOpsec_Module_Query_Guard {
 				</table>
 
 				<?php submit_button( 'Save settings' ); ?>
+			</form>
+
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-top:1em">
+				<?php wp_nonce_field( 'wpopsec_qg_refresh_xmlrpc_allow' ); ?>
+				<input type="hidden" name="action" value="wpopsec_qg_refresh_xmlrpc_allow">
+				<?php submit_button( 'Refresh Jetpack IP list now', 'secondary', 'submit', false ); ?>
 			</form>
 		</div>
 		<?php
