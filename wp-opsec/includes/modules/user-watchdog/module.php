@@ -404,93 +404,123 @@ class WPOpsec_Module_User_Watchdog {
 		$alerts   = array_reverse( (array) get_option( 'wpopsec_user_watchdog_alerts', array() ) );
 		$snapshot = (array) get_option( 'wpopsec_user_watchdog_snapshot', array() );
 		$snap_at  = (int) get_option( 'wpopsec_user_watchdog_snapshot_at', 0 );
-		?>
-		<div class="wrap">
-			<h1>WP Opsec — User Watchdog</h1>
-			<p>Watches privileged accounts. Creating a hidden administrator is how backdoors survive removal of the code that planted them, so this is checked both live (via WordPress hooks) and by an hourly snapshot diff that also catches direct database writes.</p>
 
-			<?php if ( isset( $_GET['saved'] ) ) : ?>
-				<div class="notice notice-success"><p>Settings saved.</p></div>
-			<?php endif; ?>
-			<?php if ( isset( $_GET['scanned'] ) ) : ?>
-				<div class="notice notice-success"><p>Scan complete.</p></div>
-			<?php endif; ?>
-			<?php if ( isset( $_GET['acknowledged'] ) ) : ?>
-				<div class="notice notice-success"><p>Alerts cleared.</p></div>
-			<?php endif; ?>
+		WPOpsec_UI::open( 'user-watchdog' );
 
-			<h2>Alerts</h2>
-			<?php if ( empty( $alerts ) ) : ?>
-				<p style="color:#007017;font-weight:600">No outstanding alerts.</p>
-			<?php else : ?>
-				<table class="widefat striped">
-					<thead><tr><th style="width:150px">When</th><th style="width:220px">Type</th><th>Detail</th></tr></thead>
-					<tbody>
-					<?php foreach ( $alerts as $a ) : ?>
-						<tr>
-							<td><?php echo esc_html( date( 'Y-m-d H:i', (int) $a['at'] ) ); ?></td>
-							<td><code style="color:#b32d2e"><?php echo esc_html( $a['type'] ); ?></code></td>
-							<td><?php echo esc_html( $a['message'] ); ?></td>
-						</tr>
-					<?php endforeach; ?>
-					</tbody>
-				</table>
-				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-top:1em">
-					<?php wp_nonce_field( 'wpopsec_uw_acknowledge' ); ?>
-					<input type="hidden" name="action" value="wpopsec_uw_acknowledge">
-					<?php submit_button( 'Acknowledge &amp; clear', 'secondary', 'submit', false ); ?>
-				</form>
-			<?php endif; ?>
+		foreach ( array( 'saved' => 'Settings saved.', 'scanned' => 'Scan complete.', 'acknowledged' => 'Alerts cleared.' ) as $k => $msg ) {
+			if ( isset( $_GET[ $k ] ) ) {
+				WPOpsec_UI::notice( 'success', $msg );
+			}
+		}
 
-			<h2>Privileged accounts</h2>
-			<p class="description">
-				<?php echo esc_html( count( $snapshot ) ); ?> account(s) with administrative capabilities.
-				<?php if ( $snap_at ) : ?>
-					Snapshot taken <?php echo esc_html( date( 'Y-m-d H:i', $snap_at ) ); ?>.
-				<?php endif; ?>
-			</p>
-			<table class="widefat striped" style="max-width:760px">
-				<thead><tr><th>ID</th><th>Login</th><th>Email</th><th>Roles</th></tr></thead>
+		WPOpsec_UI::tiles(
+			array(
+				array(
+					'icon'  => $alerts ? 'warning' : 'yes-alt',
+					'tone'  => $alerts ? 'bad' : 'good',
+					'value' => (string) count( $alerts ),
+					'label' => 'outstanding alerts',
+				),
+				array(
+					'icon'  => 'admin-users',
+					'tone'  => 'quiet',
+					'value' => (string) count( $snapshot ),
+					'label' => 'privileged accounts',
+				),
+				array(
+					'icon'  => 'clock',
+					'tone'  => 'quiet',
+					'value' => $snap_at ? date_i18n( 'H:i', $snap_at ) : '—',
+					'label' => $snap_at ? 'snapshot ' . date_i18n( 'M j', $snap_at ) : 'no snapshot',
+				),
+			)
+		);
+
+		WPOpsec_UI::section( 'Alerts', 'warning' );
+		if ( empty( $alerts ) ) {
+			echo '<div class="wpopsec-empty"><span class="dashicons dashicons-yes-alt"></span><p>No outstanding alerts.</p></div>';
+		} else {
+			?>
+			<table class="wpopsec-table">
+				<thead><tr><th style="width:140px">When</th><th style="width:210px">Type</th><th>Detail</th></tr></thead>
 				<tbody>
-				<?php foreach ( $snapshot as $id => $info ) : ?>
+				<?php foreach ( $alerts as $a ) : ?>
 					<tr>
-						<td><?php echo esc_html( $id ); ?></td>
-						<td><strong><?php echo esc_html( $info['login'] ); ?></strong></td>
-						<td><?php echo esc_html( $info['email'] ); ?></td>
-						<td><?php echo esc_html( implode( ', ', $info['roles'] ) ); ?></td>
+						<td class="wpopsec-nowrap"><?php echo esc_html( date_i18n( 'M j, H:i', (int) $a['at'] ) ); ?></td>
+						<td><?php WPOpsec_UI::badge( $a['type'], 'bad' ); ?></td>
+						<td class="wpopsec-muted"><?php echo esc_html( $a['message'] ); ?></td>
 					</tr>
 				<?php endforeach; ?>
 				</tbody>
 			</table>
+			<div class="wpopsec-actions" style="margin-top:14px">
+				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+					<?php wp_nonce_field( 'wpopsec_uw_acknowledge' ); ?>
+					<input type="hidden" name="action" value="wpopsec_uw_acknowledge">
+					<?php submit_button( 'Acknowledge &amp; clear', 'secondary', 'submit', false ); ?>
+				</form>
+			</div>
+			<?php
+		}
+		WPOpsec_UI::section_end();
 
-			<p style="margin-top:1em">
+		WPOpsec_UI::section( 'Privileged accounts', 'admin-users', sprintf( '%d account(s)', count( $snapshot ) ) );
+		?>
+		<table class="wpopsec-table">
+			<thead><tr><th style="width:60px">ID</th><th style="width:180px">Login</th><th style="width:240px">Email</th><th>Roles</th></tr></thead>
+			<tbody>
+			<?php foreach ( $snapshot as $id => $info ) : ?>
+				<tr>
+					<td><?php echo esc_html( $id ); ?></td>
+					<td><strong><?php echo esc_html( $info['login'] ); ?></strong></td>
+					<td class="wpopsec-muted"><?php echo esc_html( $info['email'] ); ?></td>
+					<td><?php foreach ( $info['roles'] as $r ) { WPOpsec_UI::badge( $r, 'quiet' ); echo ' '; } ?></td>
+				</tr>
+			<?php endforeach; ?>
+			</tbody>
+		</table>
+		<div class="wpopsec-actions" style="margin-top:14px">
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 				<?php wp_nonce_field( 'wpopsec_uw_scan_now' ); ?>
 				<input type="hidden" name="action" value="wpopsec_uw_scan_now">
 				<?php submit_button( 'Scan now', 'primary', 'submit', false ); ?>
 			</form>
-			</p>
-
-			<h2>Settings</h2>
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( 'wpopsec_uw_save_settings' ); ?>
-				<input type="hidden" name="action" value="wpopsec_uw_save_settings">
-				<table class="form-table">
-					<tr>
-						<th>Enabled</th>
-						<td><label><input type="checkbox" name="enabled" <?php checked( get_option( 'wpopsec_user_watchdog_enabled', true ) ); ?>> Watch privileged account changes</label></td>
-					</tr>
-					<tr>
-						<th>Email</th>
-						<td>
-							<label><input type="checkbox" name="email_alerts" <?php checked( get_option( 'wpopsec_user_watchdog_email', false ) ); ?>> Email the site admin when an alert fires</label>
-							<p class="description">Sent to <code><?php echo esc_html( get_option( 'admin_email' ) ); ?></code>. Note that an attacker who already has admin access can change that address — the event log is the more reliable record.</p>
-						</td>
-					</tr>
-				</table>
-				<?php submit_button( 'Save settings' ); ?>
-			</form>
 		</div>
 		<?php
+		WPOpsec_UI::section_end();
+		?>
+
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<?php wp_nonce_field( 'wpopsec_uw_save_settings' ); ?>
+			<input type="hidden" name="action" value="wpopsec_uw_save_settings">
+
+			<?php WPOpsec_UI::section( 'Settings', 'admin-generic' ); ?>
+				<?php
+				WPOpsec_UI::row(
+					'Enabled',
+					function () {
+						?>
+						<label><input type="checkbox" name="enabled" <?php checked( get_option( 'wpopsec_user_watchdog_enabled', true ) ); ?>> Watch privileged account changes</label>
+						<?php
+					},
+					'Checked live through WordPress hooks, and by an hourly snapshot diff that also catches accounts written straight to the database.'
+				);
+
+				WPOpsec_UI::row(
+					'Email',
+					function () {
+						?>
+						<label><input type="checkbox" name="email_alerts" <?php checked( get_option( 'wpopsec_user_watchdog_email', false ) ); ?>> Email the site admin when an alert fires</label>
+						<?php
+					},
+					'Sent to <code>' . esc_html( get_option( 'admin_email' ) ) . '</code>, rate-limited to one every 15 minutes. Note that an attacker who already has admin access can change that address — the event log is the more reliable record.'
+				);
+				?>
+			<?php WPOpsec_UI::section_end(); ?>
+
+			<?php submit_button( 'Save settings' ); ?>
+		</form>
+		<?php
+		WPOpsec_UI::close();
 	}
 }

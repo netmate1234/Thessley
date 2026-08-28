@@ -235,78 +235,112 @@ class WPOpsec_Module_Auto_Update {
 
 		$blocked = defined( 'AUTOMATIC_UPDATER_DISABLED' ) && AUTOMATIC_UPDATER_DISABLED;
 		$no_mods = defined( 'DISALLOW_FILE_MODS' ) && DISALLOW_FILE_MODS;
+
+		WPOpsec_UI::open( 'auto-update' );
+
+		if ( isset( $_GET['saved'] ) ) {
+			WPOpsec_UI::notice( 'success', 'Settings saved.' );
+		}
+
+		if ( $blocked || $no_mods ) {
+			WPOpsec_UI::notice(
+				'error',
+				'<p><strong>Automatic updates are disabled at the wp-config level</strong> ('
+					. esc_html( $blocked ? 'AUTOMATIC_UPDATER_DISABLED' : 'DISALLOW_FILE_MODS' )
+					. '). Nothing on this page can take effect until that constant is removed.</p>',
+				true
+			);
+		}
+
+		WPOpsec_UI::tiles(
+			array(
+				array(
+					'icon'  => 'update',
+					'tone'  => 'off' === $plugins ? 'warn' : 'good',
+					'value' => 'off' === $plugins ? 'Off' : ( 'all' === $plugins ? 'All' : 'Flagged' ),
+					'label' => 'plugin auto-updates',
+				),
+				array(
+					'icon'  => 'wordpress-alt',
+					'tone'  => 'off' === $core ? 'warn' : 'good',
+					'value' => ucfirst( $core ),
+					'label' => 'core releases',
+				),
+				array(
+					'icon'  => $flagged_ct ? 'warning' : 'yes-alt',
+					'tone'  => $flagged_ct ? 'warn' : 'good',
+					'value' => (string) $flagged_ct,
+					'label' => 'currently flagged',
+				),
+			)
+		);
 		?>
-		<div class="wrap">
-			<h1>WP Opsec — Auto Updates</h1>
-			<p>About 60% of WordPress compromises exploit a flaw that was <em>already patched</em>, and widely-targeted vulnerabilities get mass-exploited within hours of disclosure. Installing the update is the fix; reading a report about it later isn't.</p>
 
-			<?php if ( isset( $_GET['saved'] ) ) : ?>
-				<div class="notice notice-success"><p>Settings saved.</p></div>
-			<?php endif; ?>
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<?php wp_nonce_field( 'wpopsec_au_save_settings' ); ?>
+			<input type="hidden" name="action" value="wpopsec_au_save_settings">
 
-			<?php if ( $blocked || $no_mods ) : ?>
-				<div class="notice notice-error inline">
-					<p><strong>Automatic updates are disabled at the wp-config level</strong>
-					(<?php echo esc_html( $blocked ? 'AUTOMATIC_UPDATER_DISABLED' : 'DISALLOW_FILE_MODS' ); ?>).
-					Nothing on this page can take effect until that constant is removed.</p>
+			<?php WPOpsec_UI::section( 'What to update automatically', 'update' ); ?>
+				<?php
+				WPOpsec_UI::row(
+					'WordPress core',
+					function () use ( $core ) {
+						?>
+						<label><input type="radio" name="core" value="minor" <?php checked( $core, 'minor' ); ?>> Security &amp; maintenance releases only <?php WPOpsec_UI::badge( 'recommended', 'good' ); ?></label>
+						<label><input type="radio" name="core" value="major" <?php checked( $core, 'major' ); ?>> All releases, including major versions</label>
+						<label><input type="radio" name="core" value="off" <?php checked( $core, 'off' ); ?>> Off</label>
+						<?php
+					},
+					'Minor releases are where core security fixes ship, and they are deliberately low-risk. Major releases can change editor behaviour.'
+				);
+
+				WPOpsec_UI::row(
+					'Plugins',
+					function () use ( $plugins, $scan, $flagged_ct ) {
+						?>
+						<label>
+							<input type="radio" name="plugins" value="flagged" <?php checked( $plugins, 'flagged' ); ?>>
+							Only plugins the vulnerability scan flagged <?php WPOpsec_UI::badge( 'recommended', 'good' ); ?>
+							<?php if ( $scan ) : ?>
+								<span class="wpopsec-muted">— currently <?php echo esc_html( $flagged_ct ); ?></span>
+							<?php endif; ?>
+						</label>
+						<label><input type="radio" name="plugins" value="all" <?php checked( $plugins, 'all' ); ?>> All plugins</label>
+						<label><input type="radio" name="plugins" value="off" <?php checked( $plugins, 'off' ); ?>> Off (use WordPress&#39;s own per-plugin settings)</label>
+						<?php
+					},
+					'91% of WordPress vulnerabilities are in plugins, so this is the setting that matters most. "Flagged" re-runs the scan before each sweep so it acts on current data. These settings only ever <em>add</em> to what you have already enabled per-plugin on the Plugins screen — the exclusion list below is the only thing that turns an auto-update off.'
+				);
+
+				WPOpsec_UI::row(
+					'Themes',
+					function () use ( $themes ) {
+						?>
+						<label><input type="radio" name="themes" value="all" <?php checked( $themes, 'all' ); ?>> All themes</label>
+						<label><input type="radio" name="themes" value="off" <?php checked( $themes, 'off' ); ?>> Off</label>
+						<?php
+					},
+					'Leave off if you have customised a theme directly instead of using a child theme — an update would overwrite your changes.'
+				);
+				?>
+			<?php WPOpsec_UI::section_end(); ?>
+
+			<?php WPOpsec_UI::section( 'Never auto-update', 'dismiss', sprintf( '%d excluded', count( $exclude ) ) ); ?>
+				<div class="wpopsec-scroll">
+					<?php foreach ( get_plugins() as $file => $data ) : ?>
+						<label>
+							<input type="checkbox" name="exclude[]" value="<?php echo esc_attr( $file ); ?>" <?php checked( in_array( $file, $exclude, true ) ); ?>>
+							<?php echo esc_html( $data['Name'] ); ?>
+							<span class="wpopsec-muted">v<?php echo esc_html( $data['Version'] ); ?></span>
+						</label>
+					<?php endforeach; ?>
 				</div>
-			<?php endif; ?>
+				<p class="wpopsec-help">For plugins that are customised, licence-locked, or that you update by hand.</p>
+			<?php WPOpsec_UI::section_end(); ?>
 
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( 'wpopsec_au_save_settings' ); ?>
-				<input type="hidden" name="action" value="wpopsec_au_save_settings">
-
-				<table class="form-table">
-					<tr>
-						<th>WordPress core</th>
-						<td>
-							<label><input type="radio" name="core" value="minor" <?php checked( $core, 'minor' ); ?>> Security &amp; maintenance releases only <em>(recommended)</em></label><br>
-							<label><input type="radio" name="core" value="major" <?php checked( $core, 'major' ); ?>> All releases, including major versions</label><br>
-							<label><input type="radio" name="core" value="off" <?php checked( $core, 'off' ); ?>> Off</label>
-							<p class="description">Minor releases are where core security fixes ship, and they're deliberately low-risk. Major releases can change editor behaviour.</p>
-						</td>
-					</tr>
-					<tr>
-						<th>Plugins</th>
-						<td>
-							<label><input type="radio" name="plugins" value="flagged" <?php checked( $plugins, 'flagged' ); ?>>
-								Only plugins the vulnerability scan flagged <em>(recommended)</em>
-								<?php if ( $scan ) : ?>
-									— currently <strong><?php echo esc_html( $flagged_ct ); ?></strong>
-								<?php endif; ?>
-							</label><br>
-							<label><input type="radio" name="plugins" value="all" <?php checked( $plugins, 'all' ); ?>> All plugins</label><br>
-							<label><input type="radio" name="plugins" value="off" <?php checked( $plugins, 'off' ); ?>> Off (use WordPress's own per-plugin settings)</label>
-							<p class="description">91% of WordPress vulnerabilities are in plugins, so this is the setting that matters most. "Flagged" re-runs the scan before each sweep so it acts on current data. These settings only ever <em>add</em> to what you've already enabled per-plugin on the Plugins screen — the exclusion list below is the only thing that turns an auto-update off.</p>
-						</td>
-					</tr>
-					<tr>
-						<th>Themes</th>
-						<td>
-							<label><input type="radio" name="themes" value="all" <?php checked( $themes, 'all' ); ?>> All themes</label><br>
-							<label><input type="radio" name="themes" value="off" <?php checked( $themes, 'off' ); ?>> Off</label>
-							<p class="description">Leave off if you've customised a theme directly instead of using a child theme — an update would overwrite your changes.</p>
-						</td>
-					</tr>
-					<tr>
-						<th>Never auto-update</th>
-						<td>
-							<div style="max-height:220px;overflow:auto;border:1px solid #ddd;padding:8px;max-width:520px">
-								<?php foreach ( get_plugins() as $file => $data ) : ?>
-									<label style="display:block">
-										<input type="checkbox" name="exclude[]" value="<?php echo esc_attr( $file ); ?>" <?php checked( in_array( $file, $exclude, true ) ); ?>>
-										<?php echo esc_html( $data['Name'] ); ?>
-									</label>
-								<?php endforeach; ?>
-							</div>
-							<p class="description">For plugins that are customised, licence-locked, or that you update by hand.</p>
-						</td>
-					</tr>
-				</table>
-
-				<?php submit_button( 'Save settings' ); ?>
-			</form>
-		</div>
+			<?php submit_button( 'Save settings' ); ?>
+		</form>
 		<?php
+		WPOpsec_UI::close();
 	}
 }

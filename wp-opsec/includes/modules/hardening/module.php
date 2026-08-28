@@ -229,91 +229,117 @@ class WPOpsec_Module_Hardening {
 		$hidden_result = get_option( 'wpopsec_hardening_hidden_result', array() );
 		$guard_active  = self::uploads_guard_active();
 		$file_edit_off = defined( 'DISALLOW_FILE_EDIT' ) && DISALLOW_FILE_EDIT;
+		$hidden        = (array) ( $hidden_result['hidden'] ?? array() );
+
+		WPOpsec_UI::open( 'hardening' );
+
+		if ( isset( $_GET['saved'] ) && '1' === $_GET['saved'] ) {
+			WPOpsec_UI::notice( 'success', 'Settings saved.' );
+		} elseif ( isset( $_GET['saved'] ) && 'guardfail' === $_GET['saved'] ) {
+			WPOpsec_UI::notice( 'error', 'Could not write ' . self::uploads_htaccess_path() . ' — check filesystem permissions.' );
+		}
+		if ( isset( $_GET['scanned'] ) ) {
+			WPOpsec_UI::notice( 'success', 'Scan complete.' );
+		}
+
+		WPOpsec_UI::tiles(
+			array(
+				array(
+					'icon'  => $file_edit_off ? 'yes-alt' : 'warning',
+					'tone'  => $file_edit_off ? 'good' : 'warn',
+					'value' => $file_edit_off ? 'Disabled' : 'Enabled',
+					'label' => 'dashboard file editor',
+				),
+				array(
+					'icon'  => $guard_active ? 'yes-alt' : 'warning',
+					'tone'  => $guard_active ? 'good' : 'warn',
+					'value' => $guard_active ? 'Guarded' : 'Unguarded',
+					'label' => 'PHP in uploads',
+				),
+				array(
+					'icon'  => $hidden ? 'dismiss' : 'yes-alt',
+					'tone'  => $hidden ? 'bad' : 'good',
+					'value' => $hidden ? (string) count( $hidden ) : '0',
+					'label' => 'hidden plugins',
+				),
+			)
+		);
+
+		WPOpsec_UI::section( 'Hidden plugins', 'visibility' );
+		echo '<p class="wpopsec-help" style="margin-top:0">Files with a plugin header that exist on disk but do not appear in the Plugins screen. A backdoor can filter itself out of that list while staying active, so this compares against the filtered list the admin actually sees.</p>';
+
+		if ( empty( $hidden_result ) ) {
+			echo '<div class="wpopsec-empty"><span class="dashicons dashicons-marker" style="color:#646970"></span><p>Not scanned yet.</p></div>';
+		} elseif ( empty( $hidden ) ) {
+			echo '<div class="wpopsec-empty"><span class="dashicons dashicons-yes-alt"></span><p>No hidden plugins found.</p></div>';
+		} else {
+			$list = '<p><strong>Plugin files not shown in the plugin list:</strong></p><ul>';
+			foreach ( $hidden as $h ) {
+				$list .= '<li><code>' . esc_html( $h ) . '</code></li>';
+			}
+			$list .= '</ul><p>Inspect these on disk before deleting — note the file, then read its contents.</p>';
+			WPOpsec_UI::notice( 'error', $list, true );
+		}
+
+		if ( ! empty( $hidden_result['mu_plugins'] ) ) {
+			echo '<p style="margin-bottom:4px"><strong>Must-use plugins</strong> <span class="wpopsec-muted">(always active, never listed on the Plugins screen)</span></p>';
+			echo '<ul style="margin:0 0 0 1.4em;list-style:disc">';
+			foreach ( $hidden_result['mu_plugins'] as $mu ) {
+				echo '<li><code>' . esc_html( $mu ) . '</code>'
+					. ( 'wp-opsec-early.php' === $mu ? ' <span class="wpopsec-muted">— installed by this plugin</span>' : '' )
+					. '</li>';
+			}
+			echo '</ul>';
+		}
 		?>
-		<div class="wrap">
-			<h1>WP Opsec — Hardening</h1>
-			<p>Removes the tools an attacker uses <em>after</em> getting in: editing PHP from the dashboard, executing an uploaded webshell, and hiding a malicious plugin from the plugin list.</p>
-
-			<?php if ( isset( $_GET['saved'] ) && '1' === $_GET['saved'] ) : ?>
-				<div class="notice notice-success"><p>Settings saved.</p></div>
-			<?php elseif ( isset( $_GET['saved'] ) && 'guardfail' === $_GET['saved'] ) : ?>
-				<div class="notice notice-error"><p>Couldn't write <code><?php echo esc_html( self::uploads_htaccess_path() ); ?></code> — check filesystem permissions.</p></div>
-			<?php endif; ?>
-			<?php if ( isset( $_GET['scanned'] ) ) : ?>
-				<div class="notice notice-success"><p>Scan complete.</p></div>
-			<?php endif; ?>
-
-			<h2>Hidden plugins</h2>
-			<p class="description">Files with a plugin header that exist on disk but don't appear in WordPress's plugin list. A backdoor can filter itself out of that list while staying active — comparing against the raw directory catches it.</p>
-			<?php if ( empty( $hidden_result ) ) : ?>
-				<p>Not scanned yet.</p>
-			<?php elseif ( empty( $hidden_result['hidden'] ) ) : ?>
-				<p style="color:#007017;font-weight:600">No hidden plugins found.</p>
-			<?php else : ?>
-				<div class="notice notice-error inline">
-					<p><strong>Plugin files not shown in the plugin list:</strong></p>
-					<ul style="margin-left:1.5em;list-style:disc">
-						<?php foreach ( $hidden_result['hidden'] as $h ) : ?>
-							<li><code><?php echo esc_html( $h ); ?></code></li>
-						<?php endforeach; ?>
-					</ul>
-					<p>Inspect these on disk before deleting — note the file, then check its contents.</p>
-				</div>
-			<?php endif; ?>
-
-			<?php if ( ! empty( $hidden_result['mu_plugins'] ) ) : ?>
-				<p><strong>Must-use plugins</strong> (always active, never listed on the Plugins screen):</p>
-				<ul style="margin-left:1.5em;list-style:disc">
-					<?php foreach ( $hidden_result['mu_plugins'] as $mu ) : ?>
-						<li><code><?php echo esc_html( $mu ); ?></code><?php echo 'wp-opsec-early.php' === $mu ? ' <em>— installed by this plugin</em>' : ''; ?></li>
-					<?php endforeach; ?>
-				</ul>
-			<?php endif; ?>
-
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin:1em 0">
+		<div class="wpopsec-actions" style="margin-top:14px">
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 				<?php wp_nonce_field( 'wpopsec_hd_scan_now' ); ?>
 				<input type="hidden" name="action" value="wpopsec_hd_scan_now">
 				<?php submit_button( 'Scan now', 'secondary', 'submit', false ); ?>
 			</form>
-
-			<h2>Settings</h2>
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( 'wpopsec_hd_save_settings' ); ?>
-				<input type="hidden" name="action" value="wpopsec_hd_save_settings">
-
-				<table class="form-table">
-					<tr>
-						<th>Dashboard file editor</th>
-						<td>
-							<label><input type="checkbox" name="disable_file_edit" <?php checked( get_option( 'wpopsec_hardening_disable_file_edit', true ) ); ?>> Disable the plugin/theme code editor</label>
-							<p class="description">
-								Currently <strong><?php echo $file_edit_off ? 'disabled' : 'enabled'; ?></strong>.
-								Anyone who reaches wp-admin as an administrator can otherwise edit PHP straight into a live file — the shortest path from stolen password to running code.
-								<?php if ( defined( 'DISALLOW_FILE_EDIT' ) && ! get_option( 'wpopsec_hardening_disable_file_edit', true ) ) : ?>
-									<br><em>Already set in wp-config.php, so unchecking this here has no effect.</em>
-								<?php endif; ?>
-							</p>
-						</td>
-					</tr>
-					<tr>
-						<th>PHP execution in uploads</th>
-						<td>
-							<label><input type="checkbox" name="uploads_guard" <?php checked( get_option( 'wpopsec_hardening_uploads_guard', false ) ); ?>> Block PHP execution in <code>wp-content/uploads</code></label>
-							<p class="description">
-								Currently <strong><?php echo $guard_active ? 'active' : 'not active'; ?></strong>
-								(writes an <code>.htaccess</code> into the uploads folder).
-								<?php if ( ! self::is_apache() ) : ?>
-									<br><strong>This server doesn't look like Apache.</strong> nginx ignores <code>.htaccess</code>, so this needs an equivalent server-block rule instead:
-									<code style="display:block;margin-top:.4em">location ~* /wp-content/uploads/.*\.php$ { deny all; }</code>
-								<?php endif; ?>
-							</p>
-						</td>
-					</tr>
-				</table>
-
-				<?php submit_button( 'Save settings' ); ?>
-			</form>
 		</div>
 		<?php
+		WPOpsec_UI::section_end();
+		?>
+
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<?php wp_nonce_field( 'wpopsec_hd_save_settings' ); ?>
+			<input type="hidden" name="action" value="wpopsec_hd_save_settings">
+
+			<?php WPOpsec_UI::section( 'Settings', 'admin-generic' ); ?>
+				<?php
+				WPOpsec_UI::row(
+					'Dashboard file editor',
+					function () use ( $file_edit_off ) {
+						?>
+						<label><input type="checkbox" name="disable_file_edit" <?php checked( get_option( 'wpopsec_hardening_disable_file_edit', true ) ); ?>> Disable the plugin/theme code editor</label>
+						<?php
+						WPOpsec_UI::badge( $file_edit_off ? 'currently disabled' : 'currently enabled', $file_edit_off ? 'good' : 'warn' );
+					},
+					'Anyone who reaches wp-admin as an administrator can otherwise edit PHP straight into a live file — the shortest path from a stolen password to running code.'
+				);
+
+				$is_apache = self::is_apache();
+				WPOpsec_UI::row(
+					'PHP in uploads',
+					function () use ( $guard_active, $is_apache ) {
+						?>
+						<label><input type="checkbox" name="uploads_guard" <?php checked( get_option( 'wpopsec_hardening_uploads_guard', false ) ); ?>> Block PHP execution in <code>wp-content/uploads</code></label>
+						<?php
+						WPOpsec_UI::badge( $guard_active ? 'active' : 'not active', $guard_active ? 'good' : 'warn' );
+						if ( ! $is_apache ) {
+							echo '<p class="wpopsec-help"><strong>This server does not look like Apache.</strong> nginx ignores <code>.htaccess</code>, so this needs an equivalent server-block rule instead:<br><code>location ~* /wp-content/uploads/.*\.php$ { deny all; }</code></p>';
+						}
+					},
+					'Writes an <code>.htaccess</code> into the uploads folder. Any attacker who gets an arbitrary-file-upload primitive lands there first, and a .php file that cannot execute is inert.'
+				);
+				?>
+			<?php WPOpsec_UI::section_end(); ?>
+
+			<?php submit_button( 'Save settings' ); ?>
+		</form>
+		<?php
+		WPOpsec_UI::close();
 	}
 }

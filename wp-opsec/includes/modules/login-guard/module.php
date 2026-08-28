@@ -309,80 +309,107 @@ class WPOpsec_Module_Login_Guard {
 
 		$locked = self::locked_ips();
 		arsort( $locked );
+
+		WPOpsec_UI::open( 'login-guard' );
+
+		if ( isset( $_GET['saved'] ) ) {
+			WPOpsec_UI::notice( 'success', 'Settings saved.' );
+		}
+
+		WPOpsec_UI::section( 'Currently locked out', 'lock', sprintf( '%d active', count( $locked ) ) );
+		if ( empty( $locked ) ) {
+			echo '<div class="wpopsec-empty"><span class="dashicons dashicons-yes-alt"></span><p>No IPs are locked out.</p></div>';
+		} else {
+			?>
+			<table class="wpopsec-table">
+				<thead><tr><th style="width:180px">IP</th><th>Locked until</th></tr></thead>
+				<tbody>
+				<?php foreach ( $locked as $ip => $until ) : ?>
+					<tr>
+						<td><code><?php echo esc_html( $ip ); ?></code></td>
+						<td class="wpopsec-nowrap"><?php echo esc_html( date_i18n( 'Y-m-d H:i', (int) $until ) ); ?></td>
+					</tr>
+				<?php endforeach; ?>
+				</tbody>
+			</table>
+			<?php
+		}
+		WPOpsec_UI::section_end();
 		?>
-		<div class="wrap">
-			<h1>WP Opsec — Login Guard</h1>
-			<p>Rate-limits failed logins per IP and locks out brute-force attempts. Your LAN, and anything in the trusted networks file, is never locked out.</p>
 
-			<?php if ( isset( $_GET['saved'] ) ) : ?>
-				<div class="notice notice-success"><p>Settings saved.</p></div>
-			<?php endif; ?>
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<?php wp_nonce_field( 'wpopsec_lg_save_settings' ); ?>
+			<input type="hidden" name="action" value="wpopsec_lg_save_settings">
 
-			<h2>Currently locked out</h2>
-			<?php if ( empty( $locked ) ) : ?>
-				<p>No IPs are locked out.</p>
-			<?php else : ?>
-				<table class="widefat" style="max-width:500px">
-					<thead><tr><th>IP</th><th>Locked until</th></tr></thead>
-					<tbody>
-					<?php foreach ( $locked as $ip => $until ) : ?>
-						<tr>
-							<td><?php echo esc_html( $ip ); ?></td>
-							<td><?php echo esc_html( date_i18n( 'Y-m-d H:i', (int) $until ) ); ?></td>
-						</tr>
-					<?php endforeach; ?>
-					</tbody>
-				</table>
-			<?php endif; ?>
+			<?php WPOpsec_UI::section( 'Settings', 'admin-generic' ); ?>
 
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( 'wpopsec_lg_save_settings' ); ?>
-				<input type="hidden" name="action" value="wpopsec_lg_save_settings">
+				<?php
+				WPOpsec_UI::row(
+					'Enabled',
+					function () use ( $enabled ) {
+						?>
+						<label><input type="checkbox" name="enabled" <?php checked( $enabled ); ?>> Rate-limit failed logins</label>
+						<?php
+					}
+				);
 
-				<table class="form-table">
-					<tr>
-						<th>Enabled</th>
-						<td><label><input type="checkbox" name="enabled" <?php checked( $enabled ); ?>> Rate-limit failed logins</label></td>
-					</tr>
-					<tr>
-						<th>Threshold</th>
-						<td>
-							<input type="number" name="max_fails" value="<?php echo esc_attr( $max_fails ); ?>" min="1" style="width:5em">
-							failures within
-							<input type="number" name="window_min" value="<?php echo esc_attr( $window_min ); ?>" min="1" style="width:5em">
-							minutes
-							<p class="description">A successful login clears the counter for that IP.</p>
-						</td>
-					</tr>
-					<tr>
-						<th>Lockout length</th>
-						<td>
-							<input type="number" name="lockout_min" value="<?php echo esc_attr( $lockout_min ); ?>" min="1" style="width:5em"> minutes
-						</td>
-					</tr>
-					<tr>
-						<th>On lockout</th>
-						<td>
-							<label><input type="checkbox" name="escalate" <?php checked( $escalate ); ?>> Also add the IP to the local blocklist</label>
-							<p class="description">Blocks them at the early gate for the lockout duration, before WordPress loads — cheaper than serving the login page to a bot.</p>
-						</td>
-					</tr>
-					<tr>
-						<th>Login errors</th>
-						<td>
-							<label><input type="checkbox" name="generic_errors" <?php checked( $generic ); ?>> Use a generic "invalid credentials" message</label>
-							<p class="description">WordPress by default says whether the <em>username</em> exists, which confirms valid accounts to an attacker.</p>
-						</td>
-					</tr>
-					<tr>
-						<th>Maintenance</th>
-						<td><label><input type="checkbox" name="clear_lockouts"> Clear all current lockouts on save</label></td>
-					</tr>
-				</table>
+				WPOpsec_UI::row(
+					'Threshold',
+					function () use ( $max_fails, $window_min ) {
+						?>
+						<input type="number" name="max_fails" value="<?php echo esc_attr( $max_fails ); ?>" min="1" style="width:5em">
+						failures within
+						<input type="number" name="window_min" value="<?php echo esc_attr( $window_min ); ?>" min="1" style="width:5em">
+						minutes
+						<?php
+					},
+					'A successful login clears the counter for that IP, so a few typos before getting in do not leave someone one mistake from a lockout.'
+				);
 
-				<?php submit_button( 'Save settings' ); ?>
-			</form>
-		</div>
+				WPOpsec_UI::row(
+					'Lockout length',
+					function () use ( $lockout_min ) {
+						?>
+						<input type="number" name="lockout_min" value="<?php echo esc_attr( $lockout_min ); ?>" min="1" style="width:5em"> minutes
+						<?php
+					}
+				);
+
+				WPOpsec_UI::row(
+					'On lockout',
+					function () use ( $escalate ) {
+						?>
+						<label><input type="checkbox" name="escalate" <?php checked( $escalate ); ?>> Also add the IP to the local blocklist</label>
+						<?php
+					},
+					'Blocks them at the early gate for the lockout duration, before WordPress loads — cheaper than serving the login page to a bot.'
+				);
+
+				WPOpsec_UI::row(
+					'Login errors',
+					function () use ( $generic ) {
+						?>
+						<label><input type="checkbox" name="generic_errors" <?php checked( $generic ); ?>> Use a generic "invalid credentials" message</label>
+						<?php
+					},
+					'WordPress by default says whether the <em>username</em> exists, which confirms valid accounts to an attacker for free.'
+				);
+
+				WPOpsec_UI::row(
+					'Maintenance',
+					function () {
+						?>
+						<label><input type="checkbox" name="clear_lockouts"> Clear all current lockouts on save</label>
+						<?php
+					}
+				);
+				?>
+
+			<?php WPOpsec_UI::section_end(); ?>
+
+			<?php submit_button( 'Save settings' ); ?>
+		</form>
 		<?php
+		WPOpsec_UI::close();
 	}
 }

@@ -369,120 +369,173 @@ class WPOpsec_Module_Vuln_Scanner {
 		);
 	}
 
-	private static function kind_badge( $kind ) {
+	private static function kind_tone( $kind ) {
 		$map = array(
-			'cve'      => array( 'Known vulnerability', '#b32d2e' ),
-			'closed'   => array( 'Removed from directory', '#b32d2e' ),
-			'stale'    => array( 'Unmaintained', '#996800' ),
-			'outdated' => array( 'Update available', '#996800' ),
+			'cve'      => array( 'Known vulnerability', 'bad' ),
+			'closed'   => array( 'Removed from directory', 'bad' ),
+			'stale'    => array( 'Unmaintained', 'warn' ),
+			'outdated' => array( 'Update available', 'warn' ),
 		);
-		list( $label, $color ) = $map[ $kind ] ?? array( $kind, '#666' );
-		return '<span style="color:' . esc_attr( $color ) . ';font-weight:600">' . esc_html( $label ) . '</span>';
+		return $map[ $kind ] ?? array( $kind, 'quiet' );
 	}
 
 	public static function render_page() {
 		$last  = get_option( 'wpopsec_vuln_last_result', array() );
 		$token = (string) get_option( 'wpopsec_vuln_wpscan_token', '' );
+
+		WPOpsec_UI::open( 'vuln-scanner' );
+
+		if ( isset( $_GET['saved'] ) ) {
+			WPOpsec_UI::notice( 'success', 'Settings saved.' );
+		}
+		if ( isset( $_GET['scanned'] ) ) {
+			WPOpsec_UI::notice( 'success', 'Scan complete.' );
+		}
+
+		if ( empty( $last ) ) {
+			WPOpsec_UI::notice( 'info', 'No scan has run yet.' );
+		} else {
+			$findings = (array) $last['findings'];
+			$critical = 0;
+			foreach ( $findings as $f ) {
+				foreach ( $f['issues'] as $i ) {
+					if ( in_array( $i['kind'], array( 'cve', 'closed' ), true ) ) {
+						$critical++;
+						break;
+					}
+				}
+			}
+
+			WPOpsec_UI::tiles(
+				array(
+					array(
+						'icon'  => $findings ? 'warning' : 'yes-alt',
+						'tone'  => $critical ? 'bad' : ( $findings ? 'warn' : 'good' ),
+						'value' => (string) count( $findings ),
+						'label' => 'components flagged',
+					),
+					array(
+						'icon'  => 'shield-alt',
+						'tone'  => $critical ? 'bad' : 'good',
+						'value' => (string) $critical,
+						'label' => 'high severity',
+					),
+					array(
+						'icon'  => 'search',
+						'tone'  => 'quiet',
+						'value' => (string) (int) ( $last['scanned_count'] ?? 0 ),
+						'label' => 'components checked',
+					),
+					array(
+						'icon'  => 'clock',
+						'tone'  => 'quiet',
+						'value' => date_i18n( 'H:i', (int) $last['at'] ),
+						'label' => 'last scan ' . date_i18n( 'M j', (int) $last['at'] ),
+					),
+				)
+			);
+
+			if ( ! empty( $last['wpscan_error'] ) ) {
+				WPOpsec_UI::notice( 'warning', $last['wpscan_error'] );
+			}
+			if ( ! empty( $last['core_update'] ) ) {
+				WPOpsec_UI::notice( 'warning', 'WordPress core update available: ' . $last['core_update'] );
+			}
+
+			WPOpsec_UI::section( 'Findings', 'warning' );
+			if ( empty( $findings ) ) {
+				echo '<div class="wpopsec-empty"><span class="dashicons dashicons-yes-alt"></span><p>Nothing flagged.</p></div>';
+			} else {
+				?>
+				<table class="wpopsec-table">
+					<thead>
+						<tr>
+							<th style="width:230px">Component</th>
+							<th style="width:70px">Type</th>
+							<th style="width:80px">Version</th>
+							<th style="width:70px">Active</th>
+							<th>Findings</th>
+						</tr>
+					</thead>
+					<tbody>
+					<?php foreach ( $findings as $f ) : ?>
+						<tr>
+							<td>
+								<strong><?php echo esc_html( $f['name'] ); ?></strong><br>
+								<code style="font-size:11px"><?php echo esc_html( $f['slug'] ); ?></code>
+							</td>
+							<td class="wpopsec-muted"><?php echo esc_html( $f['type'] ); ?></td>
+							<td><?php echo esc_html( $f['version'] ); ?></td>
+							<td>
+								<?php if ( $f['active'] ) : ?>
+									<?php WPOpsec_UI::badge( 'active', 'warn' ); ?>
+								<?php else : ?>
+									<span class="wpopsec-muted">no</span>
+								<?php endif; ?>
+							</td>
+							<td>
+								<?php foreach ( $f['issues'] as $issue ) : ?>
+									<?php list( $label, $tone ) = self::kind_tone( $issue['kind'] ); ?>
+									<div style="margin-bottom:5px">
+										<?php WPOpsec_UI::badge( $label, $tone ); ?>
+										<span class="wpopsec-muted"><?php echo esc_html( $issue['detail'] ); ?></span>
+									</div>
+								<?php endforeach; ?>
+							</td>
+						</tr>
+					<?php endforeach; ?>
+					</tbody>
+				</table>
+				<p class="wpopsec-help">An inactive plugin still has files on disk that can be reached directly — uninstall what you do not use rather than just deactivating it.</p>
+				<?php
+			}
+			WPOpsec_UI::section_end();
+		}
 		?>
-		<div class="wrap">
-			<h1>WP Opsec — Vulnerability Scan</h1>
 
-			<?php if ( isset( $_GET['saved'] ) ) : ?>
-				<div class="notice notice-success"><p>Settings saved.</p></div>
-			<?php endif; ?>
-			<?php if ( isset( $_GET['scanned'] ) ) : ?>
-				<div class="notice notice-success"><p>Scan complete.</p></div>
-			<?php endif; ?>
-
-			<?php if ( empty( $last ) ) : ?>
-				<p>No scan has run yet.</p>
-			<?php else : ?>
-				<p>
-					Last scan <?php echo esc_html( date( 'Y-m-d H:i', (int) $last['at'] ) ); ?> ·
-					<?php echo esc_html( (int) $last['scanned_count'] ); ?> components checked ·
-					<strong><?php echo esc_html( count( $last['findings'] ) ); ?></strong> flagged.
-				</p>
-
-				<?php if ( ! empty( $last['wpscan_error'] ) ) : ?>
-					<div class="notice notice-warning inline"><p><?php echo esc_html( $last['wpscan_error'] ); ?></p></div>
-				<?php endif; ?>
-
-				<?php if ( ! empty( $last['core_update'] ) ) : ?>
-					<div class="notice notice-warning inline">
-						<p><strong>WordPress core update available:</strong> <?php echo esc_html( $last['core_update'] ); ?></p>
-					</div>
-				<?php endif; ?>
-
-				<?php if ( empty( $last['findings'] ) ) : ?>
-					<p style="color:#007017;font-weight:600">Nothing flagged.</p>
-				<?php else : ?>
-					<table class="widefat striped">
-						<thead>
-							<tr>
-								<th style="width:220px">Component</th>
-								<th style="width:70px">Type</th>
-								<th style="width:80px">Version</th>
-								<th style="width:60px">Active</th>
-								<th>Findings</th>
-							</tr>
-						</thead>
-						<tbody>
-						<?php foreach ( $last['findings'] as $f ) : ?>
-							<tr>
-								<td><strong><?php echo esc_html( $f['name'] ); ?></strong><br><code style="font-size:11px"><?php echo esc_html( $f['slug'] ); ?></code></td>
-								<td><?php echo esc_html( $f['type'] ); ?></td>
-								<td><?php echo esc_html( $f['version'] ); ?></td>
-								<td><?php echo $f['active'] ? 'yes' : '<span style="color:#666">no</span>'; ?></td>
-								<td>
-									<?php foreach ( $f['issues'] as $issue ) : ?>
-										<div style="margin-bottom:.3em">
-											<?php echo self::kind_badge( $issue['kind'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-											— <?php echo esc_html( $issue['detail'] ); ?>
-										</div>
-									<?php endforeach; ?>
-								</td>
-							</tr>
-						<?php endforeach; ?>
-						</tbody>
-					</table>
-					<p class="description">An inactive plugin still has files on disk that can be reached directly — uninstall what you don't use rather than just deactivating it.</p>
-				<?php endif; ?>
-			<?php endif; ?>
-
-			<p style="margin-top:1.5em">
+		<div class="wpopsec-actions" style="margin-bottom:18px">
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 				<?php wp_nonce_field( 'wpopsec_vs_scan_now' ); ?>
 				<input type="hidden" name="action" value="wpopsec_vs_scan_now">
 				<?php submit_button( 'Scan now', 'primary', 'submit', false ); ?>
 			</form>
-			</p>
-
-			<h2>Settings</h2>
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( 'wpopsec_vs_save_settings' ); ?>
-				<input type="hidden" name="action" value="wpopsec_vs_save_settings">
-				<table class="form-table">
-					<tr>
-						<th>Directory checks</th>
-						<td>
-							<label><input type="checkbox" name="check_directory" <?php checked( get_option( 'wpopsec_vuln_check_directory', true ) ); ?>> Check WordPress.org for removed / unmaintained plugins</label>
-							<p class="description">Results are cached for a day. Plugins that were never on .org (premium, custom) are simply not reported on.</p>
-						</td>
-					</tr>
-					<tr>
-						<th><label for="wpopsec_wpscan">WPScan API token</label></th>
-						<td>
-							<input type="password" id="wpopsec_wpscan" name="wpscan_token" value="<?php echo esc_attr( $token ); ?>" style="width:26em" autocomplete="off">
-							<p class="description">
-								Optional. Adds real CVE data from <a href="https://wpscan.com/api" target="_blank" rel="noopener">wpscan.com/api</a> (free tier: 25 requests/day, which is why results are cached for 24h).
-								Everything else on this page works without a token.
-							</p>
-						</td>
-					</tr>
-				</table>
-				<?php submit_button( 'Save settings' ); ?>
-			</form>
 		</div>
+
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<?php wp_nonce_field( 'wpopsec_vs_save_settings' ); ?>
+			<input type="hidden" name="action" value="wpopsec_vs_save_settings">
+
+			<?php WPOpsec_UI::section( 'Settings', 'admin-generic' ); ?>
+				<?php
+				WPOpsec_UI::row(
+					'Directory checks',
+					function () {
+						?>
+						<label><input type="checkbox" name="check_directory" <?php checked( get_option( 'wpopsec_vuln_check_directory', true ) ); ?>> Check WordPress.org for removed / unmaintained plugins</label>
+						<?php
+					},
+					'Results are cached for a day. Plugins that were never on .org (premium, custom) are simply not reported on.'
+				);
+
+				WPOpsec_UI::row(
+					'WPScan API token',
+					function () use ( $token ) {
+						?>
+						<input type="password" name="wpscan_token" value="<?php echo esc_attr( $token ); ?>" style="width:26em" autocomplete="off">
+						<?php
+						if ( '' !== $token ) {
+							echo ' ';
+							WPOpsec_UI::badge( 'configured', 'good', 'yes-alt' );
+						}
+					},
+					'Optional. Adds real CVE data from <a href="https://wpscan.com/api" target="_blank" rel="noopener">wpscan.com/api</a> (free tier: 25 requests/day, which is why results are cached for 24h). Everything else on this page works without a token.'
+				);
+				?>
+			<?php WPOpsec_UI::section_end(); ?>
+
+			<?php submit_button( 'Save settings' ); ?>
+		</form>
 		<?php
+		WPOpsec_UI::close();
 	}
 }

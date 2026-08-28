@@ -146,45 +146,55 @@ class WPOpsec_Module_User_Enum {
 	}
 
 	public static function render_settings_page() {
+		WPOpsec_UI::open( 'user-enum' );
+
+		if ( isset( $_GET['saved'] ) ) {
+			WPOpsec_UI::notice( 'success', 'Settings saved.' );
+		}
 		?>
-		<div class="wrap">
-			<h1>WP Opsec — User Enumeration</h1>
-			<p>Stops anonymous visitors harvesting valid usernames. Logged-in users who can list users are unaffected, so the editor and admin screens keep working.</p>
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<?php wp_nonce_field( 'wpopsec_ue_save_settings' ); ?>
+			<input type="hidden" name="action" value="wpopsec_ue_save_settings">
 
-			<?php if ( isset( $_GET['saved'] ) ) : ?>
-				<div class="notice notice-success"><p>Settings saved.</p></div>
-			<?php endif; ?>
+			<?php WPOpsec_UI::section( 'What to block', 'hidden' ); ?>
 
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( 'wpopsec_ue_save_settings' ); ?>
-				<input type="hidden" name="action" value="wpopsec_ue_save_settings">
+				<?php
+				WPOpsec_UI::row(
+					'Author scans',
+					function () {
+						?>
+						<label><input type="checkbox" name="block_author_scan" <?php checked( get_option( 'wpopsec_user_enum_block_author_scan', true ) ); ?>> Block <code>?author=1</code> probes</label>
+						<?php
+					},
+					'WordPress redirects the numeric form to <code>/author/&lt;login-name&gt;/</code>, which reveals the account name. Normal author archive URLs still work.'
+				);
 
-				<table class="form-table">
-					<tr>
-						<th>Author scans</th>
-						<td>
-							<label><input type="checkbox" name="block_author_scan" <?php checked( get_option( 'wpopsec_user_enum_block_author_scan', true ) ); ?>> Block <code>?author=1</code> probes</label>
-							<p class="description">WordPress redirects the numeric form to <code>/author/&lt;login-name&gt;/</code>, which reveals the account name. Normal author archive URLs still work.</p>
-						</td>
-					</tr>
-					<tr>
-						<th>REST API</th>
-						<td>
-							<label><input type="checkbox" name="block_rest_users" <?php checked( get_option( 'wpopsec_user_enum_block_rest_users', true ) ); ?>> Require authentication for <code>/wp-json/wp/v2/users</code></label>
-							<p class="description">By default this endpoint lists every account with a published post, to anyone. Disable if a headless front end or integration reads it anonymously.</p>
-						</td>
-					</tr>
-					<tr>
-						<th>oEmbed</th>
-						<td>
-							<label><input type="checkbox" name="disable_oembed_author" <?php checked( get_option( 'wpopsec_user_enum_disable_oembed_author', true ) ); ?>> Strip author details from oEmbed responses</label>
-						</td>
-					</tr>
-				</table>
+				WPOpsec_UI::row(
+					'REST API',
+					function () {
+						?>
+						<label><input type="checkbox" name="block_rest_users" <?php checked( get_option( 'wpopsec_user_enum_block_rest_users', true ) ); ?>> Require authentication for <code>/wp-json/wp/v2/users</code></label>
+						<?php
+					},
+					'By default this endpoint lists every account with a published post, to anyone. <code>/users/me</code> is left alone. Disable if a headless front end reads it anonymously.'
+				);
 
-				<?php submit_button( 'Save settings' ); ?>
-			</form>
-		</div>
+				WPOpsec_UI::row(
+					'oEmbed',
+					function () {
+						?>
+						<label><input type="checkbox" name="disable_oembed_author" <?php checked( get_option( 'wpopsec_user_enum_disable_oembed_author', true ) ); ?>> Strip author details from oEmbed responses</label>
+						<?php
+					},
+					'oEmbed output includes <code>author_name</code> and <code>author_url</code> for any public post.'
+				);
+				?>
+
+			<?php WPOpsec_UI::section_end(); ?>
+
+			<?php submit_button( 'Save settings' ); ?>
+		</form>
 		<?php
+		WPOpsec_UI::close();
 	}
 }

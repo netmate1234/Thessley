@@ -317,9 +317,11 @@ class WPOpsec_Module_Loader {
 			)
 		);
 
+		// Shared tokens/components first, then the dashboard-only additions.
+		WPOpsec_UI::styles();
 		self::dashboard_styles();
 		?>
-		<div class="wrap wpopsec-dash">
+		<div class="wrap wpopsec wpopsec-dash">
 			<h1 class="wpopsec-title">
 				<span class="dashicons dashicons-shield"></span>
 				WP Opsec
@@ -499,8 +501,7 @@ class WPOpsec_Module_Loader {
 	private static function dashboard_styles() {
 		?>
 		<style>
-		.wpopsec-dash { --ok:#00875a; --warn:#b26e00; --bad:#c9356a; --ink:#1d2327; --muted:#646970;
-			--line:#dcdcde; --card:#fff; --bg:#f6f7f7; }
+		/* Tokens come from WPOpsec_UI::styles(); only dashboard-specific bits below. */
 		.wpopsec-dash .wpopsec-title { display:flex; align-items:center; gap:10px; font-size:23px; margin-bottom:18px; }
 		.wpopsec-dash .wpopsec-title .dashicons { font-size:30px; width:30px; height:30px; color:#2271b1; }
 

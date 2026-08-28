@@ -449,124 +449,150 @@ class WPOpsec_Module_File_Integrity {
 		);
 	}
 
-	private static function render_file_list( $label, $files, $tone = 'normal' ) {
+	private static function render_file_list( $label, $files, $tone = 'warn' ) {
 		if ( empty( $files ) ) {
 			return;
 		}
-		$color = 'critical' === $tone ? '#b32d2e' : '#996800';
-		echo '<p style="color:' . esc_attr( $color ) . ';font-weight:600;margin-bottom:.3em">' . esc_html( $label ) . ' (' . count( $files ) . ')</p>';
-		echo '<ul style="margin:0 0 1em 1.5em;list-style:disc">';
+		echo '<div class="wpopsec-files"><p class="wpopsec-files__title">';
+		WPOpsec_UI::badge( $label . ' (' . count( $files ) . ')', $tone );
+		echo '</p><ul>';
 		foreach ( array_slice( $files, 0, 50 ) as $f ) {
 			echo '<li><code>' . esc_html( $f ) . '</code></li>';
 		}
 		if ( count( $files ) > 50 ) {
-			echo '<li>… and ' . esc_html( count( $files ) - 50 ) . ' more</li>';
+			echo '<li class="wpopsec-muted">… and ' . esc_html( count( $files ) - 50 ) . ' more</li>';
 		}
-		echo '</ul>';
+		echo '</ul></div>';
 	}
 
 	public static function render_page() {
-		$last          = get_option( 'wpopsec_integrity_last_result', array() );
-		$baseline_at   = (int) get_option( 'wpopsec_integrity_baseline_at', 0 );
-		$baseline_ct   = (int) get_option( 'wpopsec_integrity_baseline_count', 0 );
+		$last        = get_option( 'wpopsec_integrity_last_result', array() );
+		$baseline_at = (int) get_option( 'wpopsec_integrity_baseline_at', 0 );
+		$baseline_ct = (int) get_option( 'wpopsec_integrity_baseline_count', 0 );
+
+		WPOpsec_UI::open( 'file-integrity' );
+
+		if ( isset( $_GET['saved'] ) ) {
+			WPOpsec_UI::notice( 'success', 'Settings saved.' );
+		}
+		if ( isset( $_GET['scanned'] ) ) {
+			WPOpsec_UI::notice( 'success', 'Scan complete.' );
+		}
+		if ( isset( $_GET['rebaselined'] ) && 'partial' === $_GET['rebaselined'] ) {
+			WPOpsec_UI::notice( 'error', 'The scan could not read every file, so the baseline was left unchanged — replacing it with a partial crawl would make the unread files look like new files on the next scan.' );
+		} elseif ( isset( $_GET['rebaselined'] ) ) {
+			WPOpsec_UI::notice( 'success', 'Baseline re-taken.' );
+		}
+
+		if ( ! empty( $last['diff']['partial'] ) ) {
+			$msg = '<p><strong>Last scan was incomplete</strong> — results below may under-report:</p><ul>';
+			foreach ( (array) $last['diff']['errors'] as $err ) {
+				$msg .= '<li>' . esc_html( $err ) . '</li>';
+			}
+			$msg .= '</ul><p>Deleted-file detection is skipped while a scan is partial.</p>';
+			WPOpsec_UI::notice( 'warning', $msg, true );
+		}
+
+		$core_issues = count( (array) ( $last['core']['modified'] ?? array() ) ) + count( (array) ( $last['core']['missing'] ?? array() ) );
+		$drift       = count( (array) ( $last['diff']['added'] ?? array() ) )
+			+ count( (array) ( $last['diff']['modified'] ?? array() ) )
+			+ count( (array) ( $last['diff']['deleted'] ?? array() ) );
+
+		WPOpsec_UI::tiles(
+			array(
+				array(
+					'icon'  => $core_issues ? 'dismiss' : 'yes-alt',
+					'tone'  => $core_issues ? 'bad' : 'good',
+					'value' => (string) $core_issues,
+					'label' => 'core file issues',
+				),
+				array(
+					'icon'  => $drift ? 'warning' : 'yes-alt',
+					'tone'  => $drift ? 'bad' : 'good',
+					'value' => (string) $drift,
+					'label' => 'changes since baseline',
+				),
+				array(
+					'icon'  => 'media-code',
+					'tone'  => $baseline_at ? 'quiet' : 'warn',
+					'value' => $baseline_at ? number_format_i18n( $baseline_ct ) : '—',
+					'label' => $baseline_at ? 'files baselined ' . date_i18n( 'M j', $baseline_at ) : 'no baseline yet',
+				),
+			)
+		);
+
+		WPOpsec_UI::section( 'Core files', 'wordpress-alt' );
+		echo '<p class="wpopsec-help" style="margin-top:0">Verified against WordPress.org&#39;s published checksums for your exact version and locale — authoritative, and valid even if this plugin was installed after a compromise.</p>';
+		if ( empty( $last['core'] ) ) {
+			echo '<div class="wpopsec-empty"><span class="dashicons dashicons-marker" style="color:#646970"></span><p>Not checked yet.</p></div>';
+		} elseif ( ! empty( $last['core']['error'] ) ) {
+			WPOpsec_UI::notice( 'warning', $last['core']['error'] );
+		} elseif ( empty( $last['core']['modified'] ) && empty( $last['core']['missing'] ) ) {
+			echo '<div class="wpopsec-empty"><span class="dashicons dashicons-yes-alt"></span><p>All '
+				. esc_html( number_format_i18n( $last['core']['checked'] ) ) . ' core files match.</p></div>';
+		} else {
+			self::render_file_list( 'Modified core files', $last['core']['modified'], 'bad' );
+			self::render_file_list( 'Missing core files', $last['core']['missing'], 'bad' );
+			echo '<p class="wpopsec-help">Dashboard → Updates → "Re-install now" restores core files without touching your content.</p>';
+		}
+		WPOpsec_UI::section_end();
+
+		WPOpsec_UI::section( 'Plugins, themes &amp; mu-plugins', 'admin-plugins' );
+		echo '<p class="wpopsec-help" style="margin-top:0">No published checksums exist for these, so they are compared against a snapshot taken on this site.</p>';
+		if ( empty( $last['diff'] ) ) {
+			echo '<div class="wpopsec-empty"><span class="dashicons dashicons-marker" style="color:#646970"></span><p>Not checked yet.</p></div>';
+		} elseif ( ! empty( $last['diff']['no_baseline'] ) ) {
+			WPOpsec_UI::notice( 'info', 'Take a baseline to start detecting changes.' );
+		} else {
+			$d = $last['diff'];
+			if ( empty( $d['added'] ) && empty( $d['modified'] ) && empty( $d['deleted'] ) ) {
+				echo '<div class="wpopsec-empty"><span class="dashicons dashicons-yes-alt"></span><p>No changes since the baseline.</p></div>';
+			} else {
+				self::render_file_list( 'Added', $d['added'], 'bad' );
+				self::render_file_list( 'Modified', $d['modified'], 'bad' );
+				self::render_file_list( 'Deleted', $d['deleted'], 'warn' );
+				echo '<p class="wpopsec-help">Updating or installing a plugin/theme legitimately changes these files. Re-take the baseline once you have confirmed the changes are yours.</p>';
+			}
+		}
+		WPOpsec_UI::section_end();
 		?>
-		<div class="wrap">
-			<h1>WP Opsec — File Integrity</h1>
 
-			<?php if ( isset( $_GET['saved'] ) ) : ?>
-				<div class="notice notice-success"><p>Settings saved.</p></div>
-			<?php endif; ?>
-			<?php if ( isset( $_GET['scanned'] ) ) : ?>
-				<div class="notice notice-success"><p>Scan complete.</p></div>
-			<?php endif; ?>
-			<?php if ( isset( $_GET['rebaselined'] ) && 'partial' === $_GET['rebaselined'] ) : ?>
-				<div class="notice notice-error"><p>The scan couldn't read every file, so the baseline was left unchanged — replacing it with a partial crawl would make the unread files look like new files on the next scan. See the incomplete-scan note below.</p></div>
-			<?php elseif ( isset( $_GET['rebaselined'] ) ) : ?>
-				<div class="notice notice-success"><p>Baseline re-taken.</p></div>
-			<?php endif; ?>
-
-			<?php if ( ! empty( $last['diff']['partial'] ) ) : ?>
-				<div class="notice notice-warning">
-					<p><strong>Last scan was incomplete</strong> — results below may under-report:</p>
-					<ul style="margin-left:1.5em;list-style:disc">
-						<?php foreach ( (array) $last['diff']['errors'] as $err ) : ?>
-							<li><?php echo esc_html( $err ); ?></li>
-						<?php endforeach; ?>
-					</ul>
-					<p>Deleted-file detection is skipped while a scan is partial. If this is the time limit, the site has more files than one pass can hash.</p>
-				</div>
-			<?php endif; ?>
-
-			<h2>Core files</h2>
-			<p class="description">Verified against WordPress.org's published checksums for your exact version and locale — authoritative, and valid even if this plugin was installed after a compromise.</p>
-			<?php if ( empty( $last['core'] ) ) : ?>
-				<p>Not checked yet.</p>
-			<?php elseif ( ! empty( $last['core']['error'] ) ) : ?>
-				<div class="notice notice-warning inline"><p><?php echo esc_html( $last['core']['error'] ); ?></p></div>
-			<?php elseif ( empty( $last['core']['modified'] ) && empty( $last['core']['missing'] ) ) : ?>
-				<p style="color:#007017;font-weight:600">All <?php echo esc_html( number_format_i18n( $last['core']['checked'] ) ); ?> core files match.</p>
-			<?php else : ?>
-				<?php self::render_file_list( 'Modified core files', $last['core']['modified'], 'critical' ); ?>
-				<?php self::render_file_list( 'Missing core files', $last['core']['missing'], 'critical' ); ?>
-				<p class="description">Reinstalling WordPress from Dashboard → Updates → "Re-install now" restores core files without touching your content.</p>
-			<?php endif; ?>
-
-			<h2>Plugins, themes &amp; mu-plugins</h2>
-			<p class="description">
-				No published checksums exist for these, so they're compared against a snapshot taken on this site.
-				<?php if ( $baseline_at ) : ?>
-					Baseline: <?php echo esc_html( number_format_i18n( $baseline_ct ) ); ?> files, taken <?php echo esc_html( date( 'Y-m-d H:i', $baseline_at ) ); ?>.
-				<?php else : ?>
-					<strong>No baseline taken yet.</strong>
-				<?php endif; ?>
-			</p>
-			<?php if ( empty( $last['diff'] ) ) : ?>
-				<p>Not checked yet.</p>
-			<?php elseif ( ! empty( $last['diff']['no_baseline'] ) ) : ?>
-				<p>Take a baseline to start detecting changes.</p>
-			<?php else : ?>
-				<?php $d = $last['diff']; ?>
-				<?php if ( empty( $d['added'] ) && empty( $d['modified'] ) && empty( $d['deleted'] ) ) : ?>
-					<p style="color:#007017;font-weight:600">No changes since the baseline.</p>
-				<?php else : ?>
-					<?php self::render_file_list( 'Added', $d['added'], 'critical' ); ?>
-					<?php self::render_file_list( 'Modified', $d['modified'], 'critical' ); ?>
-					<?php self::render_file_list( 'Deleted', $d['deleted'] ); ?>
-					<p class="description">Updating or installing a plugin/theme legitimately changes these files. Re-take the baseline after you've done so, once you've confirmed the changes are yours.</p>
-				<?php endif; ?>
-			<?php endif; ?>
-
-			<p style="margin-top:1.5em">
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display:inline">
+		<div class="wpopsec-actions" style="margin-bottom:18px">
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 				<?php wp_nonce_field( 'wpopsec_fi_scan_now' ); ?>
 				<input type="hidden" name="action" value="wpopsec_fi_scan_now">
 				<?php submit_button( 'Scan now', 'primary', 'submit', false ); ?>
 			</form>
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display:inline;margin-left:.5em"
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"
 				onsubmit="return confirm('Re-take the baseline? Current files become the new known-good reference — only do this if you trust the current state.');">
 				<?php wp_nonce_field( 'wpopsec_fi_rebaseline' ); ?>
 				<input type="hidden" name="action" value="wpopsec_fi_rebaseline">
 				<?php submit_button( 'Take / re-take baseline', 'secondary', 'submit', false ); ?>
 			</form>
-			</p>
-
-			<h2>Settings</h2>
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( 'wpopsec_fi_save_settings' ); ?>
-				<input type="hidden" name="action" value="wpopsec_fi_save_settings">
-				<table class="form-table">
-					<tr>
-						<th>Daily scan checks</th>
-						<td>
-							<label><input type="checkbox" name="check_core" <?php checked( get_option( 'wpopsec_integrity_check_core', true ) ); ?>> Core files vs WordPress.org checksums</label><br>
-							<label><input type="checkbox" name="check_baseline" <?php checked( get_option( 'wpopsec_integrity_check_baseline', true ) ); ?>> Plugins/themes vs local baseline</label>
-							<p class="description">Findings are written to the Event Log.</p>
-						</td>
-					</tr>
-				</table>
-				<?php submit_button( 'Save settings' ); ?>
-			</form>
 		</div>
+
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<?php wp_nonce_field( 'wpopsec_fi_save_settings' ); ?>
+			<input type="hidden" name="action" value="wpopsec_fi_save_settings">
+
+			<?php WPOpsec_UI::section( 'Settings', 'admin-generic' ); ?>
+				<?php
+				WPOpsec_UI::row(
+					'Daily scan checks',
+					function () {
+						?>
+						<label><input type="checkbox" name="check_core" <?php checked( get_option( 'wpopsec_integrity_check_core', true ) ); ?>> Core files vs WordPress.org checksums</label>
+						<label><input type="checkbox" name="check_baseline" <?php checked( get_option( 'wpopsec_integrity_check_baseline', true ) ); ?>> Plugins/themes vs local baseline</label>
+						<?php
+					},
+					'Findings are written to the Event Log. A scan that cannot finish within its time budget is reported as partial rather than treated as complete.'
+				);
+				?>
+			<?php WPOpsec_UI::section_end(); ?>
+
+			<?php submit_button( 'Save settings' ); ?>
+		</form>
 		<?php
+		WPOpsec_UI::close();
 	}
 }

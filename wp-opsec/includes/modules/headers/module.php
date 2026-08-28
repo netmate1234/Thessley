@@ -202,76 +202,117 @@ class WPOpsec_Module_Headers {
 	public static function render_settings_page() {
 		$defs    = self::definitions();
 		$current = self::build();
+
+		WPOpsec_UI::open( 'headers' );
+
+		if ( isset( $_GET['saved'] ) ) {
+			WPOpsec_UI::notice( 'success', 'Settings saved.' );
+		}
+
+		if ( self::enabled( 'hsts' ) && ! self::request_is_https() ) {
+			$msg = '<p><strong>HSTS is enabled but this request is not recognised as HTTPS</strong>, so the header is withheld — sending it over plain HTTP would pin browsers to a scheme the site may not serve.</p>';
+			if ( ! get_option( 'wpopsec_headers_behind_proxy', false ) && ! empty( $_SERVER['HTTP_X_FORWARDED_PROTO'] ) ) {
+				$msg .= '<p>This request arrived with <code>X-Forwarded-Proto: '
+					. esc_html( sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_FORWARDED_PROTO'] ) ) )
+					. '</code>, which suggests a reverse proxy is terminating TLS. Tick the proxy option below to honour it.</p>';
+			}
+			WPOpsec_UI::notice( 'warning', $msg, true );
+		}
+
+		WPOpsec_UI::section( 'Currently sent', 'visibility', sprintf( '%d header(s)', count( $current ) ) );
+		if ( empty( $current ) ) {
+			echo '<div class="wpopsec-empty"><span class="dashicons dashicons-warning" style="color:#b26e00"></span><p>No security headers are being sent.</p></div>';
+		} else {
+			echo '<table class="wpopsec-table"><tbody>';
+			foreach ( $current as $name => $value ) {
+				printf(
+					'<tr><td style="width:270px"><strong>%s</strong></td><td><code>%s</code></td></tr>',
+					esc_html( $name ),
+					esc_html( $value )
+				);
+			}
+			echo '</tbody></table>';
+		}
+		WPOpsec_UI::section_end();
 		?>
-		<div class="wrap">
-			<h1>WP Opsec — Security Headers</h1>
 
-			<?php if ( isset( $_GET['saved'] ) ) : ?>
-				<div class="notice notice-success"><p>Settings saved.</p></div>
-			<?php endif; ?>
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<?php wp_nonce_field( 'wpopsec_hdr_save_settings' ); ?>
+			<input type="hidden" name="action" value="wpopsec_hdr_save_settings">
 
-			<h2>Currently sent</h2>
-			<?php if ( empty( $current ) ) : ?>
-				<p>No security headers are being sent.</p>
-			<?php else : ?>
-				<table class="widefat" style="max-width:800px">
-					<?php foreach ( $current as $name => $value ) : ?>
-						<tr><th style="width:280px"><?php echo esc_html( $name ); ?></th><td><code><?php echo esc_html( $value ); ?></code></td></tr>
-					<?php endforeach; ?>
-				</table>
-			<?php endif; ?>
-			<?php if ( self::enabled( 'hsts' ) && ! self::request_is_https() ) : ?>
-				<div class="notice notice-warning inline">
-					<p>HSTS is enabled but this request isn't recognised as HTTPS, so the header is being withheld — sending it over plain HTTP would pin browsers to a scheme the site may not serve.</p>
-					<?php if ( ! get_option( 'wpopsec_headers_behind_proxy', false ) && ! empty( $_SERVER['HTTP_X_FORWARDED_PROTO'] ) ) : ?>
-						<p><strong>This request arrived with <code>X-Forwarded-Proto: <?php echo esc_html( sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_FORWARDED_PROTO'] ) ) ); ?></code></strong>, which suggests a reverse proxy is terminating TLS. Tick the proxy option below to have HSTS honour it.</p>
-					<?php endif; ?>
-				</div>
-			<?php endif; ?>
+			<?php WPOpsec_UI::section( 'Headers', 'shield' ); ?>
+				<?php foreach ( $defs as $id => $def ) : ?>
+					<div class="wpopsec-row">
+						<div class="wpopsec-row__label">
+							<label style="font-weight:600">
+								<input type="checkbox" name="headers[]" value="<?php echo esc_attr( $id ); ?>" <?php checked( self::enabled( $id ) ); ?>>
+								<?php echo esc_html( $def['label'] ); ?>
+							</label>
+						</div>
+						<div class="wpopsec-row__field">
+							<?php
+							if ( empty( $def['default'] ) ) {
+								WPOpsec_UI::badge( 'can break a site', 'warn', 'warning' );
+							} else {
+								WPOpsec_UI::badge( 'safe default', 'good', 'yes-alt' );
+							}
+							?>
+							<p class="wpopsec-help"><?php echo esc_html( $def['desc'] ); ?></p>
+						</div>
+					</div>
+				<?php endforeach; ?>
+			<?php WPOpsec_UI::section_end(); ?>
 
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( 'wpopsec_hdr_save_settings' ); ?>
-				<input type="hidden" name="action" value="wpopsec_hdr_save_settings">
+			<?php WPOpsec_UI::section( 'HSTS options', 'admin-site-alt3' ); ?>
+				<?php
+				WPOpsec_UI::row(
+					'max-age',
+					function () {
+						?>
+						<input type="number" name="hsts_max_age" value="<?php echo esc_attr( (int) get_option( 'wpopsec_headers_hsts_max_age', 15552000 ) ); ?>" min="0" style="width:9em"> seconds
+						<?php
+					}
+				);
+				WPOpsec_UI::row(
+					'Scope',
+					function () {
+						?>
+						<label><input type="checkbox" name="hsts_subdomains" <?php checked( get_option( 'wpopsec_headers_hsts_subdomains', false ) ); ?>> includeSubDomains</label>
+						<label><input type="checkbox" name="hsts_preload" <?php checked( get_option( 'wpopsec_headers_hsts_preload', false ) ); ?>> preload</label>
+						<?php
+					},
+					'<code>preload</code> submits to a browser-baked list that is slow and awkward to reverse — do not set it casually.'
+				);
+				WPOpsec_UI::row(
+					'Reverse proxy',
+					function () {
+						?>
+						<label><input type="checkbox" name="behind_proxy" <?php checked( get_option( 'wpopsec_headers_behind_proxy', false ) ); ?>> This site is behind a proxy that terminates HTTPS</label>
+						<?php
+					},
+					'Tick this if TLS ends at nginx/Cloudflare/a load balancer and PHP is served plain HTTP — otherwise <code>is_ssl()</code> is false and HSTS is never sent. Only tick it when a proxy really is in front, since <code>X-Forwarded-Proto</code> can be forged by anyone able to reach the backend directly.'
+				);
+				?>
+			<?php WPOpsec_UI::section_end(); ?>
 
-				<table class="form-table">
-					<tr>
-						<th>Headers</th>
-						<td>
-							<?php foreach ( $defs as $id => $def ) : ?>
-								<label style="display:block;margin-bottom:.6em">
-									<input type="checkbox" name="headers[]" value="<?php echo esc_attr( $id ); ?>" <?php checked( self::enabled( $id ) ); ?>>
-									<strong><?php echo esc_html( $def['label'] ); ?></strong><br>
-									<span class="description" style="margin-left:1.8em"><?php echo esc_html( $def['desc'] ); ?></span>
-								</label>
-							<?php endforeach; ?>
-						</td>
-					</tr>
-					<tr>
-						<th>HSTS options</th>
-						<td>
-							max-age <input type="number" name="hsts_max_age" value="<?php echo esc_attr( (int) get_option( 'wpopsec_headers_hsts_max_age', 15552000 ) ); ?>" min="0" style="width:9em"> seconds
-							<p style="margin:.4em 0"><label><input type="checkbox" name="hsts_subdomains" <?php checked( get_option( 'wpopsec_headers_hsts_subdomains', false ) ); ?>> includeSubDomains</label></p>
-							<p style="margin:.4em 0"><label><input type="checkbox" name="hsts_preload" <?php checked( get_option( 'wpopsec_headers_hsts_preload', false ) ); ?>> preload</label></p>
-							<p style="margin:.4em 0"><label><input type="checkbox" name="behind_proxy" <?php checked( get_option( 'wpopsec_headers_behind_proxy', false ) ); ?>> This site is behind a reverse proxy that terminates HTTPS</label></p>
-							<p class="description">
-								Only sent on HTTPS requests. <code>preload</code> submits to a browser-baked list that is slow and awkward to reverse — don't set it casually.
-								<br>Tick the proxy box if TLS ends at nginx/Cloudflare/a load balancer and PHP is served plain HTTP — otherwise <code>is_ssl()</code> is false and HSTS is never sent. Only tick it when a proxy really is in front, since <code>X-Forwarded-Proto</code> can be forged by anyone able to reach the backend directly.
-							</p>
-						</td>
-					</tr>
-					<tr>
-						<th><label for="wpopsec_csp">CSP policy</label></th>
-						<td>
-							<textarea id="wpopsec_csp" name="csp_policy" rows="4" cols="70" placeholder="default-src 'self'; img-src 'self' data:; script-src 'self' 'unsafe-inline'"><?php echo esc_textarea( (string) get_option( 'wpopsec_headers_csp_policy', '' ) ); ?></textarea>
-							<p><label><input type="checkbox" name="csp_report_only" <?php checked( get_option( 'wpopsec_headers_csp_report_only', true ) ); ?>> Report-only (log violations, don't enforce)</label></p>
-							<p class="description">Leave report-only until your browser console shows no violations on the front end <em>and</em> in wp-admin.</p>
-						</td>
-					</tr>
-				</table>
+			<?php WPOpsec_UI::section( 'Content-Security-Policy', 'editor-code' ); ?>
+				<?php
+				WPOpsec_UI::row(
+					'Policy',
+					function () {
+						?>
+						<textarea name="csp_policy" rows="4" style="width:100%;max-width:640px" placeholder="default-src 'self'; img-src 'self' data:; script-src 'self' 'unsafe-inline'"><?php echo esc_textarea( (string) get_option( 'wpopsec_headers_csp_policy', '' ) ); ?></textarea>
+						<label style="margin-top:8px"><input type="checkbox" name="csp_report_only" <?php checked( get_option( 'wpopsec_headers_csp_report_only', true ) ); ?>> Report-only (log violations, do not enforce)</label>
+						<?php
+					},
+					'Leave report-only until your browser console shows no violations on the front end <em>and</em> in wp-admin. CSP is the single most likely header to break themes, page builders and embeds.'
+				);
+				?>
+			<?php WPOpsec_UI::section_end(); ?>
 
-				<?php submit_button( 'Save settings' ); ?>
-			</form>
-		</div>
+			<?php submit_button( 'Save settings' ); ?>
+		</form>
 		<?php
+		WPOpsec_UI::close();
 	}
 }

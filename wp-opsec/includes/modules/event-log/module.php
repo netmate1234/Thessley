@@ -199,8 +199,8 @@ class WPOpsec_Module_Event_Log {
 		global $wpdb;
 
 		$filters = array(
-			'module' => isset( $_GET['f_module'] ) ? sanitize_text_field( wp_unslash( $_GET['f_module'] ) ) : '',
-			'action' => isset( $_GET['f_action'] ) ? sanitize_text_field( wp_unslash( $_GET['f_action'] ) ) : '',
+			'module'  => isset( $_GET['f_module'] ) ? sanitize_text_field( wp_unslash( $_GET['f_module'] ) ) : '',
+			'action'  => isset( $_GET['f_action'] ) ? sanitize_text_field( wp_unslash( $_GET['f_action'] ) ) : '',
 			'ip'      => isset( $_GET['f_ip'] ) ? sanitize_text_field( wp_unslash( $_GET['f_ip'] ) ) : '',
 			'min_sev' => isset( $_GET['f_sev'] ) ? max( 0, min( 20, (int) $_GET['f_sev'] ) ) : 0,
 			'sort'    => isset( $_GET['sort'] ) && 'severity' === $_GET['sort'] ? 'severity' : 'time',
@@ -213,169 +213,160 @@ class WPOpsec_Module_Event_Log {
 		$modules = $wpdb->get_col( "SELECT DISTINCT module FROM {$table} ORDER BY module" ) ?: array();
 		$retain  = (int) get_option( 'wpopsec_event_log_retain_days', self::DEFAULT_RETAIN );
 
-		$last24 = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE created_at > DATE_SUB(NOW(), INTERVAL 1 DAY)" );
+		$last24    = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE created_at > DATE_SUB(NOW(), INTERVAL 1 DAY)" );
 		$blocked24 = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE action = 'blocked' AND created_at > DATE_SUB(NOW(), INTERVAL 1 DAY)" );
-		$worst24 = (int) $wpdb->get_var( "SELECT MAX(severity) FROM {$table} WHERE created_at > DATE_SUB(NOW(), INTERVAL 1 DAY)" );
+		$worst24   = (int) $wpdb->get_var( "SELECT MAX(severity) FROM {$table} WHERE created_at > DATE_SUB(NOW(), INTERVAL 1 DAY)" );
 		$high_open = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE severity >= 14 AND created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)" );
+
+		WPOpsec_UI::open( 'event-log' );
+
+		if ( isset( $_GET['saved'] ) ) {
+			WPOpsec_UI::notice( 'success', 'Settings saved.' );
+		}
+		if ( isset( $_GET['cleared'] ) ) {
+			WPOpsec_UI::notice( 'success', 'Event log cleared.' );
+		}
+
+		$worst_meta = wpopsec_severity_meta( $worst24 );
+		WPOpsec_UI::tiles(
+			array(
+				array( 'icon' => 'list-view', 'tone' => 'quiet', 'value' => number_format_i18n( $result['total'] ), 'label' => 'events stored' ),
+				array( 'icon' => 'clock', 'tone' => 'quiet', 'value' => number_format_i18n( $last24 ), 'label' => 'in the last 24h' ),
+				array( 'icon' => 'dismiss', 'tone' => $blocked24 ? 'bad' : 'good', 'value' => number_format_i18n( $blocked24 ), 'label' => 'blocked in 24h' ),
+				array(
+					'icon'  => $worst24 >= 14 ? 'warning' : 'yes-alt',
+					'tone'  => $worst24 >= 18 ? 'bad' : ( $worst24 >= 10 ? 'warn' : 'good' ),
+					'value' => $worst24 ? $worst24 . '/20' : '—',
+					'label' => $worst24 ? 'worst in 24h · ' . $worst_meta[0] : 'nothing in 24h',
+				),
+			)
+		);
+
+		if ( $high_open ) {
+			WPOpsec_UI::notice(
+				'error',
+				'<p><strong>' . esc_html( number_format_i18n( $high_open ) ) . '</strong> event(s) at severity 14+ in the last 7 days. '
+				. '<a href="' . esc_url( add_query_arg( array( 'page' => 'wp-opsec-event-log', 'f_sev' => 14, 'sort' => 'severity' ), admin_url( 'admin.php' ) ) ) . '">Review them →</a></p>',
+				true
+			);
+		}
+
+		WPOpsec_UI::section( 'Events', 'list-view', sprintf( '%s matching', number_format_i18n( $result['total'] ) ) );
 		?>
-		<style>
-		.wpopsec-sev { display:inline-flex; align-items:center; gap:6px; }
-		.wpopsec-sev__num { display:inline-grid; place-items:center; min-width:26px; height:22px;
-			padding:0 5px; border-radius:4px; color:#fff; font-weight:700; font-size:12px;
-			font-variant-numeric:tabular-nums; }
-		.wpopsec-sev__label { font-size:11px; text-transform:uppercase; letter-spacing:.4px; color:#646970; }
-		.wpopsec-sevbar { display:inline-block; width:54px; height:5px; border-radius:3px;
-			background:#e9eaec; overflow:hidden; vertical-align:middle; }
-		.wpopsec-sevbar i { display:block; height:100%; border-radius:3px; }
-		</style>
+		<form method="get" class="wpopsec-actions" style="margin-bottom:14px">
+			<input type="hidden" name="page" value="wp-opsec-event-log">
+			<select name="f_module">
+				<option value="">All modules</option>
+				<?php foreach ( $modules as $m ) : ?>
+					<option value="<?php echo esc_attr( $m ); ?>" <?php selected( $filters['module'], $m ); ?>><?php echo esc_html( $m ); ?></option>
+				<?php endforeach; ?>
+			</select>
+			<select name="f_action">
+				<option value="">Any action</option>
+				<?php foreach ( array( 'blocked', 'logged', 'noted' ) as $a ) : ?>
+					<option value="<?php echo esc_attr( $a ); ?>" <?php selected( $filters['action'], $a ); ?>><?php echo esc_html( $a ); ?></option>
+				<?php endforeach; ?>
+			</select>
+			<select name="f_sev">
+				<option value="0">Any severity</option>
+				<?php foreach ( array( 18 => 'Critical (18+)', 14 => 'High (14+)', 10 => 'Medium (10+)', 5 => 'Low (5+)' ) as $v => $label ) : ?>
+					<option value="<?php echo esc_attr( $v ); ?>" <?php selected( $filters['min_sev'], $v ); ?>><?php echo esc_html( $label ); ?></option>
+				<?php endforeach; ?>
+			</select>
+			<select name="sort">
+				<option value="time" <?php selected( $filters['sort'], 'time' ); ?>>Newest first</option>
+				<option value="severity" <?php selected( $filters['sort'], 'severity' ); ?>>Most severe first</option>
+			</select>
+			<input type="text" name="f_ip" value="<?php echo esc_attr( $filters['ip'] ); ?>" placeholder="IP" style="width:130px">
+			<?php submit_button( 'Filter', 'secondary', 'submit', false ); ?>
+		</form>
 
-		<div class="wrap">
-			<h1>WP Opsec — Event Log</h1>
-
-			<?php if ( isset( $_GET['saved'] ) ) : ?>
-				<div class="notice notice-success"><p>Settings saved.</p></div>
-			<?php endif; ?>
-			<?php if ( isset( $_GET['cleared'] ) ) : ?>
-				<div class="notice notice-success"><p>Event log cleared.</p></div>
-			<?php endif; ?>
-
-			<p>
-				<strong><?php echo esc_html( number_format_i18n( $result['total'] ) ); ?></strong> events stored ·
-				<strong><?php echo esc_html( number_format_i18n( $last24 ) ); ?></strong> in the last 24h
-				(<?php echo esc_html( number_format_i18n( $blocked24 ) ); ?> blocked)
-				<?php if ( $worst24 ) : ?>
-					<?php list( $w_label, $w_color ) = wpopsec_severity_meta( $worst24 ); ?>
-					· worst in 24h:
-					<span class="wpopsec-sev">
-						<span class="wpopsec-sev__num" style="background:<?php echo esc_attr( $w_color ); ?>"><?php echo esc_html( $worst24 ); ?></span>
-						<span class="wpopsec-sev__label"><?php echo esc_html( $w_label ); ?></span>
-					</span>
-				<?php endif; ?>
-			</p>
-
-			<?php if ( $high_open ) : ?>
-				<div class="notice notice-error inline">
-					<p>
-						<strong><?php echo esc_html( number_format_i18n( $high_open ) ); ?></strong>
-						event(s) at severity 14+ in the last 7 days.
-						<a href="<?php echo esc_url( add_query_arg( array( 'page' => 'wp-opsec-event-log', 'f_sev' => 14, 'sort' => 'severity' ), admin_url( 'admin.php' ) ) ); ?>">Review them →</a>
-					</p>
-				</div>
-			<?php endif; ?>
-
-			<form method="get" style="margin:1em 0">
-				<input type="hidden" name="page" value="wp-opsec-event-log">
-				<select name="f_module">
-					<option value="">All modules</option>
-					<?php foreach ( $modules as $m ) : ?>
-						<option value="<?php echo esc_attr( $m ); ?>" <?php selected( $filters['module'], $m ); ?>><?php echo esc_html( $m ); ?></option>
-					<?php endforeach; ?>
-				</select>
-				<select name="f_action">
-					<option value="">Any action</option>
-					<?php foreach ( array( 'blocked', 'logged', 'noted' ) as $a ) : ?>
-						<option value="<?php echo esc_attr( $a ); ?>" <?php selected( $filters['action'], $a ); ?>><?php echo esc_html( $a ); ?></option>
-					<?php endforeach; ?>
-				</select>
-				<input type="text" name="f_ip" value="<?php echo esc_attr( $filters['ip'] ); ?>" placeholder="IP">
-				<select name="f_sev">
-					<option value="0">Any severity</option>
-					<?php
-					foreach ( array( 18 => 'Critical (18+)', 14 => 'High (14+)', 10 => 'Medium (10+)', 5 => 'Low (5+)' ) as $v => $label ) :
-						?>
-						<option value="<?php echo esc_attr( $v ); ?>" <?php selected( $filters['min_sev'], $v ); ?>><?php echo esc_html( $label ); ?></option>
-					<?php endforeach; ?>
-				</select>
-				<select name="sort">
-					<option value="time" <?php selected( $filters['sort'], 'time' ); ?>>Newest first</option>
-					<option value="severity" <?php selected( $filters['sort'], 'severity' ); ?>>Most severe first</option>
-				</select>
-				<?php submit_button( 'Filter', 'secondary', 'submit', false ); ?>
-			</form>
-
-			<table class="widefat striped">
-				<thead>
+		<table class="wpopsec-table">
+			<thead>
+				<tr>
+					<th style="width:120px">Severity</th>
+					<th style="width:130px">Time</th>
+					<th style="width:110px">Module</th>
+					<th style="width:170px">Event</th>
+					<th style="width:90px">Action</th>
+					<th style="width:120px">IP</th>
+					<th>Request / detail</th>
+				</tr>
+			</thead>
+			<tbody>
+			<?php if ( empty( $result['rows'] ) ) : ?>
+				<tr><td colspan="7"><div class="wpopsec-empty"><span class="dashicons dashicons-yes-alt"></span><p>No events match.</p></div></td></tr>
+			<?php else : ?>
+				<?php foreach ( $result['rows'] as $row ) : ?>
 					<tr>
-						<th style="width:130px">Severity</th>
-						<th style="width:140px">Time</th>
-						<th style="width:100px">Module</th>
-						<th style="width:160px">Event</th>
-						<th style="width:70px">Action</th>
-						<th style="width:120px">IP</th>
-						<th>Request / detail</th>
-					</tr>
-				</thead>
-				<tbody>
-				<?php if ( empty( $result['rows'] ) ) : ?>
-					<tr><td colspan="7">No events recorded.</td></tr>
-				<?php else : ?>
-					<?php foreach ( $result['rows'] as $row ) : ?>
-						<?php list( $sev_label, $sev_color ) = wpopsec_severity_meta( $row->severity ); ?>
-						<tr>
-							<td>
-								<span class="wpopsec-sev">
-									<span class="wpopsec-sev__num" style="background:<?php echo esc_attr( $sev_color ); ?>"><?php echo esc_html( (int) $row->severity ); ?></span>
-									<span>
-										<span class="wpopsec-sev__label"><?php echo esc_html( $sev_label ); ?></span><br>
-										<span class="wpopsec-sevbar"><i style="width:<?php echo esc_attr( (int) $row->severity * 5 ); ?>%;background:<?php echo esc_attr( $sev_color ); ?>"></i></span>
-									</span>
-								</span>
-							</td>
-							<td><?php echo esc_html( $row->created_at ); ?></td>
-							<td><?php echo esc_html( $row->module ); ?></td>
-							<td><code><?php echo esc_html( $row->event ); ?></code></td>
-							<td>
-								<?php if ( 'blocked' === $row->action ) : ?>
-									<span style="color:#b32d2e;font-weight:600">blocked</span>
-								<?php else : ?>
-									<?php echo esc_html( $row->action ); ?>
-								<?php endif; ?>
-							</td>
-							<td><?php echo esc_html( $row->ip ); ?></td>
-							<td>
-								<?php if ( $row->uri ) : ?>
-									<code style="font-size:11px"><?php echo esc_html( $row->uri ); ?></code><br>
-								<?php endif; ?>
-								<?php echo esc_html( $row->detail ); ?>
-							</td>
-						</tr>
-					<?php endforeach; ?>
-				<?php endif; ?>
-				</tbody>
-			</table>
-
-			<?php
-			$total_pages = (int) ceil( $result['total'] / self::PER_PAGE );
-			if ( $total_pages > 1 ) :
-				echo '<div class="tablenav"><div class="tablenav-pages">';
-				echo paginate_links(
-					array(
-						'base'    => add_query_arg( 'paged', '%#%' ),
-						'format'  => '',
-						'current' => $page,
-						'total'   => $total_pages,
-					)
-				);
-				echo '</div></div>';
-			endif;
-			?>
-
-			<h2>Settings</h2>
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( 'wpopsec_el_save_settings' ); ?>
-				<input type="hidden" name="action" value="wpopsec_el_save_settings">
-				<table class="form-table">
-					<tr>
-						<th><label for="wpopsec_retain">Keep events for</label></th>
+						<td><?php WPOpsec_UI::severity_badge( $row->severity ); ?></td>
+						<td class="wpopsec-nowrap"><?php echo esc_html( mysql2date( 'M j, H:i', $row->created_at ) ); ?></td>
+						<td><span style="font-size:12px;font-weight:600;color:#2271b1"><?php echo esc_html( $row->module ); ?></span></td>
+						<td><code><?php echo esc_html( $row->event ); ?></code></td>
 						<td>
-							<input type="number" id="wpopsec_retain" name="retain_days" value="<?php echo esc_attr( $retain ); ?>" min="1" style="width:6em"> days
-							<p class="description">Older events are deleted daily.</p>
+							<?php
+							if ( 'blocked' === $row->action ) {
+								WPOpsec_UI::badge( 'blocked', 'bad' );
+							} elseif ( 'logged' === $row->action ) {
+								WPOpsec_UI::badge( 'logged', 'warn' );
+							} else {
+								WPOpsec_UI::badge( 'noted', 'quiet' );
+							}
+							?>
+						</td>
+						<td class="wpopsec-nowrap"><code><?php echo esc_html( $row->ip ); ?></code></td>
+						<td class="wpopsec-muted">
+							<?php if ( $row->uri ) : ?>
+								<code style="font-size:11px"><?php echo esc_html( $row->uri ); ?></code><br>
+							<?php endif; ?>
+							<?php echo esc_html( $row->detail ); ?>
 						</td>
 					</tr>
-				</table>
-				<?php submit_button( 'Save settings' ); ?>
-			</form>
+				<?php endforeach; ?>
+			<?php endif; ?>
+			</tbody>
+		</table>
 
+		<?php
+		$total_pages = (int) ceil( $result['total'] / self::PER_PAGE );
+		if ( $total_pages > 1 ) {
+			echo '<div class="tablenav" style="margin-top:12px"><div class="tablenav-pages">';
+			echo paginate_links(
+				array(
+					'base'    => add_query_arg( 'paged', '%#%' ),
+					'format'  => '',
+					'current' => $page,
+					'total'   => $total_pages,
+				)
+			);
+			echo '</div></div>';
+		}
+
+		WPOpsec_UI::section_end();
+		?>
+
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<?php wp_nonce_field( 'wpopsec_el_save_settings' ); ?>
+			<input type="hidden" name="action" value="wpopsec_el_save_settings">
+
+			<?php WPOpsec_UI::section( 'Settings', 'admin-generic' ); ?>
+				<?php
+				WPOpsec_UI::row(
+					'Retention',
+					function () use ( $retain ) {
+						?>
+						Keep events for <input type="number" name="retain_days" value="<?php echo esc_attr( $retain ); ?>" min="1" style="width:6em"> days
+						<?php
+					},
+					'Older events are deleted daily.'
+				);
+				?>
+			<?php WPOpsec_UI::section_end(); ?>
+
+			<?php submit_button( 'Save settings' ); ?>
+		</form>
+
+		<div class="wpopsec-actions" style="margin-top:14px">
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"
 				onsubmit="return confirm('Delete all recorded events? This cannot be undone.');">
 				<?php wp_nonce_field( 'wpopsec_el_clear' ); ?>
@@ -384,5 +375,6 @@ class WPOpsec_Module_Event_Log {
 			</form>
 		</div>
 		<?php
+		WPOpsec_UI::close();
 	}
 }

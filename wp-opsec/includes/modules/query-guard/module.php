@@ -271,83 +271,144 @@ class WPOpsec_Module_Query_Guard {
 		$allow_jetpack = get_option( 'wpopsec_qg_allow_jetpack', true );
 		$jp_ranges     = get_option( 'wpopsec_qg_xmlrpc_allow_ranges', array() );
 		$jp_updated_at = get_option( 'wpopsec_qg_xmlrpc_allow_updated_at', 0 );
+
+		WPOpsec_UI::open( 'query-guard' );
+
+		if ( isset( $_GET['saved'] ) ) {
+			WPOpsec_UI::notice( 'success', 'Settings saved.' );
+		}
+		if ( isset( $_GET['refreshed'] ) ) {
+			WPOpsec_UI::notice( 'success', 'Jetpack IP list refreshed.' );
+		}
+
+		WPOpsec_UI::tiles(
+			array(
+				array(
+					'icon'  => 'block' === $mode ? 'shield-alt' : 'visibility',
+					'tone'  => 'block' === $mode ? 'good' : 'warn',
+					'value' => 'block' === $mode ? 'Blocking' : 'Log only',
+					'label' => 'enforcement mode',
+				),
+				array(
+					'icon'  => 'filter',
+					'tone'  => 'quiet',
+					'value' => (string) count( (array) $categories ),
+					'label' => 'signature categories on',
+				),
+				array(
+					'icon'  => get_option( 'wpopsec_query_guard_scan_post', true ) ? 'yes-alt' : 'minus',
+					'tone'  => get_option( 'wpopsec_query_guard_scan_post', true ) ? 'good' : 'warn',
+					'value' => get_option( 'wpopsec_query_guard_scan_post', true ) ? 'GET + POST' : 'GET only',
+					'label' => 'request scanning',
+				),
+			)
+		);
 		?>
-		<div class="wrap">
-			<h1>WP Opsec — Query Guard</h1>
-			<p>Scans the GET query string of every request for common attack signatures (SQLi, XSS, path traversal, command injection). POST bodies are never inspected, to avoid false positives against legitimate content like the block editor.</p>
 
-			<?php if ( isset( $_GET['saved'] ) ) : ?>
-				<div class="notice notice-success"><p>Settings saved.</p></div>
-			<?php endif; ?>
-			<?php if ( isset( $_GET['refreshed'] ) ) : ?>
-				<div class="notice notice-success"><p>Jetpack IP list refreshed.</p></div>
-			<?php endif; ?>
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<?php wp_nonce_field( 'wpopsec_qg_save_settings' ); ?>
+			<input type="hidden" name="action" value="wpopsec_qg_save_settings">
 
+			<?php WPOpsec_UI::section( 'Query string signatures', 'filter' ); ?>
+				<?php
+				WPOpsec_UI::row(
+					'Categories',
+					function () use ( $categories ) {
+						foreach ( self::CATEGORIES as $id => $label ) {
+							?>
+							<label>
+								<input type="checkbox" name="categories[]" value="<?php echo esc_attr( $id ); ?>" <?php checked( in_array( $id, $categories, true ) ); ?>>
+								<?php echo esc_html( $label ); ?>
+							</label>
+							<?php
+						}
+					},
+					'Applies to the GET query string. POST bodies are scanned separately with a much narrower set — real content legitimately contains XSS and SQL-looking strings.'
+				);
+				?>
+			<?php WPOpsec_UI::section_end(); ?>
+
+			<?php WPOpsec_UI::section( 'Request bodies', 'upload' ); ?>
+				<?php
+				WPOpsec_UI::row(
+					'POST scanning',
+					function () {
+						?>
+						<label><input type="checkbox" name="scan_post" <?php checked( get_option( 'wpopsec_query_guard_scan_post', true ) ); ?>> Scan POST data and file uploads</label>
+						<?php
+					},
+					'Code execution, file wrappers, traversal and executable file uploads only — no XSS/SQLi patterns.'
+				);
+
+				WPOpsec_UI::row(
+					'Who to scan',
+					function () {
+						$scope = get_option( 'wpopsec_query_guard_post_scope', 'anon' );
+						?>
+						<label><input type="radio" name="post_scope" value="anon" <?php checked( $scope, 'anon' ); ?>> Logged-out visitors only <?php WPOpsec_UI::badge( 'recommended', 'good' ); ?></label>
+						<label><input type="radio" name="post_scope" value="all" <?php checked( $scope, 'all' ); ?>> Everyone, including logged-in users</label>
+						<?php
+					},
+					'43% of plugin vulnerabilities are exploitable without logging in, which is what the first option covers. Scanning logged-in POSTs as well will flag the block editor and any code-snippet plugin.'
+				);
+				?>
+			<?php WPOpsec_UI::section_end(); ?>
+
+			<?php WPOpsec_UI::section( 'xmlrpc.php', 'rest-api' ); ?>
+				<?php
+				WPOpsec_UI::row(
+					'Block access',
+					function () use ( $block_xmlrpc ) {
+						?>
+						<label><input type="checkbox" name="block_xmlrpc" <?php checked( $block_xmlrpc ); ?>> Block access to xmlrpc.php entirely</label>
+						<?php
+					},
+					'Off by default — xmlrpc.php is needed by Jetpack, the WordPress mobile app, desktop blog clients and pingbacks. Enable only if you know this site uses none of them. Pingback-based DDoS amplification and password guessing via multicall are the common abuses.'
+				);
+
+				WPOpsec_UI::row(
+					'Jetpack exemption',
+					function () use ( $allow_jetpack, $jp_ranges, $jp_updated_at ) {
+						?>
+						<label><input type="checkbox" name="allow_jetpack" <?php checked( $allow_jetpack ); ?>> Still allow Jetpack (Automattic) IPs through</label>
+						<?php
+						if ( $jp_updated_at ) {
+							WPOpsec_UI::badge( count( $jp_ranges ) . ' ranges · ' . date_i18n( 'M j', $jp_updated_at ), 'good', 'yes-alt' );
+						} else {
+							WPOpsec_UI::badge( 'not fetched yet', 'warn' );
+						}
+					},
+					'Fetched from Automattic&#39;s own published list, refreshed daily. For other providers, add their IPs to the trusted networks file on the <a href="' . esc_url( admin_url( 'admin.php?page=wp-opsec-ip-blocklist' ) ) . '">IP Blocklist</a> page — that list is exempt here too.'
+				);
+				?>
+			<?php WPOpsec_UI::section_end(); ?>
+
+			<?php WPOpsec_UI::section( 'Mode', 'admin-generic' ); ?>
+				<?php
+				WPOpsec_UI::row(
+					'Enforcement',
+					function () use ( $mode ) {
+						?>
+						<label><input type="radio" name="mode" value="log" <?php checked( $mode, 'log' ); ?>> Log only</label>
+						<label><input type="radio" name="mode" value="block" <?php checked( $mode, 'block' ); ?>> Block (403)</label>
+						<?php
+					},
+					'Start in log-only mode, confirm the Event Log shows no false positives, then switch to block.'
+				);
+				?>
+			<?php WPOpsec_UI::section_end(); ?>
+
+			<?php submit_button( 'Save settings' ); ?>
+		</form>
+
+		<div class="wpopsec-actions" style="margin-top:14px">
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( 'wpopsec_qg_save_settings' ); ?>
-				<input type="hidden" name="action" value="wpopsec_qg_save_settings">
-
-				<table class="form-table">
-					<tr>
-						<th>Categories</th>
-						<td>
-							<?php foreach ( self::CATEGORIES as $id => $label ) : ?>
-								<label>
-									<input type="checkbox" name="categories[]" value="<?php echo esc_attr( $id ); ?>" <?php checked( in_array( $id, $categories, true ) ); ?>>
-									<?php echo esc_html( $label ); ?>
-								</label><br>
-							<?php endforeach; ?>
-						</td>
-					</tr>
-					<tr>
-						<th>Request bodies (POST)</th>
-						<td>
-							<label><input type="checkbox" name="scan_post" <?php checked( get_option( 'wpopsec_query_guard_scan_post', true ) ); ?>> Scan POST data and file uploads</label>
-							<p class="description">Uses a much narrower signature set than the query-string scan — code execution, file wrappers, traversal, and executable file uploads only. No XSS/SQLi patterns, since real content contains those strings.</p>
-							<p style="margin:.5em 0 .2em">
-								<label><input type="radio" name="post_scope" value="anon" <?php checked( get_option( 'wpopsec_query_guard_post_scope', 'anon' ), 'anon' ); ?>> Logged-out visitors only <em>(recommended)</em></label><br>
-								<label><input type="radio" name="post_scope" value="all" <?php checked( get_option( 'wpopsec_query_guard_post_scope', 'anon' ), 'all' ); ?>> Everyone, including logged-in users</label>
-							</p>
-							<p class="description">43% of plugin vulnerabilities are exploitable without logging in, which is what the first option covers. Scanning logged-in POSTs as well will flag the block editor and any code-snippet plugin, so only pick that if you've confirmed it's quiet in log-only mode first.</p>
-						</td>
-					</tr>
-					<tr>
-						<th>xmlrpc.php</th>
-						<td>
-							<label><input type="checkbox" name="block_xmlrpc" <?php checked( $block_xmlrpc ); ?>> Block access to xmlrpc.php entirely</label>
-							<p class="description">Off by default — xmlrpc.php is needed by Jetpack and some remote-publishing tools. Enable only if you know this site doesn't use it. Any access while enabled is treated as an attack: pingback-based DDoS amplification and password-guessing via its multicall method are the common abuses.</p>
-
-							<label style="display:block;margin-top:.5em"><input type="checkbox" name="allow_jetpack" <?php checked( $allow_jetpack ); ?>> Still allow Jetpack (Automattic) IPs through</label>
-							<p class="description">
-								Fetched from Automattic's own published list, refreshed daily.
-								<?php if ( $jp_updated_at ) : ?>
-									Currently <?php echo esc_html( count( $jp_ranges ) ); ?> range(s), last updated <?php echo esc_html( date( 'Y-m-d H:i', $jp_updated_at ) ); ?>.
-								<?php else : ?>
-									Not fetched yet.
-								<?php endif; ?>
-								For other providers, add their IPs to the trusted networks file on the <a href="<?php echo esc_url( admin_url( 'admin.php?page=wp-opsec-ip-blocklist' ) ); ?>">IP Blocklist</a> page — that list is exempt here too.
-							</p>
-						</td>
-					</tr>
-					<tr>
-						<th>Mode</th>
-						<td>
-							<label><input type="radio" name="mode" value="log" <?php checked( $mode, 'log' ); ?>> Log only</label><br>
-							<label><input type="radio" name="mode" value="block" <?php checked( $mode, 'block' ); ?>> Block (403)</label>
-							<p class="description">Start in log-only mode, confirm no false positives, then switch to block.</p>
-						</td>
-					</tr>
-				</table>
-
-				<?php submit_button( 'Save settings' ); ?>
-			</form>
-
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-top:1em">
 				<?php wp_nonce_field( 'wpopsec_qg_refresh_xmlrpc_allow' ); ?>
 				<input type="hidden" name="action" value="wpopsec_qg_refresh_xmlrpc_allow">
 				<?php submit_button( 'Refresh Jetpack IP list now', 'secondary', 'submit', false ); ?>
 			</form>
 		</div>
 		<?php
+		WPOpsec_UI::close();
 	}
 }
