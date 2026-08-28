@@ -61,8 +61,18 @@ wpopsec_register_check(
 			return null;
 		}
 
-		$path = parse_url( $_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH );
-		if ( 'xmlrpc.php' !== basename( (string) $path ) ) {
+		// Match the path itself, not basename(): Apache passes /xmlrpc.php/foo
+		// straight to xmlrpc.php as PATH_INFO, and //xmlrpc.php reaches it too,
+		// but basename() returns "foo" and "" for those — so a basename check
+		// is bypassed by appending any segment to the URL.
+		//
+		// parse_url() is avoided deliberately: a leading "//" makes it read the
+		// URI as protocol-relative, so "//xmlrpc.php" parses as a *host* with
+		// no path and the check would be skipped entirely.
+		$uri  = (string) ( $_SERVER['REQUEST_URI'] ?? '' );
+		$path = rawurldecode( strtok( $uri, '?' ) );
+		$path = preg_replace( '#/+#', '/', $path ); // collapse // and ///
+		if ( ! preg_match( '#(?:^|/)xmlrpc\.php(?:/|$)#i', (string) $path ) ) {
 			return null;
 		}
 

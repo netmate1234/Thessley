@@ -47,12 +47,85 @@ class WPOpsec_Module_Login_Guard {
 		return __CLASS__;
 	}
 
-	private static function state() {
-		return get_option( 'wpopsec_login_guard_state', array() );
+	/**
+	 * Per-IP state lives in its own transient rather than one shared option.
+	 *
+	 * A distributed credential-stuffing run touches a huge number of source
+	 * IPs, and a single option meant every failed login unserialised,
+	 * appended to and rewrote the entire structure — the attack made itself
+	 * progressively more expensive to defend against. Transients also expire
+	 * on their own, so lockouts release without depending on cron.
+	 */
+	private static function entry_key( $ip ) {
+		return 'wpopsec_lg_' . md5( $ip );
 	}
 
-	private static function save_state( $state ) {
-		update_option( 'wpopsec_login_guard_state', $state, false );
+	private static function get_entry( $ip ) {
+		$entry = get_transient( self::entry_key( $ip ) );
+		return is_array( $entry ) ? $entry : array( 'fails' => array(), 'locked_until' => 0 );
+	}
+
+	private static function save_entry( $ip, $entry ) {
+		$window  = max( 1, (int) get_option( 'wpopsec_login_guard_window_min', self::DEFAULT_WINDOW_MIN ) ) * MINUTE_IN_SECONDS;
+		$expires = max( $window, (int) ( $entry['locked_until'] ?? 0 ) - time() );
+
+		set_transient( self::entry_key( $ip ), $entry, $expires );
+		self::remember_ip( $ip );
+	}
+
+	private static function clear_entry( $ip ) {
+		delete_transient( self::entry_key( $ip ) );
+		self::forget_ip( $ip );
+	}
+
+	/**
+	 * Small index of currently-locked IPs, purely so the admin screen can
+	 * list them — transients aren't enumerable. Only locked IPs go in here,
+	 * not every IP that ever failed a login, so it stays bounded.
+	 */
+	private static function remember_ip( $ip ) {
+		$entry = self::get_entry( $ip );
+		if ( empty( $entry['locked_until'] ) || $entry['locked_until'] < time() ) {
+			return;
+		}
+
+		$index = (array) get_option( 'wpopsec_login_guard_locked', array() );
+		$index[ $ip ] = (int) $entry['locked_until'];
+
+		// Hard cap: under a very wide attack this list is for display only,
+		// and enforcement never reads it — so dropping the oldest is safe.
+		if ( count( $index ) > 500 ) {
+			asort( $index );
+			$index = array_slice( $index, -500, null, true );
+		}
+
+		update_option( 'wpopsec_login_guard_locked', $index, false );
+	}
+
+	private static function forget_ip( $ip ) {
+		$index = (array) get_option( 'wpopsec_login_guard_locked', array() );
+		if ( isset( $index[ $ip ] ) ) {
+			unset( $index[ $ip ] );
+			update_option( 'wpopsec_login_guard_locked', $index, false );
+		}
+	}
+
+	/** @return array<string,int> ip => locked_until, expired entries dropped */
+	private static function locked_ips() {
+		$index   = (array) get_option( 'wpopsec_login_guard_locked', array() );
+		$now     = time();
+		$active  = array_filter(
+			$index,
+			function ( $until ) use ( $now ) {
+				return (int) $until > $now;
+			}
+		);
+
+		if ( count( $active ) !== count( $index ) ) {
+			update_option( 'wpopsec_login_guard_locked', $active, false );
+		}
+
+		return $active;
 	}
 
 	public static function on_login_failed( $username ) {
@@ -72,8 +145,7 @@ class WPOpsec_Module_Login_Guard {
 		$max    = max( 1, (int) get_option( 'wpopsec_login_guard_max_fails', self::DEFAULT_MAX_FAILS ) );
 		$now    = time();
 
-		$state = self::state();
-		$entry = $state[ $ip ] ?? array( 'fails' => array(), 'locked_until' => 0 );
+		$entry = self::get_entry( $ip );
 
 		// Keep only failures inside the rolling window.
 		$entry['fails'] = array_values(
@@ -93,8 +165,7 @@ class WPOpsec_Module_Login_Guard {
 			$entry['locked_until'] = $now + ( $lockout * MINUTE_IN_SECONDS );
 			$entry['fails']        = array();
 
-			$state[ $ip ] = $entry;
-			self::save_state( $state );
+			self::save_entry( $ip, $entry );
 
 			wpopsec_log_event(
 				'login-guard',
@@ -111,8 +182,7 @@ class WPOpsec_Module_Login_Guard {
 			return;
 		}
 
-		$state[ $ip ] = $entry;
-		self::save_state( $state );
+		self::save_entry( $ip, $entry );
 
 		wpopsec_log_event( 'login-guard', 'login_failed', 'noted', sprintf( 'attempt %d/%d for user "%s"', $count, $max, $username ) );
 	}
@@ -126,11 +196,7 @@ class WPOpsec_Module_Login_Guard {
 		// A successful login clears the counter for that IP — otherwise a
 		// user who fat-fingers their password a few times, then gets in,
 		// stays one typo away from a lockout for the rest of the window.
-		$state = self::state();
-		if ( isset( $state[ $ip ] ) ) {
-			unset( $state[ $ip ] );
-			self::save_state( $state );
-		}
+		self::clear_entry( $ip );
 
 		wpopsec_log_event( 'login-guard', 'login_success', 'noted', sprintf( 'user "%s"', $user_login ) );
 	}
@@ -150,8 +216,8 @@ class WPOpsec_Module_Login_Guard {
 			return $user; // LAN/dev/trusted crawler ranges are never locked out
 		}
 
-		$state = self::state();
-		$until = (int) ( $state[ $ip ]['locked_until'] ?? 0 );
+		$entry = self::get_entry( $ip );
+		$until = (int) ( $entry['locked_until'] ?? 0 );
 
 		if ( $until > time() ) {
 			$minutes = max( 1, (int) ceil( ( $until - time() ) / MINUTE_IN_SECONDS ) );
@@ -184,26 +250,21 @@ class WPOpsec_Module_Login_Guard {
 		return __( '<strong>Error:</strong> Invalid username, email address or password.', 'wp-opsec' );
 	}
 
+	/**
+	 * Per-IP state expires with its own transient now, so this only tidies
+	 * the display index of locked IPs. Kept on cron so the list doesn't
+	 * accumulate entries on a site nobody visits in wp-admin.
+	 */
 	public static function prune() {
-		$state = self::state();
-		$now   = time();
-		$window = max( 1, (int) get_option( 'wpopsec_login_guard_window_min', self::DEFAULT_WINDOW_MIN ) ) * MINUTE_IN_SECONDS;
+		self::locked_ips();
+	}
 
-		foreach ( $state as $ip => $entry ) {
-			$locked = (int) ( $entry['locked_until'] ?? 0 ) > $now;
-			$recent = false;
-			foreach ( (array) ( $entry['fails'] ?? array() ) as $ts ) {
-				if ( $ts > $now - $window ) {
-					$recent = true;
-					break;
-				}
-			}
-			if ( ! $locked && ! $recent ) {
-				unset( $state[ $ip ] );
-			}
+	/** Clears every lockout — used by the "clear all" maintenance toggle. */
+	private static function clear_all_lockouts() {
+		foreach ( array_keys( self::locked_ips() ) as $ip ) {
+			delete_transient( self::entry_key( $ip ) );
 		}
-
-		self::save_state( $state );
+		update_option( 'wpopsec_login_guard_locked', array(), false );
 	}
 
 	public static function admin_menu() {
@@ -231,7 +292,7 @@ class WPOpsec_Module_Login_Guard {
 		update_option( 'wpopsec_login_guard_lockout_min', max( 1, (int) ( $_POST['lockout_min'] ?? self::DEFAULT_LOCKOUT_MIN ) ) );
 
 		if ( isset( $_POST['clear_lockouts'] ) ) {
-			self::save_state( array() );
+			self::clear_all_lockouts();
 		}
 
 		wp_safe_redirect( add_query_arg( 'saved', '1', wp_get_referer() ) );
@@ -246,14 +307,8 @@ class WPOpsec_Module_Login_Guard {
 		$window_min  = (int) get_option( 'wpopsec_login_guard_window_min', self::DEFAULT_WINDOW_MIN );
 		$lockout_min = (int) get_option( 'wpopsec_login_guard_lockout_min', self::DEFAULT_LOCKOUT_MIN );
 
-		$state = self::state();
-		$now   = time();
-		$locked = array_filter(
-			$state,
-			function ( $e ) use ( $now ) {
-				return (int) ( $e['locked_until'] ?? 0 ) > $now;
-			}
-		);
+		$locked = self::locked_ips();
+		arsort( $locked );
 		?>
 		<div class="wrap">
 			<h1>WP Opsec — Login Guard</h1>
@@ -270,10 +325,10 @@ class WPOpsec_Module_Login_Guard {
 				<table class="widefat" style="max-width:500px">
 					<thead><tr><th>IP</th><th>Locked until</th></tr></thead>
 					<tbody>
-					<?php foreach ( $locked as $ip => $entry ) : ?>
+					<?php foreach ( $locked as $ip => $until ) : ?>
 						<tr>
 							<td><?php echo esc_html( $ip ); ?></td>
-							<td><?php echo esc_html( date( 'Y-m-d H:i', (int) $entry['locked_until'] ) ); ?></td>
+							<td><?php echo esc_html( date_i18n( 'Y-m-d H:i', (int) $until ) ); ?></td>
 						</tr>
 					<?php endforeach; ?>
 					</tbody>

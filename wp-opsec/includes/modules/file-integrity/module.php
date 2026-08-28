@@ -79,14 +79,25 @@ class WPOpsec_Module_File_Integrity {
 		update_option( 'wpopsec_integrity_db_version', self::DB_VERSION, false );
 	}
 
-	/** Directories to baseline, relative to ABSPATH. */
+	/**
+	 * Directories to baseline. Entries are relative to ABSPATH when the
+	 * content directory lives inside it, and absolute otherwise —
+	 * WP_CONTENT_DIR is allowed to sit outside ABSPATH, and a naive
+	 * str_replace there produced a path that never resolved, so plugins and
+	 * themes were skipped while the UI still reported "no changes".
+	 */
 	private static function scan_roots() {
 		$roots = array( 'wp-admin', 'wp-includes' );
 
-		$content = str_replace( trailingslashit( ABSPATH ), '', trailingslashit( WP_CONTENT_DIR ) );
-		$roots[] = rtrim( $content, '/' ) . '/plugins';
-		$roots[] = rtrim( $content, '/' ) . '/themes';
-		$roots[] = rtrim( $content, '/' ) . '/mu-plugins';
+		$abs     = trailingslashit( ABSPATH );
+		$content = trailingslashit( WP_CONTENT_DIR );
+		$inside  = ( 0 === strpos( $content, $abs ) );
+		$base    = $inside ? substr( $content, strlen( $abs ) ) : $content;
+		$base    = rtrim( $base, '/' );
+
+		foreach ( array( 'plugins', 'themes', 'mu-plugins' ) as $sub ) {
+			$roots[] = $base . '/' . $sub;
+		}
 
 		return $roots;
 	}
@@ -96,47 +107,94 @@ class WPOpsec_Module_File_Integrity {
 	}
 
 	/**
-	 * @return array<string,array{hash:string,size:int}> relative path => info
+	 * @return array{files:array<string,array{hash:string,size:int}>, partial:bool, errors:string[]}
+	 *
+	 * `partial` is the important part of the contract: a crawl cut short by
+	 * the time budget must never be compared against a complete baseline, or
+	 * every file it didn't reach looks deleted. Callers have to check it.
 	 */
 	public static function collect_files() {
 		$files    = array();
-		$abs      = trailingslashit( ABSPATH );
-		$exts     = self::watched_extensions();
-		$deadline = time() + self::TIME_LIMIT;
+		$errors   = array();
+		$partial  = false;
+		$abs  = trailingslashit( ABSPATH );
+		$exts = self::watched_extensions();
+
+		// Filterable so a large site that legitimately can't finish in the
+		// default budget can raise it rather than living with permanently
+		// partial scans (which suppress deleted-file detection).
+		$budget   = max( 1, (int) apply_filters( 'wpopsec_integrity_time_limit', self::TIME_LIMIT ) );
+		$deadline = time() + $budget;
 
 		// Root-level PHP (wp-config.php, index.php, xmlrpc.php, ...)
 		foreach ( (array) glob( $abs . '*.php' ) as $file ) {
-			$files[ str_replace( $abs, '', $file ) ] = self::file_info( $file );
+			$files[ self::relative_path( $file ) ] = self::file_info( $file );
 		}
 
 		foreach ( self::scan_roots() as $root ) {
-			$dir = $abs . $root;
+			$dir = self::root_to_dir( $root );
 			if ( ! is_dir( $dir ) ) {
 				continue;
 			}
 
-			$iter = new RecursiveIteratorIterator(
-				new RecursiveDirectoryIterator( $dir, FilesystemIterator::SKIP_DOTS ),
-				RecursiveIteratorIterator::LEAVES_ONLY
-			);
+			try {
+				$iter = new RecursiveIteratorIterator(
+					new RecursiveDirectoryIterator( $dir, FilesystemIterator::SKIP_DOTS ),
+					// SELF_FIRST so directories are visited too: CATCH_GET_CHILD
+					// stops an unreadable one from throwing, but it also
+					// swallows it silently, and a directory we couldn't read is
+					// exactly the case that must not be mistaken for "no files
+					// here". Seeing the directory lets us flag it.
+					RecursiveIteratorIterator::SELF_FIRST,
+					RecursiveIteratorIterator::CATCH_GET_CHILD
+				);
 
-			foreach ( $iter as $file ) {
-				if ( time() > $deadline ) {
-					break 2; // partial pass; next run continues from a fresh crawl
+				foreach ( $iter as $file ) {
+					if ( time() > $deadline ) {
+						$partial  = true;
+						$errors[] = sprintf( 'time limit (%ds) reached while scanning %s — raise it with the wpopsec_integrity_time_limit filter', $budget, $root );
+						break 2;
+					}
+
+					if ( $file->isDir() ) {
+						if ( ! $file->isReadable() ) {
+							$partial  = true;
+							$errors[] = sprintf( 'directory not readable, contents unchecked: %s', self::relative_path( $file->getPathname() ) );
+						}
+						continue;
+					}
+
+					if ( ! $file->isFile() ) {
+						continue;
+					}
+					$ext = strtolower( $file->getExtension() );
+					if ( ! in_array( $ext, $exts, true ) && '.htaccess' !== $file->getFilename() ) {
+						continue;
+					}
+					$path           = self::relative_path( $file->getPathname() );
+					$files[ $path ] = self::file_info( $file->getPathname() );
 				}
-				if ( ! $file->isFile() ) {
-					continue;
-				}
-				$ext = strtolower( $file->getExtension() );
-				if ( ! in_array( $ext, $exts, true ) && '.htaccess' !== $file->getFilename() ) {
-					continue;
-				}
-				$path = str_replace( $abs, '', $file->getPathname() );
-				$files[ $path ] = self::file_info( $file->getPathname() );
+			} catch ( Exception $e ) {
+				// Unreadable root, or anything else the iterator couldn't
+				// recover from: report it rather than returning a short list
+				// that would read as "files were deleted".
+				$partial  = true;
+				$errors[] = sprintf( 'could not fully read %s: %s', $root, $e->getMessage() );
 			}
 		}
 
-		return $files;
+		return array( 'files' => $files, 'partial' => $partial, 'errors' => $errors );
+	}
+
+	/** Path as stored in the baseline: relative to ABSPATH when inside it. */
+	private static function relative_path( $absolute ) {
+		$abs = trailingslashit( ABSPATH );
+		return 0 === strpos( $absolute, $abs ) ? substr( $absolute, strlen( $abs ) ) : $absolute;
+	}
+
+	/** Roots may be relative to ABSPATH or absolute (wp-content moved out). */
+	private static function root_to_dir( $root ) {
+		return ( '/' === substr( $root, 0, 1 ) ) ? $root : trailingslashit( ABSPATH ) . $root;
 	}
 
 	private static function file_info( $path ) {
@@ -149,9 +207,23 @@ class WPOpsec_Module_File_Integrity {
 	public static function rebaseline() {
 		global $wpdb;
 
-		$files = self::collect_files();
+		$scan  = self::collect_files();
+		$files = $scan['files'];
 		$table = self::table();
 		$now   = current_time( 'mysql' );
+
+		// Refuse to overwrite a good baseline with a truncated crawl: the
+		// missing files would show up as "added" on the next scan, which is
+		// indistinguishable from an attacker dropping files.
+		if ( $scan['partial'] ) {
+			wpopsec_log_event(
+				'file-integrity',
+				'baseline_aborted',
+				'noted',
+				'incomplete crawl, baseline left unchanged: ' . implode( '; ', $scan['errors'] )
+			);
+			return new WP_Error( 'wpopsec_partial_scan', implode( '; ', $scan['errors'] ) );
+		}
 
 		$wpdb->query( "TRUNCATE TABLE {$table}" );
 
@@ -244,7 +316,8 @@ class WPOpsec_Module_File_Integrity {
 			$baseline[ $row['path'] ] = $row['file_hash'];
 		}
 
-		$current  = self::collect_files();
+		$scan     = self::collect_files();
+		$current  = $scan['files'];
 		$added    = array();
 		$modified = array();
 
@@ -256,9 +329,20 @@ class WPOpsec_Module_File_Integrity {
 			}
 		}
 
-		$deleted = array_values( array_diff( array_keys( $baseline ), array_keys( $current ) ) );
+		// Only meaningful if the crawl actually finished. On a partial pass
+		// everything not reached would otherwise be reported as deleted.
+		$deleted = $scan['partial']
+			? array()
+			: array_values( array_diff( array_keys( $baseline ), array_keys( $current ) ) );
 
-		return array( 'added' => $added, 'modified' => $modified, 'deleted' => $deleted, 'no_baseline' => false );
+		return array(
+			'added'       => $added,
+			'modified'    => $modified,
+			'deleted'     => $deleted,
+			'no_baseline' => false,
+			'partial'     => $scan['partial'],
+			'errors'      => $scan['errors'],
+		);
 	}
 
 	public static function run_scan() {
@@ -282,6 +366,15 @@ class WPOpsec_Module_File_Integrity {
 		if ( get_option( 'wpopsec_integrity_check_baseline', true ) ) {
 			$diff             = self::diff_baseline();
 			$result['diff']   = $diff;
+
+			if ( ! empty( $diff['partial'] ) ) {
+				wpopsec_log_event(
+					'file-integrity',
+					'scan_incomplete',
+					'noted',
+					'results are partial and may under-report: ' . implode( '; ', (array) $diff['errors'] )
+				);
+			}
 
 			if ( empty( $diff['no_baseline'] ) ) {
 				$changes = count( $diff['added'] ) + count( $diff['modified'] ) + count( $diff['deleted'] );
@@ -322,7 +415,13 @@ class WPOpsec_Module_File_Integrity {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
-		self::rebaseline();
+
+		$result = self::rebaseline();
+		if ( is_wp_error( $result ) ) {
+			wp_safe_redirect( add_query_arg( 'rebaselined', 'partial', wp_get_referer() ) );
+			exit;
+		}
+
 		self::run_scan();
 		wp_safe_redirect( add_query_arg( 'rebaselined', '1', wp_get_referer() ) );
 		exit;
@@ -380,8 +479,22 @@ class WPOpsec_Module_File_Integrity {
 			<?php if ( isset( $_GET['scanned'] ) ) : ?>
 				<div class="notice notice-success"><p>Scan complete.</p></div>
 			<?php endif; ?>
-			<?php if ( isset( $_GET['rebaselined'] ) ) : ?>
+			<?php if ( isset( $_GET['rebaselined'] ) && 'partial' === $_GET['rebaselined'] ) : ?>
+				<div class="notice notice-error"><p>The scan couldn't read every file, so the baseline was left unchanged — replacing it with a partial crawl would make the unread files look like new files on the next scan. See the incomplete-scan note below.</p></div>
+			<?php elseif ( isset( $_GET['rebaselined'] ) ) : ?>
 				<div class="notice notice-success"><p>Baseline re-taken.</p></div>
+			<?php endif; ?>
+
+			<?php if ( ! empty( $last['diff']['partial'] ) ) : ?>
+				<div class="notice notice-warning">
+					<p><strong>Last scan was incomplete</strong> — results below may under-report:</p>
+					<ul style="margin-left:1.5em;list-style:disc">
+						<?php foreach ( (array) $last['diff']['errors'] as $err ) : ?>
+							<li><?php echo esc_html( $err ); ?></li>
+						<?php endforeach; ?>
+					</ul>
+					<p>Deleted-file detection is skipped while a scan is partial. If this is the time limit, the site has more files than one pass can hash.</p>
+				</div>
 			<?php endif; ?>
 
 			<h2>Core files</h2>

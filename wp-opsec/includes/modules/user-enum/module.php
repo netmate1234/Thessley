@@ -24,7 +24,7 @@ class WPOpsec_Module_User_Enum {
 			add_action( 'template_redirect', array( __CLASS__, 'block_author_scan' ) );
 		}
 		if ( get_option( 'wpopsec_user_enum_block_rest_users', true ) ) {
-			add_filter( 'rest_authentication_errors', array( __CLASS__, 'block_rest_users' ), 20 );
+			add_filter( 'rest_request_before_callbacks', array( __CLASS__, 'block_rest_users' ), 20, 3 );
 			add_filter( 'rest_endpoints', array( __CLASS__, 'remove_user_endpoints' ) );
 		}
 		if ( get_option( 'wpopsec_user_enum_disable_oembed_author', true ) ) {
@@ -64,18 +64,38 @@ class WPOpsec_Module_User_Enum {
 	/**
 	 * /wp-json/wp/v2/users lists every account with a published post,
 	 * including slugs, to anonymous callers by default.
+	 *
+	 * Matches on the resolved REST route rather than REQUEST_URI: a raw
+	 * substring test also fired on ordinary front-end URLs that merely
+	 * contained "/wp/v2/users" (a post permalink about the REST API, a
+	 * redirect parameter), 401-ing pages that had nothing to do with the
+	 * users endpoint.
+	 *
+	 * @param mixed            $response
+	 * @param array|object     $handler
+	 * @param WP_REST_Request  $request
 	 */
-	public static function block_rest_users( $result ) {
-		if ( ! empty( $result ) || self::viewer_may_list_users() ) {
-			return $result;
+	public static function block_rest_users( $response, $handler, $request ) {
+		if ( is_wp_error( $response ) || self::viewer_may_list_users() ) {
+			return $response;
 		}
 
-		$route = isset( $_SERVER['REQUEST_URI'] ) ? (string) $_SERVER['REQUEST_URI'] : '';
-		if ( false === strpos( $route, '/wp/v2/users' ) ) {
-			return $result;
+		if ( ! $request instanceof WP_REST_Request ) {
+			return $response;
 		}
 
-		wpopsec_log_event( 'user-enum', 'rest_users', 'blocked', 'anonymous REST users query' );
+		$route = (string) $request->get_route();
+		if ( ! preg_match( '#^/wp/v2/users(/|$)#', $route ) ) {
+			return $response;
+		}
+
+		// /users/me is the caller's own record and needs authentication
+		// anyway — it leaks nothing about other accounts.
+		if ( preg_match( '#^/wp/v2/users/me(/|$)#', $route ) ) {
+			return $response;
+		}
+
+		wpopsec_log_event( 'user-enum', 'rest_users', 'blocked', 'anonymous REST users query: ' . $route );
 
 		return new WP_Error(
 			'wpopsec_rest_users_forbidden',

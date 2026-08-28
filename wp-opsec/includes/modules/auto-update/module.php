@@ -71,12 +71,21 @@ class WPOpsec_Module_Auto_Update {
 		$mode = get_option( 'wpopsec_auto_update_plugins', 'flagged' );
 		$file = $item->plugin ?? '';
 
+		// An explicit exclusion is the one case where overriding WordPress
+		// downward is intended — the admin named this plugin as hands-off.
+		if ( self::is_excluded( $file ) ) {
+			return false;
+		}
+
 		if ( 'all' === $mode ) {
-			return ! self::is_excluded( $file );
+			return true;
 		}
 
 		if ( 'flagged' === $mode ) {
-			return self::is_flagged_by_scanner( $file ) && ! self::is_excluded( $file );
+			// Only ever add to what WordPress already decided. Returning a
+			// hard false here would silently switch off per-plugin
+			// auto-updates the admin had enabled on the Plugins screen.
+			return self::is_flagged_by_scanner( $file ) ? true : $update;
 		}
 
 		return $update; // 'off' — leave WordPress's own per-plugin setting alone
@@ -268,7 +277,7 @@ class WPOpsec_Module_Auto_Update {
 							</label><br>
 							<label><input type="radio" name="plugins" value="all" <?php checked( $plugins, 'all' ); ?>> All plugins</label><br>
 							<label><input type="radio" name="plugins" value="off" <?php checked( $plugins, 'off' ); ?>> Off (use WordPress's own per-plugin settings)</label>
-							<p class="description">91% of WordPress vulnerabilities are in plugins, so this is the setting that matters most. "Flagged" re-runs the scan before each sweep so it acts on current data.</p>
+							<p class="description">91% of WordPress vulnerabilities are in plugins, so this is the setting that matters most. "Flagged" re-runs the scan before each sweep so it acts on current data. These settings only ever <em>add</em> to what you've already enabled per-plugin on the Plugins screen — the exclusion list below is the only thing that turns an auto-update off.</p>
 						</td>
 					</tr>
 					<tr>

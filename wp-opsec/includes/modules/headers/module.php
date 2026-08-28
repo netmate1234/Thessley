@@ -72,6 +72,39 @@ class WPOpsec_Module_Headers {
 		return in_array( $id, (array) $saved, true );
 	}
 
+	/**
+	 * Whether the *visitor's* connection is HTTPS.
+	 *
+	 * is_ssl() only sees the connection to PHP, so behind a reverse proxy
+	 * that terminates TLS and forwards plain HTTP it returns false even
+	 * though the browser is on HTTPS — which silently suppressed HSTS on
+	 * exactly the setups most likely to want it. X-Forwarded-Proto is only
+	 * consulted when the admin has confirmed the site is behind a trusted
+	 * proxy, because that header is attacker-controlled otherwise.
+	 */
+	public static function request_is_https() {
+		if ( is_ssl() ) {
+			return true;
+		}
+
+		if ( ! get_option( 'wpopsec_headers_behind_proxy', false ) ) {
+			return false;
+		}
+
+		$proto = $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '';
+		if ( '' !== $proto ) {
+			// May be a comma-separated chain; the first entry is the client.
+			$first = trim( strtok( $proto, ',' ) );
+			return 0 === strcasecmp( 'https', $first );
+		}
+
+		if ( isset( $_SERVER['HTTP_X_FORWARDED_SSL'] ) && 'on' === strtolower( $_SERVER['HTTP_X_FORWARDED_SSL'] ) ) {
+			return true;
+		}
+
+		return false;
+	}
+
 	/** @return array<string,string> header => value */
 	public static function build() {
 		$headers = array();
@@ -92,7 +125,7 @@ class WPOpsec_Module_Headers {
 		// Only meaningful over HTTPS, and actively harmful to send otherwise
 		// (a browser that sees it on a working HTTP-only site will pin HTTPS
 		// and the site becomes unreachable).
-		if ( self::enabled( 'hsts' ) && is_ssl() ) {
+		if ( self::enabled( 'hsts' ) && self::request_is_https() ) {
 			$max_age  = max( 0, (int) get_option( 'wpopsec_headers_hsts_max_age', 15552000 ) );
 			$value    = 'max-age=' . $max_age;
 			if ( get_option( 'wpopsec_headers_hsts_subdomains', false ) ) {
@@ -154,6 +187,7 @@ class WPOpsec_Module_Headers {
 		update_option( 'wpopsec_headers_hsts_max_age', max( 0, (int) ( $_POST['hsts_max_age'] ?? 15552000 ) ) );
 		update_option( 'wpopsec_headers_hsts_subdomains', isset( $_POST['hsts_subdomains'] ) );
 		update_option( 'wpopsec_headers_hsts_preload', isset( $_POST['hsts_preload'] ) );
+		update_option( 'wpopsec_headers_behind_proxy', isset( $_POST['behind_proxy'] ) );
 
 		update_option( 'wpopsec_headers_csp_report_only', isset( $_POST['csp_report_only'] ) );
 		$policy = isset( $_POST['csp_policy'] ) ? trim( wp_unslash( $_POST['csp_policy'] ) ) : '';
@@ -186,8 +220,13 @@ class WPOpsec_Module_Headers {
 					<?php endforeach; ?>
 				</table>
 			<?php endif; ?>
-			<?php if ( self::enabled( 'hsts' ) && ! is_ssl() ) : ?>
-				<div class="notice notice-warning inline"><p>HSTS is enabled but this request isn't HTTPS, so the header is being withheld. Sending it over plain HTTP would pin browsers to HTTPS for a site that doesn't serve it.</p></div>
+			<?php if ( self::enabled( 'hsts' ) && ! self::request_is_https() ) : ?>
+				<div class="notice notice-warning inline">
+					<p>HSTS is enabled but this request isn't recognised as HTTPS, so the header is being withheld — sending it over plain HTTP would pin browsers to a scheme the site may not serve.</p>
+					<?php if ( ! get_option( 'wpopsec_headers_behind_proxy', false ) && ! empty( $_SERVER['HTTP_X_FORWARDED_PROTO'] ) ) : ?>
+						<p><strong>This request arrived with <code>X-Forwarded-Proto: <?php echo esc_html( sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_FORWARDED_PROTO'] ) ) ); ?></code></strong>, which suggests a reverse proxy is terminating TLS. Tick the proxy option below to have HSTS honour it.</p>
+					<?php endif; ?>
+				</div>
 			<?php endif; ?>
 
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
@@ -213,7 +252,11 @@ class WPOpsec_Module_Headers {
 							max-age <input type="number" name="hsts_max_age" value="<?php echo esc_attr( (int) get_option( 'wpopsec_headers_hsts_max_age', 15552000 ) ); ?>" min="0" style="width:9em"> seconds
 							<p style="margin:.4em 0"><label><input type="checkbox" name="hsts_subdomains" <?php checked( get_option( 'wpopsec_headers_hsts_subdomains', false ) ); ?>> includeSubDomains</label></p>
 							<p style="margin:.4em 0"><label><input type="checkbox" name="hsts_preload" <?php checked( get_option( 'wpopsec_headers_hsts_preload', false ) ); ?>> preload</label></p>
-							<p class="description">Only sent on HTTPS requests. <code>preload</code> submits to a browser-baked list that is slow and awkward to reverse — don't set it casually.</p>
+							<p style="margin:.4em 0"><label><input type="checkbox" name="behind_proxy" <?php checked( get_option( 'wpopsec_headers_behind_proxy', false ) ); ?>> This site is behind a reverse proxy that terminates HTTPS</label></p>
+							<p class="description">
+								Only sent on HTTPS requests. <code>preload</code> submits to a browser-baked list that is slow and awkward to reverse — don't set it casually.
+								<br>Tick the proxy box if TLS ends at nginx/Cloudflare/a load balancer and PHP is served plain HTTP — otherwise <code>is_ssl()</code> is false and HSTS is never sent. Only tick it when a proxy really is in front, since <code>X-Forwarded-Proto</code> can be forged by anyone able to reach the backend directly.
+							</p>
 						</td>
 					</tr>
 					<tr>

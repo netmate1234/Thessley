@@ -267,31 +267,38 @@ class WPOpsec_Module_Vuln_Scanner {
 		}
 
 		$wpscan = self::wpscan_lookup( $components );
+
+		// Index by slug and assign through it: an earlier version walked
+		// $findings by reference and left $f dangling when it took `continue 2`,
+		// so a later by-value foreach over the same array overwrote the last
+		// element on every iteration.
+		$index_by_slug = array();
+		foreach ( $findings as $i => $f ) {
+			$index_by_slug[ $f['slug'] ] = $i;
+		}
+
 		foreach ( $wpscan['items'] as $slug => $vulns ) {
-			foreach ( $findings as &$f ) {
-				if ( $f['slug'] === $slug ) {
-					foreach ( $vulns as $v ) {
-						$f['issues'][] = array(
-							'kind'   => 'cve',
-							'detail' => $v['title'] . ( $v['fixed_in'] ? sprintf( ' (fixed in %s)', $v['fixed_in'] ) : ' (no fix available)' ),
-						);
-					}
-					continue 2;
-				}
+			$issues = array();
+			foreach ( $vulns as $v ) {
+				$issues[] = array(
+					'kind'   => 'cve',
+					'detail' => $v['title'] . ( $v['fixed_in'] ? sprintf( ' (fixed in %s)', $v['fixed_in'] ) : ' (no fix available)' ),
+				);
 			}
-			unset( $f );
+
+			if ( isset( $index_by_slug[ $slug ] ) ) {
+				$findings[ $index_by_slug[ $slug ] ]['issues'] = array_merge(
+					$findings[ $index_by_slug[ $slug ] ]['issues'],
+					$issues
+				);
+				continue;
+			}
 
 			// Component had no other issue but does have a CVE.
 			foreach ( $components as $c ) {
 				if ( $c['slug'] === $slug ) {
-					$issues = array();
-					foreach ( $vulns as $v ) {
-						$issues[] = array(
-							'kind'   => 'cve',
-							'detail' => $v['title'] . ( $v['fixed_in'] ? sprintf( ' (fixed in %s)', $v['fixed_in'] ) : ' (no fix available)' ),
-						);
-					}
-					$findings[] = array_merge( $c, array( 'issues' => $issues ) );
+					$findings[]                  = array_merge( $c, array( 'issues' => $issues ) );
+					$index_by_slug[ $c['slug'] ] = count( $findings ) - 1;
 					break;
 				}
 			}

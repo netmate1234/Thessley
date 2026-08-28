@@ -59,11 +59,54 @@ class WPOpsec_Module_User_Watchdog {
 		return false;
 	}
 
-	/** @return array<int,array> user id => identifying fields */
+	/**
+	 * Roles that grant any of SENSITIVE_CAPS, so the snapshot query can ask
+	 * for just those instead of walking every account.
+	 *
+	 * @return string[]
+	 */
+	private static function privileged_roles() {
+		$roles = array();
+
+		foreach ( wp_roles()->roles as $slug => $role ) {
+			foreach ( self::SENSITIVE_CAPS as $cap ) {
+				if ( ! empty( $role['capabilities'][ $cap ] ) ) {
+					$roles[] = $slug;
+					continue 2;
+				}
+			}
+		}
+
+		return $roles;
+	}
+
+	/**
+	 * @return array<int,array> user id => identifying fields
+	 *
+	 * Queries only privileged roles rather than enumerating every user:
+	 * this runs on user_register and profile_update, so on a membership or
+	 * shop site the old "load all users, then get_userdata() each" pass
+	 * turned an ordinary customer signup into thousands of queries.
+	 */
 	public static function build_snapshot() {
 		$snapshot = array();
+		$roles    = self::privileged_roles();
 
-		foreach ( get_users( array( 'fields' => array( 'ID' ) ) ) as $u ) {
+		$args = array(
+			'fields'  => array( 'ID', 'user_login', 'user_email' ),
+			'number'  => 500,
+			'orderby' => 'ID',
+		);
+
+		// role__in only covers role-based privilege. A user granted a
+		// capability directly (no matching role) wouldn't appear, so fall
+		// back to a full pass if the site has no privileged roles at all —
+		// which shouldn't happen, but silently watching nothing would be worse.
+		if ( $roles ) {
+			$args['role__in'] = $roles;
+		}
+
+		foreach ( get_users( $args ) as $u ) {
 			$user = get_userdata( $u->ID );
 			if ( ! $user || ! self::is_privileged( $user ) ) {
 				continue;
@@ -175,15 +218,21 @@ class WPOpsec_Module_User_Watchdog {
 		}
 
 		// Creating a user fires this too, with no previous roles. That's not
-		// an escalation, and user_register already reports it — reporting
-		// both just doubles the noise for one event.
+		// an escalation, and user_register already reports it (and snapshots
+		// when the account is privileged) — so there's nothing to do here.
 		if ( empty( $old_roles ) ) {
-			self::snapshot();
 			return;
 		}
 
 		$was = self::role_list_is_privileged( (array) $old_roles );
 		$now = self::is_privileged( $user );
+
+		// A change between two unprivileged roles (subscriber -> customer on
+		// a shop, say) can't affect the privileged-account snapshot, and this
+		// hook fires on routine membership activity.
+		if ( ! $was && ! $now ) {
+			return;
+		}
 
 		if ( $now && ! $was ) {
 			$detail = sprintf(
