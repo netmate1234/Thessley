@@ -80,6 +80,17 @@ wpopsec_register_check(
 		}
 
 		error_log( "wp-opsec query-guard: blocked [{$hit['id']}] qs=\"{$snippet}\"" );
+
+		$ip = wpopsec_client_ip();
+		if ( '' !== $ip ) {
+			// Escalate to the shared local blocklist so ip-blocklist catches
+			// this IP on future requests too, not just this one. Gated on
+			// query-guard's own mode being "block" (not just detecting a hit)
+			// so an unverified/tuning-stage signature can't cause real blocks
+			// via a side channel while its own module is still in log-only mode.
+			wpopsec_local_blocklist_add( $ip, "query-guard: {$hit['id']}" );
+		}
+
 		return array( 'reason' => 'Access denied.' );
 	}
 );

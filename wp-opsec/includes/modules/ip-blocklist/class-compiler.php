@@ -9,33 +9,6 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class WPOpsec_IP_Blocklist_Compiler {
 
-	/**
-	 * Private/reserved IPv4 space (RFC 1918 + IANA special-purpose registry).
-	 * REMOTE_ADDR can't be spoofed over TCP, so a "bogon" source address only
-	 * ever means a LAN/dev/VPN client or a reverse proxy passing an internal
-	 * hop IP — never an attacker. Some sources (e.g. FireHOL's fullbogons
-	 * component) list these as "bad" anyway; always excluded here regardless
-	 * of source, since blocking them has no security value and guarantees
-	 * self-lockout on any non-public deployment.
-	 */
-	const RESERVED_CIDRS = array(
-		'0.0.0.0/8',
-		'10.0.0.0/8',
-		'100.64.0.0/10',
-		'127.0.0.0/8',
-		'169.254.0.0/16',
-		'172.16.0.0/12',
-		'192.0.0.0/24',
-		'192.0.2.0/24',
-		'192.88.99.0/24',
-		'192.168.0.0/16',
-		'198.18.0.0/15',
-		'198.51.100.0/24',
-		'203.0.113.0/24',
-		'224.0.0.0/4',
-		'240.0.0.0/4',
-	);
-
 	public static function data_file() {
 		return WPOPSEC_CHECKS_DIR . '/data/ip-blocklist-ranges.php';
 	}
@@ -52,7 +25,8 @@ class WPOpsec_IP_Blocklist_Compiler {
 		}
 
 		$merged = self::merge( $ranges );
-		$merged = self::exclude_reserved( $merged );
+		$merged = self::exclude( $merged, wpopsec_reserved_ranges() );
+		$merged = self::exclude( $merged, wpopsec_trusted_ranges() );
 		self::write( $merged );
 
 		return array(
@@ -93,11 +67,16 @@ class WPOpsec_IP_Blocklist_Compiler {
 		return $merged;
 	}
 
-	/** @return array<int, array{0:int,1:int}> $merged with reserved ranges cut out */
-	private static function exclude_reserved( array $merged ) {
-		$reserved = array_map( array( __CLASS__, 'cidr_to_range' ), self::RESERVED_CIDRS );
-
-		foreach ( $reserved as $r ) {
+	/**
+	 * @param array<int, array{0:int,1:int}> $merged
+	 * @param array<int, array{0:int,1:int}> $cut ranges to remove
+	 * @return array<int, array{0:int,1:int}> $merged with $cut ranges removed
+	 * Used for both reserved space and the operator-supplied trusted-networks
+	 * file, via the shared mu-loader definitions, so the external list and
+	 * the local-escalation list can never disagree about what's exempt.
+	 */
+	private static function exclude( array $merged, array $cut ) {
+		foreach ( $cut as $r ) {
 			$next = array();
 			foreach ( $merged as $piece ) {
 				if ( $piece[1] < $r[0] || $piece[0] > $r[1] ) {
@@ -115,13 +94,6 @@ class WPOpsec_IP_Blocklist_Compiler {
 		}
 
 		return $merged;
-	}
-
-	private static function cidr_to_range( $cidr ) {
-		list( $ip, $prefix ) = explode( '/', $cidr );
-		$mask  = ( 0xFFFFFFFF << ( 32 - (int) $prefix ) ) & 0xFFFFFFFF;
-		$start = ip2long( $ip ) & $mask;
-		return array( $start, $start | ( ~$mask & 0xFFFFFFFF ) );
 	}
 
 	private static function write( array $merged ) {

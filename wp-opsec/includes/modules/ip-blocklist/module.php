@@ -41,6 +41,8 @@ class WPOpsec_Module_IP_Blocklist {
 		add_action( 'admin_menu', array( __CLASS__, 'admin_menu' ) );
 		add_action( 'admin_post_wpopsec_refresh_now', array( __CLASS__, 'handle_refresh_now' ) );
 		add_action( 'admin_post_wpopsec_save_settings', array( __CLASS__, 'handle_save_settings' ) );
+		add_action( 'admin_post_wpopsec_add_local', array( __CLASS__, 'handle_add_local' ) );
+		add_action( 'admin_post_wpopsec_remove_local', array( __CLASS__, 'handle_remove_local' ) );
 
 		return __CLASS__;
 	}
@@ -52,6 +54,11 @@ class WPOpsec_Module_IP_Blocklist {
 
 		$stats['updated_at'] = time();
 		update_option( 'wpopsec_ip_blocklist_stats', $stats, false );
+
+		// Piggyback the local blocklist's expiry sweep on this same cron run —
+		// otherwise an escalated IP's compiled range file never gets rewritten
+		// once it's past expires_at unless another IP happens to get added.
+		wpopsec_local_blocklist_rebuild();
 
 		return $stats;
 	}
@@ -110,6 +117,42 @@ class WPOpsec_Module_IP_Blocklist {
 		$sources        = array_values( array_intersect( $posted_sources, array_keys( WPOpsec_IP_Blocklist_Fetcher::SOURCES ) ) );
 		update_option( 'wpopsec_ip_blocklist_sources', $sources );
 
+		$trusted_file = isset( $_POST['trusted_networks_file'] ) ? trim( wp_unslash( $_POST['trusted_networks_file'] ) ) : '';
+		update_option( 'wpopsec_trusted_networks_file', $trusted_file );
+
+		wp_safe_redirect( add_query_arg( 'saved', '1', wp_get_referer() ) );
+		exit;
+	}
+
+	public static function handle_add_local() {
+		check_admin_referer( 'wpopsec_add_local' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( 'Forbidden', 403 );
+		}
+
+		$ip = isset( $_POST['ip'] ) ? trim( wp_unslash( $_POST['ip'] ) ) : '';
+		if ( false !== filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
+			$reason = isset( $_POST['reason'] ) ? sanitize_text_field( wp_unslash( $_POST['reason'] ) ) : 'manual';
+			$hours  = isset( $_POST['hours'] ) ? max( 1, (int) $_POST['hours'] ) : 24;
+			wpopsec_local_blocklist_add( $ip, $reason ?: 'manual', $hours * HOUR_IN_SECONDS );
+		}
+
+		wp_safe_redirect( add_query_arg( 'saved', '1', wp_get_referer() ) );
+		exit;
+	}
+
+	public static function handle_remove_local() {
+		check_admin_referer( 'wpopsec_remove_local' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( 'Forbidden', 403 );
+		}
+
+		$ip   = isset( $_POST['ip'] ) ? wp_unslash( $_POST['ip'] ) : '';
+		$list = get_option( 'wpopsec_local_blocklist', array() );
+		unset( $list[ $ip ] );
+		update_option( 'wpopsec_local_blocklist', $list, false );
+		wpopsec_local_blocklist_rebuild();
+
 		wp_safe_redirect( add_query_arg( 'saved', '1', wp_get_referer() ) );
 		exit;
 	}
@@ -119,6 +162,7 @@ class WPOpsec_Module_IP_Blocklist {
 		$mode             = get_option( 'wpopsec_ip_blocklist_mode', 'log' );
 		$allowlist        = get_option( 'wpopsec_ip_allowlist', array() );
 		$enabled_sources  = get_option( 'wpopsec_ip_blocklist_sources', WPOpsec_IP_Blocklist_Fetcher::DEFAULT_ENABLED );
+		$trusted_file     = get_option( 'wpopsec_trusted_networks_file', '' );
 		?>
 		<div class="wrap">
 			<h1>WP Opsec — IP Blocklist</h1>
@@ -148,6 +192,44 @@ class WPOpsec_Module_IP_Blocklist {
 				<?php wp_nonce_field( 'wpopsec_refresh_now' ); ?>
 				<input type="hidden" name="action" value="wpopsec_refresh_now">
 				<?php submit_button( 'Refresh now', 'secondary', 'submit', false ); ?>
+			</form>
+
+			<h2>Local blocklist</h2>
+			<p>IPs added here (manually, or auto-escalated by other modules like Query Guard) are checked alongside the reputation lists above, and expire automatically.</p>
+			<?php $local = get_option( 'wpopsec_local_blocklist', array() ); ?>
+			<?php if ( empty( $local ) ) : ?>
+				<p>No local entries.</p>
+			<?php else : ?>
+				<table class="widefat" style="max-width:700px">
+					<thead><tr><th>IP</th><th>Reason</th><th>Added</th><th>Expires</th><th></th></tr></thead>
+					<tbody>
+					<?php foreach ( $local as $ip => $entry ) : ?>
+						<tr>
+							<td><?php echo esc_html( $ip ); ?></td>
+							<td><?php echo esc_html( $entry['reason'] ?? '' ); ?></td>
+							<td><?php echo esc_html( date( 'Y-m-d H:i', $entry['added_at'] ?? 0 ) ); ?></td>
+							<td><?php echo esc_html( date( 'Y-m-d H:i', $entry['expires_at'] ?? 0 ) ); ?></td>
+							<td>
+								<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+									<?php wp_nonce_field( 'wpopsec_remove_local' ); ?>
+									<input type="hidden" name="action" value="wpopsec_remove_local">
+									<input type="hidden" name="ip" value="<?php echo esc_attr( $ip ); ?>">
+									<?php submit_button( 'Remove', 'small', 'submit', false ); ?>
+								</form>
+							</td>
+						</tr>
+					<?php endforeach; ?>
+					</tbody>
+				</table>
+			<?php endif; ?>
+
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-top:1em">
+				<?php wp_nonce_field( 'wpopsec_add_local' ); ?>
+				<input type="hidden" name="action" value="wpopsec_add_local">
+				<input type="text" name="ip" placeholder="1.2.3.4" required>
+				<input type="text" name="reason" placeholder="reason (optional)">
+				<input type="number" name="hours" value="24" min="1" style="width:5em"> hours
+				<?php submit_button( 'Add to local blocklist', 'secondary', 'submit', false ); ?>
 			</form>
 
 			<h2>Settings</h2>
@@ -181,6 +263,24 @@ class WPOpsec_Module_IP_Blocklist {
 						<td>
 							<textarea id="wpopsec_allowlist" name="allowlist" rows="4" cols="40"><?php echo esc_textarea( implode( "\n", $allowlist ) ); ?></textarea>
 							<p class="description">One IPv4 per line. Always allowed regardless of blocklist match.</p>
+						</td>
+					</tr>
+					<tr>
+						<th><label for="wpopsec_trusted_file">Trusted networks file</label></th>
+						<td>
+							<input type="text" id="wpopsec_trusted_file" name="trusted_networks_file" value="<?php echo esc_attr( $trusted_file ); ?>" style="width:30em" placeholder="/etc/eagleeye/crawler-nets.conf">
+							<?php if ( '' !== $trusted_file ) : ?>
+								<?php $trusted_count = count( wpopsec_trusted_ranges() ); ?>
+								<p class="description">
+									<?php if ( is_readable( $trusted_file ) ) : ?>
+										Readable — <?php echo esc_html( $trusted_count ); ?> network(s) loaded, e.g. known crawler ranges. Excluded from both the reputation-list compile and local escalation.
+									<?php else : ?>
+										<strong>Not readable</strong> by the web server user — check the path and permissions.
+									<?php endif; ?>
+								</p>
+							<?php else : ?>
+								<p class="description">Optional. Path to a CIDR-per-line file (e.g. known crawler/search-engine ranges) that's always exempt from blocking, on this and the local list.</p>
+							<?php endif; ?>
 						</td>
 					</tr>
 				</table>

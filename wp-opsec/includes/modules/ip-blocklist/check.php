@@ -5,13 +5,17 @@
 wpopsec_register_check(
 	function () {
 		static $ranges = null;
+		static $local  = null;
 
 		if ( null === $ranges ) {
 			$data_file = __DIR__ . '/data/ip-blocklist-ranges.php';
 			$ranges    = file_exists( $data_file ) ? require $data_file : array();
 		}
+		if ( null === $local ) {
+			$local = file_exists( wpopsec_local_blocklist_file() ) ? require wpopsec_local_blocklist_file() : array();
+		}
 
-		if ( empty( $ranges ) ) {
+		if ( empty( $ranges ) && empty( $local ) ) {
 			return null;
 		}
 
@@ -30,14 +34,21 @@ wpopsec_register_check(
 			return null;
 		}
 
-		if ( ! wpopsec_ip_in_ranges( $needle, $ranges ) ) {
+		$source = null;
+		if ( wpopsec_ip_in_ranges( $needle, $local ) ) {
+			$source = 'local';
+		} elseif ( wpopsec_ip_in_ranges( $needle, $ranges ) ) {
+			$source = 'reputation list';
+		}
+
+		if ( null === $source ) {
 			return null;
 		}
 
 		$mode = get_option( 'wpopsec_ip_blocklist_mode', 'log' );
 
 		if ( 'block' !== $mode ) {
-			error_log( "wp-opsec ip-blocklist: would block {$ip} (log-only mode)" );
+			error_log( "wp-opsec ip-blocklist: would block {$ip} ({$source}, log-only mode)" );
 			return null;
 		}
 

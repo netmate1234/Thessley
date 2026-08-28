@@ -32,6 +32,15 @@ class WPOpsec_Module_Loader {
 	public static function activate() {
 		self::copy_mu_loader();
 
+		// Guarantee the shared helpers (wpopsec_local_blocklist_add() etc.)
+		// are defined in *this* process before module activate() hooks run.
+		// Normal bootstrap loads this file as an actual mu-plugin before
+		// plugins_loaded fires, but on a fresh/re-activation the file may
+		// not have existed yet when that happened this same request —
+		// require_once dedups by path, so this is a no-op when it's already
+		// loaded and a real load when it wasn't.
+		require_once WPOPSEC_MU_DEST;
+
 		foreach ( self::$modules as $module => $class ) {
 			self::load_module( $module );
 			if ( method_exists( $class, 'activate' ) ) {
