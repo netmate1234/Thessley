@@ -66,6 +66,25 @@ wpopsec_register_check(
 			return null;
 		}
 
+		$ip_long = ip2long( wpopsec_client_ip() );
+
+		// Jetpack is the one common legitimate xmlrpc.php consumer — allow
+		// its published IPs through by default. Any other provider (backup
+		// tools, remote publishers, etc.) goes through the general trusted-
+		// networks file rather than us guessing at more hardcoded IP data.
+		if ( false !== $ip_long ) {
+			if ( wpopsec_ip_is_trusted( $ip_long ) ) {
+				return null;
+			}
+			if ( get_option( 'wpopsec_qg_allow_jetpack', true ) ) {
+				foreach ( get_option( 'wpopsec_qg_xmlrpc_allow_ranges', array() ) as $r ) {
+					if ( $ip_long >= $r[0] && $ip_long <= $r[1] ) {
+						return null;
+					}
+				}
+			}
+		}
+
 		$mode = get_option( 'wpopsec_query_guard_mode', 'log' );
 
 		if ( 'block' !== $mode ) {
