@@ -57,6 +57,45 @@ if ( ! function_exists( 'wpopsec_query_guard_patterns' ) ) {
 
 wpopsec_register_check(
 	function () {
+		if ( ! get_option( 'wpopsec_query_guard_block_xmlrpc', false ) ) {
+			return null;
+		}
+
+		$path = parse_url( $_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH );
+		if ( 'xmlrpc.php' !== basename( (string) $path ) ) {
+			return null;
+		}
+
+		$mode = get_option( 'wpopsec_query_guard_mode', 'log' );
+
+		if ( 'block' !== $mode ) {
+			error_log( 'wp-opsec query-guard: would block xmlrpc.php access (log-only mode)' );
+			return null;
+		}
+
+		error_log( 'wp-opsec query-guard: blocked xmlrpc.php access' );
+
+		$ip = wpopsec_client_ip();
+		if ( '' !== $ip ) {
+			// If the admin turned this on at all, they've said the site never
+			// legitimately uses xmlrpc.php — any hit is worth escalating.
+			wpopsec_local_blocklist_add( $ip, 'query-guard: xmlrpc_access' );
+		}
+
+		// Not wp_die() here deliberately: xmlrpc.php defines XMLRPC_REQUEST
+		// before this runs, and WP's wp_die() detects that constant and
+		// routes to its XML-RPC-aware die handler, which per XML-RPC
+		// convention returns HTTP 200 with the error as a <fault> in the
+		// body — the endpoint would still be neutralized, but "blocked"
+		// should mean an actual 403 here, so set it directly and stop.
+		status_header( 403 );
+		nocache_headers();
+		exit;
+	}
+);
+
+wpopsec_register_check(
+	function () {
 		$qs = isset( $_SERVER['QUERY_STRING'] ) ? (string) $_SERVER['QUERY_STRING'] : '';
 		if ( '' === $qs ) {
 			return null;

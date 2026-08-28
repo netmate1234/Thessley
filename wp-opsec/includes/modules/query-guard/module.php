@@ -72,13 +72,16 @@ class WPOpsec_Module_Query_Guard {
 		$categories = array_values( array_intersect( $posted, array_keys( self::CATEGORIES ) ) );
 		update_option( 'wpopsec_query_guard_categories', $categories );
 
+		update_option( 'wpopsec_query_guard_block_xmlrpc', isset( $_POST['block_xmlrpc'] ) );
+
 		wp_safe_redirect( add_query_arg( 'saved', '1', wp_get_referer() ) );
 		exit;
 	}
 
 	public static function render_settings_page() {
-		$mode       = get_option( 'wpopsec_query_guard_mode', 'log' );
-		$categories = get_option( 'wpopsec_query_guard_categories', array_keys( self::CATEGORIES ) );
+		$mode          = get_option( 'wpopsec_query_guard_mode', 'log' );
+		$categories    = get_option( 'wpopsec_query_guard_categories', array_keys( self::CATEGORIES ) );
+		$block_xmlrpc  = get_option( 'wpopsec_query_guard_block_xmlrpc', false );
 		?>
 		<div class="wrap">
 			<h1>WP Opsec — Query Guard</h1>
@@ -102,6 +105,13 @@ class WPOpsec_Module_Query_Guard {
 									<?php echo esc_html( $label ); ?>
 								</label><br>
 							<?php endforeach; ?>
+						</td>
+					</tr>
+					<tr>
+						<th>xmlrpc.php</th>
+						<td>
+							<label><input type="checkbox" name="block_xmlrpc" <?php checked( $block_xmlrpc ); ?>> Block access to xmlrpc.php entirely</label>
+							<p class="description">Off by default — xmlrpc.php is needed by Jetpack and some remote-publishing tools. Enable only if you know this site doesn't use it. Any access while enabled is treated as an attack: pingback-based DDoS amplification and password-guessing via its multicall method are the common abuses.</p>
 						</td>
 					</tr>
 					<tr>
