@@ -13,6 +13,7 @@ class WPOpsec_Module_Loader {
 	/** @var array<string,string> module directory name => class name, in load order */
 	private static $modules = array(
 		'ip-blocklist' => 'WPOpsec_Module_IP_Blocklist',
+		'query-guard'  => 'WPOpsec_Module_Query_Guard',
 	);
 
 	public static function init() {
