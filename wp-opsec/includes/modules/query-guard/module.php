@@ -45,7 +45,136 @@ class WPOpsec_Module_Query_Guard {
 		add_action( 'admin_post_wpopsec_qg_refresh_xmlrpc_allow', array( __CLASS__, 'handle_refresh_xmlrpc_allow' ) );
 		add_action( self::XMLRPC_CRON_HOOK, array( __CLASS__, 'refresh_xmlrpc_allowlist' ) );
 
+		// POST scanning can't run in the early gate: it needs
+		// is_user_logged_in(), which depends on pluggable.php, not loaded at
+		// mu-plugin time. It hooks `init` rather than `plugins_loaded`
+		// because register() is itself called during plugins_loaded — a
+		// callback added there would be scheduled at a priority that has
+		// already passed and would silently never run. `init` still fires
+		// before request routing, admin-ajax handlers and REST dispatch.
+		if ( get_option( 'wpopsec_query_guard_scan_post', true ) ) {
+			add_action( 'init', array( __CLASS__, 'scan_request_body' ), 0 );
+		}
+
 		return __CLASS__;
+	}
+
+	/**
+	 * Patterns for request bodies. Deliberately much narrower than the
+	 * query-string set: no XSS/SQLi signatures here, because legitimate
+	 * content genuinely contains those strings. These target code execution,
+	 * file inclusion and upload abuse — things that have no business in a
+	 * form submission from a visitor.
+	 */
+	private static function body_patterns() {
+		return array(
+			array( 'id' => 'body_php_open_tag', 'regex' => '/<\?php\b/i' ),
+			array( 'id' => 'body_php_wrapper', 'regex' => '#\b(php|data|expect|phar)://#i' ),
+			array( 'id' => 'body_eval_exec', 'regex' => '/\b(eval|assert|create_function|shell_exec|passthru|proc_open|popen|system)\s*\(/i' ),
+			array( 'id' => 'body_base64_payload', 'regex' => '/base64_decode\s*\(/i' ),
+			array( 'id' => 'body_traversal', 'regex' => '#\.\./\.\./#' ),
+			array( 'id' => 'body_null_byte', 'regex' => '/%00|\x00/' ),
+		);
+	}
+
+	/** Executable extensions that should never arrive via an upload field. */
+	private static function dangerous_upload_regex() {
+		return '/\.(php[0-9]?|phtml|phps|phar|pht|shtml|cgi|pl|py|jsp|asp|aspx|htaccess)(\.|$)/i';
+	}
+
+	public static function scan_request_body() {
+		if ( 'POST' !== ( $_SERVER['REQUEST_METHOD'] ?? '' ) && 'PUT' !== ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) {
+			return;
+		}
+
+		$ip = wpopsec_client_ip();
+		if ( '' !== $ip && wpopsec_ip_is_exempt( $ip ) ) {
+			return;
+		}
+
+		// Authenticated users legitimately post PHP-ish content: the block
+		// editor, code snippet plugins, support forms. Unauthenticated POST is
+		// where the bulk of exploitable plugin bugs are actually reached, so
+		// that's the default scope. Checked with a real cookie validation,
+		// not just cookie presence, so a forged cookie can't opt out of it.
+		if ( 'all' !== get_option( 'wpopsec_query_guard_post_scope', 'anon' ) ) {
+			if ( is_user_logged_in() ) {
+				return;
+			}
+		}
+
+		$hit = self::find_body_hit();
+		if ( ! $hit ) {
+			return;
+		}
+
+		$mode = get_option( 'wpopsec_query_guard_mode', 'log' );
+
+		if ( 'block' !== $mode ) {
+			wpopsec_log_event( 'query-guard', $hit['id'], 'logged', $hit['detail'] );
+			return;
+		}
+
+		wpopsec_log_event( 'query-guard', $hit['id'], 'blocked', $hit['detail'] );
+
+		if ( '' !== $ip ) {
+			wpopsec_local_blocklist_add( $ip, "query-guard: {$hit['id']}" );
+		}
+
+		status_header( 403 );
+		nocache_headers();
+		wp_die( 'Access denied.', '403 Forbidden', array( 'response' => 403 ) );
+	}
+
+	/** @return array{id:string,detail:string}|null */
+	private static function find_body_hit() {
+		// Uploaded filenames first — an executable extension arriving from an
+		// anonymous visitor is about as unambiguous as a signal gets.
+		foreach ( (array) $_FILES as $field => $file ) {
+			foreach ( (array) ( is_array( $file['name'] ?? null ) ? $file['name'] : array( $file['name'] ?? '' ) ) as $name ) {
+				if ( '' !== $name && preg_match( self::dangerous_upload_regex(), (string) $name ) ) {
+					return array(
+						'id'     => 'upload_executable_ext',
+						'detail' => sprintf( 'field "%s" filename "%s"', $field, substr( (string) $name, 0, 100 ) ),
+					);
+				}
+			}
+		}
+
+		$patterns = self::body_patterns();
+
+		foreach ( self::flatten( $_POST ) as $key => $value ) {
+			if ( ! is_string( $value ) || '' === $value ) {
+				continue;
+			}
+			foreach ( $patterns as $p ) {
+				if ( preg_match( $p['regex'], $value ) ) {
+					return array(
+						'id'     => $p['id'],
+						'detail' => sprintf( 'field "%s": %s', $key, substr( preg_replace( '/\s+/', ' ', $value ), 0, 120 ) ),
+					);
+				}
+			}
+		}
+
+		return null;
+	}
+
+	/** @return array<string,mixed> dot-joined key => scalar */
+	private static function flatten( $data, $prefix = '', $depth = 0 ) {
+		$out = array();
+		if ( $depth > 6 ) {
+			return $out;
+		}
+		foreach ( (array) $data as $k => $v ) {
+			$key = '' === $prefix ? (string) $k : $prefix . '.' . $k;
+			if ( is_array( $v ) ) {
+				$out += self::flatten( $v, $key, $depth + 1 );
+			} else {
+				$out[ $key ] = $v;
+			}
+		}
+		return $out;
 	}
 
 	/**
@@ -127,6 +256,10 @@ class WPOpsec_Module_Query_Guard {
 		update_option( 'wpopsec_query_guard_block_xmlrpc', isset( $_POST['block_xmlrpc'] ) );
 		update_option( 'wpopsec_qg_allow_jetpack', isset( $_POST['allow_jetpack'] ) );
 
+		update_option( 'wpopsec_query_guard_scan_post', isset( $_POST['scan_post'] ) );
+		$scope = sanitize_text_field( wp_unslash( $_POST['post_scope'] ?? 'anon' ) );
+		update_option( 'wpopsec_query_guard_post_scope', in_array( $scope, array( 'anon', 'all' ), true ) ? $scope : 'anon' );
+
 		wp_safe_redirect( add_query_arg( 'saved', '1', wp_get_referer() ) );
 		exit;
 	}
@@ -164,6 +297,18 @@ class WPOpsec_Module_Query_Guard {
 									<?php echo esc_html( $label ); ?>
 								</label><br>
 							<?php endforeach; ?>
+						</td>
+					</tr>
+					<tr>
+						<th>Request bodies (POST)</th>
+						<td>
+							<label><input type="checkbox" name="scan_post" <?php checked( get_option( 'wpopsec_query_guard_scan_post', true ) ); ?>> Scan POST data and file uploads</label>
+							<p class="description">Uses a much narrower signature set than the query-string scan — code execution, file wrappers, traversal, and executable file uploads only. No XSS/SQLi patterns, since real content contains those strings.</p>
+							<p style="margin:.5em 0 .2em">
+								<label><input type="radio" name="post_scope" value="anon" <?php checked( get_option( 'wpopsec_query_guard_post_scope', 'anon' ), 'anon' ); ?>> Logged-out visitors only <em>(recommended)</em></label><br>
+								<label><input type="radio" name="post_scope" value="all" <?php checked( get_option( 'wpopsec_query_guard_post_scope', 'anon' ), 'all' ); ?>> Everyone, including logged-in users</label>
+							</p>
+							<p class="description">43% of plugin vulnerabilities are exploitable without logging in, which is what the first option covers. Scanning logged-in POSTs as well will flag the block editor and any code-snippet plugin, so only pick that if you've confirmed it's quiet in log-only mode first.</p>
 						</td>
 					</tr>
 					<tr>

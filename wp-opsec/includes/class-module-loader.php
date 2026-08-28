@@ -21,6 +21,11 @@ class WPOpsec_Module_Loader {
 		'user-enum'      => 'WPOpsec_Module_User_Enum',
 		'file-integrity' => 'WPOpsec_Module_File_Integrity',
 		'vuln-scanner'   => 'WPOpsec_Module_Vuln_Scanner',
+		// vuln-scanner before auto-update: "update what was flagged" mode
+		// reads the scanner's last result.
+		'auto-update'    => 'WPOpsec_Module_Auto_Update',
+		'user-watchdog'  => 'WPOpsec_Module_User_Watchdog',
+		'hardening'      => 'WPOpsec_Module_Hardening',
 	);
 
 	public static function init() {
@@ -169,6 +174,30 @@ class WPOpsec_Module_Loader {
 				'note'  => self::vuln_note(),
 				'key'   => 'vuln-scanner',
 			),
+			array(
+				'title' => 'Auto Updates',
+				'page'  => 'wp-opsec-auto-update',
+				'state' => 'off' === get_option( 'wpopsec_auto_update_plugins', 'flagged' ) ? 'Plugins off' : 'Plugins on',
+				'on'    => 'off' !== get_option( 'wpopsec_auto_update_plugins', 'flagged' ),
+				'note'  => sprintf( 'core: %s', get_option( 'wpopsec_auto_update_core', 'minor' ) ),
+				'key'   => 'auto-update',
+			),
+			array(
+				'title' => 'User Watchdog',
+				'page'  => 'wp-opsec-user-watchdog',
+				'state' => self::watchdog_state(),
+				'on'    => ! count( (array) get_option( 'wpopsec_user_watchdog_alerts', array() ) ),
+				'note'  => sprintf( '%d privileged account(s)', count( (array) get_option( 'wpopsec_user_watchdog_snapshot', array() ) ) ),
+				'key'   => 'user-watchdog',
+			),
+			array(
+				'title' => 'Hardening',
+				'page'  => 'wp-opsec-hardening',
+				'state' => ( defined( 'DISALLOW_FILE_EDIT' ) && DISALLOW_FILE_EDIT ) ? 'Editor off' : 'Editor on',
+				'on'    => defined( 'DISALLOW_FILE_EDIT' ) && DISALLOW_FILE_EDIT,
+				'note'  => self::hardening_note(),
+				'key'   => 'hardening',
+			),
 		);
 		?>
 		<div class="wrap">
@@ -229,6 +258,22 @@ class WPOpsec_Module_Loader {
 		$issues = count( $last['core']['modified'] ?? array() ) + count( $last['core']['missing'] ?? array() )
 			+ count( $last['diff']['added'] ?? array() ) + count( $last['diff']['modified'] ?? array() );
 		return $issues ? sprintf( '%d change(s) flagged', $issues ) : 'no changes';
+	}
+
+	private static function watchdog_state() {
+		$alerts = count( (array) get_option( 'wpopsec_user_watchdog_alerts', array() ) );
+		return $alerts ? sprintf( '%d alert(s)', $alerts ) : 'Clear';
+	}
+
+	private static function hardening_note() {
+		$hidden = get_option( 'wpopsec_hardening_hidden_result', array() );
+		$n      = count( (array) ( $hidden['hidden'] ?? array() ) );
+		if ( $n ) {
+			return sprintf( '%d hidden plugin(s)', $n );
+		}
+		return class_exists( 'WPOpsec_Module_Hardening' ) && WPOpsec_Module_Hardening::uploads_guard_active()
+			? 'uploads guarded'
+			: 'uploads unguarded';
 	}
 
 	private static function vuln_note() {
