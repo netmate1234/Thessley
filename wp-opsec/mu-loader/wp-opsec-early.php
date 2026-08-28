@@ -26,11 +26,63 @@ if ( ! function_exists( 'wpopsec_register_check' ) ) {
 		global $wpopsec_checks;
 		$wpopsec_checks[] = $check;
 	}
+}
 
+if ( ! function_exists( 'wpopsec_client_ip' ) ) {
 	function wpopsec_client_ip() {
 		return isset( $_SERVER['REMOTE_ADDR'] ) ? $_SERVER['REMOTE_ADDR'] : '';
 	}
+}
 
+if ( ! function_exists( 'wpopsec_events_table' ) ) {
+	function wpopsec_events_table() {
+		global $wpdb;
+		return $wpdb->prefix . 'wpopsec_events';
+	}
+}
+
+if ( ! function_exists( 'wpopsec_log_event' ) ) {
+	/**
+	 * Central event log every module writes to, so the admin has one place
+	 * to see what fired instead of grepping error_log on the server. Also
+	 * mirrored to error_log, which is what the operator's existing external
+	 * tooling (fail2ban-style watchers, log shippers) can consume.
+	 *
+	 * @param string $module  module id, e.g. 'query-guard'
+	 * @param string $event   short machine-readable event id
+	 * @param string $action  'blocked' | 'logged' (log-only mode) | 'noted'
+	 * @param string $detail  free-text context (truncated)
+	 */
+	function wpopsec_log_event( $module, $event, $action = 'noted', $detail = '' ) {
+		global $wpdb;
+
+		$ip     = wpopsec_client_ip();
+		$detail = substr( str_replace( array( "\r", "\n" ), ' ', (string) $detail ), 0, 500 );
+
+		error_log( "wp-opsec {$module}: [{$event}] {$action} ip={$ip} {$detail}" );
+
+		// Never let a logging failure (missing table mid-upgrade, DB hiccup)
+		// take down the request it was only meant to annotate.
+		$table = wpopsec_events_table();
+		$wpdb->suppress_errors( true );
+		$wpdb->insert(
+			$table,
+			array(
+				'created_at' => current_time( 'mysql' ),
+				'module'     => substr( (string) $module, 0, 32 ),
+				'event'      => substr( (string) $event, 0, 64 ),
+				'action'     => substr( (string) $action, 0, 16 ),
+				'ip'         => substr( $ip, 0, 45 ),
+				'uri'        => substr( (string) ( $_SERVER['REQUEST_URI'] ?? '' ), 0, 255 ),
+				'detail'     => $detail,
+			),
+			array( '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
+		);
+		$wpdb->suppress_errors( false );
+	}
+}
+
+if ( ! function_exists( 'wpopsec_reserved_cidrs' ) ) {
 	/**
 	 * Private/reserved IPv4 space (RFC 1918 + IANA special-purpose registry).
 	 * Shared by every module: REMOTE_ADDR can't be spoofed over TCP, so a
@@ -58,14 +110,18 @@ if ( ! function_exists( 'wpopsec_register_check' ) ) {
 			'240.0.0.0/4',
 		);
 	}
+}
 
+if ( ! function_exists( 'wpopsec_cidr_to_range' ) ) {
 	function wpopsec_cidr_to_range( $cidr ) {
 		list( $ip, $prefix ) = explode( '/', $cidr );
 		$mask  = ( 0xFFFFFFFF << ( 32 - (int) $prefix ) ) & 0xFFFFFFFF;
 		$start = ip2long( $ip ) & $mask;
 		return array( $start, $start | ( ~$mask & 0xFFFFFFFF ) );
 	}
+}
 
+if ( ! function_exists( 'wpopsec_reserved_ranges' ) ) {
 	/** @return array<int, array{0:int,1:int}> */
 	function wpopsec_reserved_ranges() {
 		static $ranges = null;
@@ -74,7 +130,9 @@ if ( ! function_exists( 'wpopsec_register_check' ) ) {
 		}
 		return $ranges;
 	}
+}
 
+if ( ! function_exists( 'wpopsec_ip_is_reserved' ) ) {
 	function wpopsec_ip_is_reserved( $ip ) {
 		$long = is_int( $ip ) ? $ip : ip2long( $ip );
 		if ( false === $long ) {
@@ -87,7 +145,9 @@ if ( ! function_exists( 'wpopsec_register_check' ) ) {
 		}
 		return false;
 	}
+}
 
+if ( ! function_exists( 'wpopsec_trusted_ranges' ) ) {
 	/**
 	 * Optional operator-supplied trusted-networks file (CIDR per line, '#'
 	 * comments) — e.g. known search-engine crawler ranges you never want
@@ -117,7 +177,9 @@ if ( ! function_exists( 'wpopsec_register_check' ) ) {
 
 		return $ranges;
 	}
+}
 
+if ( ! function_exists( 'wpopsec_ip_is_trusted' ) ) {
 	function wpopsec_ip_is_trusted( $ip ) {
 		$long = is_int( $ip ) ? $ip : ip2long( $ip );
 		if ( false === $long ) {
@@ -130,12 +192,16 @@ if ( ! function_exists( 'wpopsec_register_check' ) ) {
 		}
 		return false;
 	}
+}
 
+if ( ! function_exists( 'wpopsec_ip_is_exempt' ) ) {
 	/** Combined "never enforce against this IP" check — reserved + operator-trusted. */
 	function wpopsec_ip_is_exempt( $ip ) {
 		return wpopsec_ip_is_reserved( $ip ) || wpopsec_ip_is_trusted( $ip );
 	}
+}
 
+if ( ! function_exists( 'wpopsec_local_blocklist_file' ) ) {
 	/**
 	 * Shared cross-module IP escalation: any check can call this to add an
 	 * IP to a short-lived local blocklist that ip-blocklist also enforces,
@@ -145,7 +211,9 @@ if ( ! function_exists( 'wpopsec_register_check' ) ) {
 	function wpopsec_local_blocklist_file() {
 		return WPMU_PLUGIN_DIR . '/wp-opsec-checks/data/local-blocklist-ranges.php';
 	}
+}
 
+if ( ! function_exists( 'wpopsec_local_blocklist_add' ) ) {
 	function wpopsec_local_blocklist_add( $ip, $reason, $ttl_seconds = DAY_IN_SECONDS ) {
 		$long = ip2long( $ip );
 		if ( false === $long || wpopsec_ip_is_exempt( $long ) ) {
@@ -164,7 +232,9 @@ if ( ! function_exists( 'wpopsec_register_check' ) ) {
 
 		return true;
 	}
+}
 
+if ( ! function_exists( 'wpopsec_local_blocklist_rebuild' ) ) {
 	/** Drops expired entries and rewrites the compiled range file. */
 	function wpopsec_local_blocklist_rebuild() {
 		$list = get_option( 'wpopsec_local_blocklist', array() );

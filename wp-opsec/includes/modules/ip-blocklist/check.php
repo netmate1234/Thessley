@@ -48,9 +48,11 @@ wpopsec_register_check(
 		$mode = get_option( 'wpopsec_ip_blocklist_mode', 'log' );
 
 		if ( 'block' !== $mode ) {
-			error_log( "wp-opsec ip-blocklist: would block {$ip} ({$source}, log-only mode)" );
+			wpopsec_log_event( 'ip-blocklist', 'listed_ip', 'logged', "matched {$source} (log-only mode)" );
 			return null;
 		}
+
+		wpopsec_log_event( 'ip-blocklist', 'listed_ip', 'blocked', "matched {$source}" );
 
 		return array( 'reason' => 'Access denied.' );
 	}

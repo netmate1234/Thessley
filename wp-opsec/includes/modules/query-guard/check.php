@@ -88,11 +88,11 @@ wpopsec_register_check(
 		$mode = get_option( 'wpopsec_query_guard_mode', 'log' );
 
 		if ( 'block' !== $mode ) {
-			error_log( 'wp-opsec query-guard: would block xmlrpc.php access (log-only mode)' );
+			wpopsec_log_event( 'query-guard', 'xmlrpc_access', 'logged', 'log-only mode' );
 			return null;
 		}
 
-		error_log( 'wp-opsec query-guard: blocked xmlrpc.php access' );
+		wpopsec_log_event( 'query-guard', 'xmlrpc_access', 'blocked' );
 
 		$ip = wpopsec_client_ip();
 		if ( '' !== $ip ) {
@@ -133,11 +133,11 @@ wpopsec_register_check(
 		$snippet = substr( str_replace( array( "\r", "\n" ), ' ', $decoded ), 0, 200 );
 
 		if ( 'block' !== $mode ) {
-			error_log( "wp-opsec query-guard: would block [{$hit['id']}] (log-only mode) qs=\"{$snippet}\"" );
+			wpopsec_log_event( 'query-guard', $hit['id'], 'logged', "qs: {$snippet}" );
 			return null;
 		}
 
-		error_log( "wp-opsec query-guard: blocked [{$hit['id']}] qs=\"{$snippet}\"" );
+		wpopsec_log_event( 'query-guard', $hit['id'], 'blocked', "qs: {$snippet}" );
 
 		$ip = wpopsec_client_ip();
 		if ( '' !== $ip ) {

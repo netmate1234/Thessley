@@ -12,12 +12,29 @@ class WPOpsec_Module_Loader {
 
 	/** @var array<string,string> module directory name => class name, in load order */
 	private static $modules = array(
-		'ip-blocklist' => 'WPOpsec_Module_IP_Blocklist',
-		'query-guard'  => 'WPOpsec_Module_Query_Guard',
+		// event-log first: it owns the table the others log into.
+		'event-log'      => 'WPOpsec_Module_Event_Log',
+		'ip-blocklist'   => 'WPOpsec_Module_IP_Blocklist',
+		'query-guard'    => 'WPOpsec_Module_Query_Guard',
+		'login-guard'    => 'WPOpsec_Module_Login_Guard',
+		'headers'        => 'WPOpsec_Module_Headers',
+		'user-enum'      => 'WPOpsec_Module_User_Enum',
+		'file-integrity' => 'WPOpsec_Module_File_Integrity',
+		'vuln-scanner'   => 'WPOpsec_Module_Vuln_Scanner',
 	);
 
 	public static function init() {
 		self::ensure_mu_loader_current();
+
+		// The mu-plugin WordPress loaded this request is whatever was on disk
+		// when the request started. Right after a plugin update that's the
+		// *previous* version, so helpers the new module code calls may not be
+		// defined yet — the copy above only fixes the next request. Load the
+		// fresh file now if anything is missing. require_once dedups by path,
+		// so this is a no-op once the current file is already loaded.
+		if ( ! function_exists( 'wpopsec_log_event' ) && file_exists( WPOPSEC_MU_DEST ) ) {
+			require_once WPOPSEC_MU_DEST;
+		}
 
 		add_action( 'admin_menu', array( __CLASS__, 'admin_menu' ), 5 );
 
@@ -72,7 +89,155 @@ class WPOpsec_Module_Loader {
 	}
 
 	public static function render_dashboard() {
-		echo '<div class="wrap"><h1>WP Opsec</h1><p>Security modules are listed in the submenu.</p></div>';
+		global $wpdb;
+
+		$table  = wpopsec_events_table();
+		$counts = array();
+		$recent = array();
+
+		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) === $table ) {
+			$counts = $wpdb->get_results(
+				"SELECT module, action, COUNT(*) c
+				 FROM {$table}
+				 WHERE created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)
+				 GROUP BY module, action",
+				ARRAY_A
+			) ?: array();
+
+			$recent = $wpdb->get_results( "SELECT * FROM {$table} ORDER BY id DESC LIMIT 10" ) ?: array();
+		}
+
+		$by_module = array();
+		foreach ( $counts as $row ) {
+			$by_module[ $row['module'] ][ $row['action'] ] = (int) $row['c'];
+		}
+
+		$cards = array(
+			array(
+				'title' => 'IP Blocklist',
+				'page'  => 'wp-opsec-ip-blocklist',
+				'state' => 'block' === get_option( 'wpopsec_ip_blocklist_mode', 'log' ) ? 'Blocking' : 'Log only',
+				'on'    => 'block' === get_option( 'wpopsec_ip_blocklist_mode', 'log' ),
+				'note'  => sprintf( '%s ranges', number_format_i18n( (int) ( get_option( 'wpopsec_ip_blocklist_stats', array() )['count_merged'] ?? 0 ) ) ),
+				'key'   => 'ip-blocklist',
+			),
+			array(
+				'title' => 'Query Guard',
+				'page'  => 'wp-opsec-query-guard',
+				'state' => 'block' === get_option( 'wpopsec_query_guard_mode', 'log' ) ? 'Blocking' : 'Log only',
+				'on'    => 'block' === get_option( 'wpopsec_query_guard_mode', 'log' ),
+				'note'  => get_option( 'wpopsec_query_guard_block_xmlrpc', false ) ? 'xmlrpc blocked' : 'xmlrpc allowed',
+				'key'   => 'query-guard',
+			),
+			array(
+				'title' => 'Login Guard',
+				'page'  => 'wp-opsec-login-guard',
+				'state' => get_option( 'wpopsec_login_guard_enabled', true ) ? 'Enabled' : 'Disabled',
+				'on'    => (bool) get_option( 'wpopsec_login_guard_enabled', true ),
+				'note'  => sprintf( '%d fails / %d min', (int) get_option( 'wpopsec_login_guard_max_fails', 8 ), (int) get_option( 'wpopsec_login_guard_window_min', 15 ) ),
+				'key'   => 'login-guard',
+			),
+			array(
+				'title' => 'Security Headers',
+				'page'  => 'wp-opsec-headers',
+				'state' => class_exists( 'WPOpsec_Module_Headers' ) && WPOpsec_Module_Headers::build() ? 'Active' : 'None',
+				'on'    => class_exists( 'WPOpsec_Module_Headers' ) && (bool) WPOpsec_Module_Headers::build(),
+				'note'  => class_exists( 'WPOpsec_Module_Headers' ) ? sprintf( '%d header(s)', count( WPOpsec_Module_Headers::build() ) ) : '',
+				'key'   => 'headers',
+			),
+			array(
+				'title' => 'User Enumeration',
+				'page'  => 'wp-opsec-user-enum',
+				'state' => get_option( 'wpopsec_user_enum_block_author_scan', true ) ? 'Protected' : 'Open',
+				'on'    => (bool) get_option( 'wpopsec_user_enum_block_author_scan', true ),
+				'note'  => get_option( 'wpopsec_user_enum_block_rest_users', true ) ? 'REST users locked' : 'REST users public',
+				'key'   => 'user-enum',
+			),
+			array(
+				'title' => 'File Integrity',
+				'page'  => 'wp-opsec-file-integrity',
+				'state' => get_option( 'wpopsec_integrity_baseline_at', 0 ) ? 'Baselined' : 'No baseline',
+				'on'    => (bool) get_option( 'wpopsec_integrity_baseline_at', 0 ),
+				'note'  => self::integrity_note(),
+				'key'   => 'file-integrity',
+			),
+			array(
+				'title' => 'Vulnerability Scan',
+				'page'  => 'wp-opsec-vuln-scanner',
+				'state' => get_option( 'wpopsec_vuln_last_result', array() ) ? 'Scanned' : 'Not run',
+				'on'    => (bool) get_option( 'wpopsec_vuln_last_result', array() ),
+				'note'  => self::vuln_note(),
+				'key'   => 'vuln-scanner',
+			),
+		);
+		?>
+		<div class="wrap">
+			<h1>WP Opsec</h1>
+
+			<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin:1.5em 0">
+				<?php foreach ( $cards as $card ) : ?>
+					<div class="card" style="margin:0;padding:14px;border:1px solid #c3c4c7;background:#fff;border-radius:4px">
+						<h2 style="margin:0 0 .3em;font-size:14px">
+							<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . $card['page'] ) ); ?>"><?php echo esc_html( $card['title'] ); ?></a>
+						</h2>
+						<p style="margin:.2em 0">
+							<span style="color:<?php echo $card['on'] ? '#007017' : '#996800'; ?>;font-weight:600"><?php echo esc_html( $card['state'] ); ?></span>
+							<?php if ( $card['note'] ) : ?>
+								<span style="color:#666"> · <?php echo esc_html( $card['note'] ); ?></span>
+							<?php endif; ?>
+						</p>
+						<?php $blocked = $by_module[ $card['key'] ]['blocked'] ?? 0; ?>
+						<?php $logged = $by_module[ $card['key'] ]['logged'] ?? 0; ?>
+						<p style="margin:.2em 0;color:#666;font-size:12px">
+							7 days: <?php echo esc_html( number_format_i18n( $blocked ) ); ?> blocked,
+							<?php echo esc_html( number_format_i18n( $logged ) ); ?> logged
+						</p>
+					</div>
+				<?php endforeach; ?>
+			</div>
+
+			<h2>Recent events</h2>
+			<?php if ( empty( $recent ) ) : ?>
+				<p>No events recorded yet.</p>
+			<?php else : ?>
+				<table class="widefat striped">
+					<thead><tr><th style="width:140px">Time</th><th style="width:110px">Module</th><th style="width:160px">Event</th><th style="width:70px">Action</th><th style="width:120px">IP</th><th>Detail</th></tr></thead>
+					<tbody>
+					<?php foreach ( $recent as $row ) : ?>
+						<tr>
+							<td><?php echo esc_html( $row->created_at ); ?></td>
+							<td><?php echo esc_html( $row->module ); ?></td>
+							<td><code><?php echo esc_html( $row->event ); ?></code></td>
+							<td><?php echo 'blocked' === $row->action ? '<span style="color:#b32d2e;font-weight:600">blocked</span>' : esc_html( $row->action ); ?></td>
+							<td><?php echo esc_html( $row->ip ); ?></td>
+							<td><?php echo esc_html( $row->detail ); ?></td>
+						</tr>
+					<?php endforeach; ?>
+					</tbody>
+				</table>
+				<p><a href="<?php echo esc_url( admin_url( 'admin.php?page=wp-opsec-event-log' ) ); ?>">View full event log →</a></p>
+			<?php endif; ?>
+		</div>
+		<?php
+	}
+
+	private static function integrity_note() {
+		$last = get_option( 'wpopsec_integrity_last_result', array() );
+		if ( empty( $last ) ) {
+			return 'never scanned';
+		}
+		$issues = count( $last['core']['modified'] ?? array() ) + count( $last['core']['missing'] ?? array() )
+			+ count( $last['diff']['added'] ?? array() ) + count( $last['diff']['modified'] ?? array() );
+		return $issues ? sprintf( '%d change(s) flagged', $issues ) : 'no changes';
+	}
+
+	private static function vuln_note() {
+		$last = get_option( 'wpopsec_vuln_last_result', array() );
+		if ( empty( $last ) ) {
+			return 'never scanned';
+		}
+		$n = count( $last['findings'] ?? array() );
+		return $n ? sprintf( '%d flagged', $n ) : 'nothing flagged';
 	}
 
 	private static function load_module( $module ) {
