@@ -241,6 +241,23 @@ class WPOpsec_Module_Loader {
 		$recent    = array();
 		$daily     = array();
 		$totals    = array( 'blocked' => 0, 'logged' => 0, 'noted' => 0 );
+		$worst     = 0;
+		$sev_module = array();
+
+		if ( $has_table ) {
+			$worst = (int) $wpdb->get_var(
+				"SELECT MAX(severity) FROM {$table} WHERE created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)"
+			);
+
+			$sev_rows = $wpdb->get_results(
+				"SELECT module, MAX(severity) s FROM {$table}
+				 WHERE created_at > DATE_SUB(NOW(), INTERVAL 7 DAY) GROUP BY module",
+				ARRAY_A
+			) ?: array();
+			foreach ( $sev_rows as $r ) {
+				$sev_module[ $r['module'] ] = (int) $r['s'];
+			}
+		}
 
 		if ( $has_table ) {
 			$counts = $wpdb->get_results(
@@ -331,11 +348,12 @@ class WPOpsec_Module_Loader {
 							<span>would block (log only)</span>
 						</div>
 					</div>
+					<?php list( $w_label, $w_color ) = wpopsec_severity_meta( $worst ); ?>
 					<div class="wpopsec-stat">
-						<span class="dashicons dashicons-info-outline"></span>
+						<span class="dashicons dashicons-warning" style="color:<?php echo esc_attr( $worst ? $w_color : '#646970' ); ?>"></span>
 						<div>
-							<strong><?php echo esc_html( number_format_i18n( $totals['noted'] ) ); ?></strong>
-							<span>events noted</span>
+							<strong><?php echo $worst ? esc_html( $worst ) . '<span style="font-size:13px;font-weight:400;color:#646970">/20</span>' : '—'; ?></strong>
+							<span>worst severity<?php echo $worst ? esc_html( ' · ' . $w_label ) : ''; ?></span>
 						</div>
 					</div>
 
@@ -390,6 +408,12 @@ class WPOpsec_Module_Loader {
 						<div class="wpopsec-card__top">
 							<span class="wpopsec-card__icon dashicons dashicons-<?php echo esc_attr( $card['icon'] ); ?>"></span>
 							<span class="wpopsec-card__title"><?php echo esc_html( $card['title'] ); ?></span>
+							<?php if ( ! empty( $sev_module[ $card['key'] ] ) ) : ?>
+								<?php list( $cs_label, $cs_color ) = wpopsec_severity_meta( $sev_module[ $card['key'] ] ); ?>
+								<span class="wpopsec-sevdot"
+									style="background:<?php echo esc_attr( $cs_color ); ?>"
+									title="<?php echo esc_attr( sprintf( 'Worst severity in 7 days: %d (%s)', $sev_module[ $card['key'] ], $cs_label ) ); ?>"><?php echo esc_html( $sev_module[ $card['key'] ] ); ?></span>
+							<?php endif; ?>
 						</div>
 						<div class="wpopsec-pill"><?php echo esc_html( $card['state'] ); ?></div>
 						<div class="wpopsec-card__note"><?php echo esc_html( $card['note'] ); ?></div>
@@ -426,6 +450,7 @@ class WPOpsec_Module_Loader {
 				<table class="wpopsec-table">
 					<thead>
 						<tr>
+							<th style="width:56px">Sev</th>
 							<th style="width:130px">Time</th>
 							<th style="width:120px">Module</th>
 							<th style="width:170px">Event</th>
@@ -436,7 +461,12 @@ class WPOpsec_Module_Loader {
 					</thead>
 					<tbody>
 					<?php foreach ( $recent as $row ) : ?>
+						<?php list( $rs_label, $rs_color ) = wpopsec_severity_meta( $row->severity ); ?>
 						<tr>
+							<td>
+								<span class="wpopsec-sevdot" style="background:<?php echo esc_attr( $rs_color ); ?>"
+									title="<?php echo esc_attr( $rs_label ); ?>"><?php echo esc_html( (int) $row->severity ); ?></span>
+							</td>
 							<td class="wpopsec-nowrap"><?php echo esc_html( mysql2date( 'M j, H:i', $row->created_at ) ); ?></td>
 							<td><span class="wpopsec-mod"><?php echo esc_html( $row->module ); ?></span></td>
 							<td><code><?php echo esc_html( $row->event ); ?></code></td>
@@ -529,6 +559,9 @@ class WPOpsec_Module_Loader {
 		.wpopsec-card__icon { font-size:19px; width:19px; height:19px; color:var(--accent, #646970); }
 		.wpopsec-card__title { font-weight:600; font-size:14px; color:var(--ink); }
 		.wpopsec-card__note { font-size:12px; color:var(--muted); margin-top:7px; }
+		.wpopsec-sevdot { margin-left:auto; display:inline-grid; place-items:center; min-width:22px;
+			height:20px; padding:0 5px; border-radius:4px; color:#fff; font-size:11px;
+			font-weight:700; font-variant-numeric:tabular-nums; }
 		.wpopsec-card__foot { margin-top:11px; display:flex; gap:6px; flex-wrap:wrap; }
 
 		.wpopsec-pill { display:inline-block; font-size:12px; font-weight:600; padding:3px 9px;

@@ -41,6 +41,126 @@ if ( ! function_exists( 'wpopsec_events_table' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wpopsec_severity_map' ) ) {
+	/**
+	 * Event severity, 1 (noise) to 20 (treat the site as compromised).
+	 *
+	 * The scale is about *what the event implies*, not how confident the
+	 * detection is. Anything at 18+ means something already succeeded —
+	 * a file changed, an admin account exists that shouldn't — as opposed
+	 * to an attempt that was stopped, which tops out around 17.
+	 *
+	 * Rough bands:
+	 *   18-20  evidence of compromise; investigate now
+	 *   14-17  serious exploitation attempt (RCE, webshell, SQLi)
+	 *   10-13  targeted probing / confirmed brute force
+	 *    5-9   background scanning and reconnaissance
+	 *    1-4   informational, expected activity
+	 *
+	 * @return array<string,int> "module:event" or "event" => severity
+	 */
+	function wpopsec_severity_map() {
+		return array(
+			// --- Evidence something already happened -------------------
+			'file-integrity:core_mismatch'          => 20,
+			'user-watchdog:unexplained_privileged_user' => 20,
+			'hardening:hidden_plugin'               => 20,
+			'user-watchdog:privileged_user_created' => 19,
+			'user-watchdog:privilege_escalation'    => 19,
+			'file-integrity:baseline_drift'         => 18,
+			'user-watchdog:admin_email_changed'     => 18,
+			'user-watchdog:privileged_user_changed' => 18,
+			'user-watchdog:privileged_user_deleted' => 17,
+
+			// --- Serious exploitation attempts ------------------------
+			'query-guard:upload_executable_ext'     => 17,
+			'query-guard:body_php_open_tag'         => 16,
+			'query-guard:body_eval_exec'            => 16,
+			'query-guard:body_php_wrapper'          => 16,
+			'query-guard:cmdi_shell_functions'      => 15,
+			'query-guard:cmdi_command_chain'        => 15,
+			'query-guard:cmdi_backtick_exec'        => 15,
+			'query-guard:traversal_php_wrapper'     => 15,
+			'query-guard:traversal_remote_wrapper'  => 15,
+			'query-guard:body_base64_payload'       => 14,
+			'query-guard:traversal_etc_passwd'      => 14,
+			'query-guard:sqli_union_select'         => 14,
+			'query-guard:sqli_extractvalue'         => 14,
+			'query-guard:sqli_information_schema'   => 13,
+			'query-guard:sqli_sleep_benchmark'      => 13,
+			'query-guard:sqli_or_equals'            => 13,
+			'query-guard:sqli_comment_injection'    => 13,
+			'query-guard:body_traversal'            => 13,
+			'query-guard:traversal_dotdot'          => 12,
+			'query-guard:xss_script_tag'            => 12,
+			'query-guard:xss_svg_onload'            => 12,
+			'query-guard:xss_js_protocol'           => 11,
+			'query-guard:xss_event_handler'         => 11,
+			'query-guard:body_null_byte'            => 11,
+			'query-guard:other_null_byte'           => 11,
+
+			// --- Targeted probing / confirmed brute force -------------
+			'login-guard:lockout'                   => 12,
+			'login-guard:locked_attempt'            => 10,
+			'query-guard:xmlrpc_access'             => 10,
+
+			// --- Reconnaissance ---------------------------------------
+			'ip-blocklist:listed_ip'                => 8,
+			'user-enum:rest_users'                  => 7,
+			'user-enum:author_scan'                 => 7,
+			'login-guard:login_failed'              => 5,
+
+			// --- Informational ----------------------------------------
+			'vuln-scanner:scan_findings'            => 6,
+			'auto-update:update_failed'             => 6,
+			'auto-update:updater_disabled'          => 5,
+			'login-guard:login_success'             => 2,
+			'auto-update:updated'                   => 2,
+			'file-integrity:baseline_taken'         => 1,
+			'user-watchdog:snapshot_taken'          => 1,
+		);
+	}
+
+	/**
+	 * Severity for one event, falling back to a mid-scale default so an
+	 * unmapped event from a new module is never silently treated as noise.
+	 */
+	function wpopsec_event_severity( $module, $event, $action = 'noted' ) {
+		$map = wpopsec_severity_map();
+		$key = $module . ':' . $event;
+
+		if ( isset( $map[ $key ] ) ) {
+			$severity = $map[ $key ];
+		} elseif ( isset( $map[ $event ] ) ) {
+			$severity = $map[ $event ];
+		} else {
+			// Unknown event: assume it matters more if a module chose to
+			// block on it than if it was only noted.
+			$severity = 'blocked' === $action ? 12 : 8;
+		}
+
+		return max( 1, min( 20, (int) $severity ) );
+	}
+
+	/** @return array{0:string,1:string} label and colour for a severity. */
+	function wpopsec_severity_meta( $severity ) {
+		$severity = (int) $severity;
+		if ( $severity >= 18 ) {
+			return array( 'Critical', '#8b0a3e' );
+		}
+		if ( $severity >= 14 ) {
+			return array( 'High', '#c9356a' );
+		}
+		if ( $severity >= 10 ) {
+			return array( 'Medium', '#b26e00' );
+		}
+		if ( $severity >= 5 ) {
+			return array( 'Low', '#2271b1' );
+		}
+		return array( 'Info', '#646970' );
+	}
+}
+
 if ( ! function_exists( 'wpopsec_log_event' ) ) {
 	/**
 	 * Central event log every module writes to, so the admin has one place
@@ -48,18 +168,23 @@ if ( ! function_exists( 'wpopsec_log_event' ) ) {
 	 * mirrored to error_log, which is what the operator's existing external
 	 * tooling (fail2ban-style watchers, log shippers) can consume.
 	 *
-	 * @param string $module  module id, e.g. 'query-guard'
-	 * @param string $event   short machine-readable event id
-	 * @param string $action  'blocked' | 'logged' (log-only mode) | 'noted'
-	 * @param string $detail  free-text context (truncated)
+	 * @param string   $module   module id, e.g. 'query-guard'
+	 * @param string   $event    short machine-readable event id
+	 * @param string   $action   'blocked' | 'logged' (log-only mode) | 'noted'
+	 * @param string   $detail   free-text context (truncated)
+	 * @param int|null $severity 1-20; omit to take it from the severity map
 	 */
-	function wpopsec_log_event( $module, $event, $action = 'noted', $detail = '' ) {
+	function wpopsec_log_event( $module, $event, $action = 'noted', $detail = '', $severity = null ) {
 		global $wpdb;
 
 		$ip     = wpopsec_client_ip();
 		$detail = substr( str_replace( array( "\r", "\n" ), ' ', (string) $detail ), 0, 500 );
 
-		error_log( "wp-opsec {$module}: [{$event}] {$action} ip={$ip} {$detail}" );
+		$severity = ( null === $severity )
+			? wpopsec_event_severity( $module, $event, $action )
+			: max( 1, min( 20, (int) $severity ) );
+
+		error_log( "wp-opsec {$module}: [{$event}] {$action} sev={$severity} ip={$ip} {$detail}" );
 
 		// Never let a logging failure (missing table mid-upgrade, DB hiccup)
 		// take down the request it was only meant to annotate.
@@ -72,11 +197,12 @@ if ( ! function_exists( 'wpopsec_log_event' ) ) {
 				'module'     => substr( (string) $module, 0, 32 ),
 				'event'      => substr( (string) $event, 0, 64 ),
 				'action'     => substr( (string) $action, 0, 16 ),
+				'severity'   => $severity,
 				'ip'         => substr( $ip, 0, 45 ),
 				'uri'        => substr( (string) ( $_SERVER['REQUEST_URI'] ?? '' ), 0, 255 ),
 				'detail'     => $detail,
 			),
-			array( '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
+			array( '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s' )
 		);
 		$wpdb->suppress_errors( false );
 	}

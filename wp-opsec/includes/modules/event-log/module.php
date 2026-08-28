@@ -10,7 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class WPOpsec_Module_Event_Log {
 
 	const CRON_HOOK      = 'wpopsec_event_log_prune';
-	const DB_VERSION     = 1;
+	const DB_VERSION     = 2;
 	const PER_PAGE       = 50;
 	const DEFAULT_RETAIN = 30; // days
 
@@ -54,17 +54,47 @@ class WPOpsec_Module_Event_Log {
 				module varchar(32) NOT NULL DEFAULT '',
 				event varchar(64) NOT NULL DEFAULT '',
 				action varchar(16) NOT NULL DEFAULT '',
+				severity tinyint(3) unsigned NOT NULL DEFAULT 0,
 				ip varchar(45) NOT NULL DEFAULT '',
 				uri varchar(255) NOT NULL DEFAULT '',
 				detail text NULL,
 				PRIMARY KEY  (id),
 				KEY created_at (created_at),
 				KEY module_event (module,event),
+				KEY severity (severity),
 				KEY ip (ip)
 			) {$collate};"
 		);
 
+		self::backfill_severity();
+
 		update_option( 'wpopsec_event_log_db_version', self::DB_VERSION, false );
+	}
+
+	/**
+	 * Rows written before severity existed default to 0, which would sort
+	 * below genuine "Info" events and read as "nothing to see". Score them
+	 * from the same map so historic rows stay comparable.
+	 */
+	private static function backfill_severity() {
+		global $wpdb;
+
+		$table = wpopsec_events_table();
+
+		$pairs = $wpdb->get_results(
+			"SELECT DISTINCT module, event, action FROM {$table} WHERE severity = 0",
+			ARRAY_A
+		);
+
+		foreach ( (array) $pairs as $p ) {
+			$wpdb->update(
+				$table,
+				array( 'severity' => wpopsec_event_severity( $p['module'], $p['event'], $p['action'] ) ),
+				array( 'module' => $p['module'], 'event' => $p['event'], 'action' => $p['action'], 'severity' => 0 ),
+				array( '%d' ),
+				array( '%s', '%s', '%s', '%d' )
+			);
+		}
 	}
 
 	private static function maybe_upgrade_table() {
@@ -144,6 +174,14 @@ class WPOpsec_Module_Event_Log {
 			$where[]  = 'ip = %s';
 			$params[] = $filters['ip'];
 		}
+		if ( ! empty( $filters['min_sev'] ) ) {
+			$where[]  = 'severity >= %d';
+			$params[] = (int) $filters['min_sev'];
+		}
+
+		$order_sql = ( ! empty( $filters['sort'] ) && 'severity' === $filters['sort'] )
+			? 'severity DESC, id DESC'
+			: 'id DESC';
 
 		$where_sql = implode( ' AND ', $where );
 
@@ -151,7 +189,7 @@ class WPOpsec_Module_Event_Log {
 		$total     = (int) ( $params ? $wpdb->get_var( $wpdb->prepare( $count_sql, $params ) ) : $wpdb->get_var( $count_sql ) );
 
 		$offset   = ( $page - 1 ) * self::PER_PAGE;
-		$rows_sql = "SELECT * FROM {$table} WHERE {$where_sql} ORDER BY id DESC LIMIT %d OFFSET %d";
+		$rows_sql = "SELECT * FROM {$table} WHERE {$where_sql} ORDER BY {$order_sql} LIMIT %d OFFSET %d";
 		$rows     = $wpdb->get_results( $wpdb->prepare( $rows_sql, array_merge( $params, array( self::PER_PAGE, $offset ) ) ) );
 
 		return array( 'rows' => $rows ?: array(), 'total' => $total );
@@ -163,7 +201,9 @@ class WPOpsec_Module_Event_Log {
 		$filters = array(
 			'module' => isset( $_GET['f_module'] ) ? sanitize_text_field( wp_unslash( $_GET['f_module'] ) ) : '',
 			'action' => isset( $_GET['f_action'] ) ? sanitize_text_field( wp_unslash( $_GET['f_action'] ) ) : '',
-			'ip'     => isset( $_GET['f_ip'] ) ? sanitize_text_field( wp_unslash( $_GET['f_ip'] ) ) : '',
+			'ip'      => isset( $_GET['f_ip'] ) ? sanitize_text_field( wp_unslash( $_GET['f_ip'] ) ) : '',
+			'min_sev' => isset( $_GET['f_sev'] ) ? max( 0, min( 20, (int) $_GET['f_sev'] ) ) : 0,
+			'sort'    => isset( $_GET['sort'] ) && 'severity' === $_GET['sort'] ? 'severity' : 'time',
 		);
 		$page = isset( $_GET['paged'] ) ? max( 1, (int) $_GET['paged'] ) : 1;
 
@@ -175,7 +215,20 @@ class WPOpsec_Module_Event_Log {
 
 		$last24 = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE created_at > DATE_SUB(NOW(), INTERVAL 1 DAY)" );
 		$blocked24 = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE action = 'blocked' AND created_at > DATE_SUB(NOW(), INTERVAL 1 DAY)" );
+		$worst24 = (int) $wpdb->get_var( "SELECT MAX(severity) FROM {$table} WHERE created_at > DATE_SUB(NOW(), INTERVAL 1 DAY)" );
+		$high_open = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE severity >= 14 AND created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)" );
 		?>
+		<style>
+		.wpopsec-sev { display:inline-flex; align-items:center; gap:6px; }
+		.wpopsec-sev__num { display:inline-grid; place-items:center; min-width:26px; height:22px;
+			padding:0 5px; border-radius:4px; color:#fff; font-weight:700; font-size:12px;
+			font-variant-numeric:tabular-nums; }
+		.wpopsec-sev__label { font-size:11px; text-transform:uppercase; letter-spacing:.4px; color:#646970; }
+		.wpopsec-sevbar { display:inline-block; width:54px; height:5px; border-radius:3px;
+			background:#e9eaec; overflow:hidden; vertical-align:middle; }
+		.wpopsec-sevbar i { display:block; height:100%; border-radius:3px; }
+		</style>
+
 		<div class="wrap">
 			<h1>WP Opsec — Event Log</h1>
 
@@ -189,8 +242,26 @@ class WPOpsec_Module_Event_Log {
 			<p>
 				<strong><?php echo esc_html( number_format_i18n( $result['total'] ) ); ?></strong> events stored ·
 				<strong><?php echo esc_html( number_format_i18n( $last24 ) ); ?></strong> in the last 24h
-				(<?php echo esc_html( number_format_i18n( $blocked24 ) ); ?> blocked).
+				(<?php echo esc_html( number_format_i18n( $blocked24 ) ); ?> blocked)
+				<?php if ( $worst24 ) : ?>
+					<?php list( $w_label, $w_color ) = wpopsec_severity_meta( $worst24 ); ?>
+					· worst in 24h:
+					<span class="wpopsec-sev">
+						<span class="wpopsec-sev__num" style="background:<?php echo esc_attr( $w_color ); ?>"><?php echo esc_html( $worst24 ); ?></span>
+						<span class="wpopsec-sev__label"><?php echo esc_html( $w_label ); ?></span>
+					</span>
+				<?php endif; ?>
 			</p>
+
+			<?php if ( $high_open ) : ?>
+				<div class="notice notice-error inline">
+					<p>
+						<strong><?php echo esc_html( number_format_i18n( $high_open ) ); ?></strong>
+						event(s) at severity 14+ in the last 7 days.
+						<a href="<?php echo esc_url( add_query_arg( array( 'page' => 'wp-opsec-event-log', 'f_sev' => 14, 'sort' => 'severity' ), admin_url( 'admin.php' ) ) ); ?>">Review them →</a>
+					</p>
+				</div>
+			<?php endif; ?>
 
 			<form method="get" style="margin:1em 0">
 				<input type="hidden" name="page" value="wp-opsec-event-log">
@@ -207,12 +278,25 @@ class WPOpsec_Module_Event_Log {
 					<?php endforeach; ?>
 				</select>
 				<input type="text" name="f_ip" value="<?php echo esc_attr( $filters['ip'] ); ?>" placeholder="IP">
+				<select name="f_sev">
+					<option value="0">Any severity</option>
+					<?php
+					foreach ( array( 18 => 'Critical (18+)', 14 => 'High (14+)', 10 => 'Medium (10+)', 5 => 'Low (5+)' ) as $v => $label ) :
+						?>
+						<option value="<?php echo esc_attr( $v ); ?>" <?php selected( $filters['min_sev'], $v ); ?>><?php echo esc_html( $label ); ?></option>
+					<?php endforeach; ?>
+				</select>
+				<select name="sort">
+					<option value="time" <?php selected( $filters['sort'], 'time' ); ?>>Newest first</option>
+					<option value="severity" <?php selected( $filters['sort'], 'severity' ); ?>>Most severe first</option>
+				</select>
 				<?php submit_button( 'Filter', 'secondary', 'submit', false ); ?>
 			</form>
 
 			<table class="widefat striped">
 				<thead>
 					<tr>
+						<th style="width:130px">Severity</th>
 						<th style="width:140px">Time</th>
 						<th style="width:100px">Module</th>
 						<th style="width:160px">Event</th>
@@ -223,10 +307,20 @@ class WPOpsec_Module_Event_Log {
 				</thead>
 				<tbody>
 				<?php if ( empty( $result['rows'] ) ) : ?>
-					<tr><td colspan="6">No events recorded.</td></tr>
+					<tr><td colspan="7">No events recorded.</td></tr>
 				<?php else : ?>
 					<?php foreach ( $result['rows'] as $row ) : ?>
+						<?php list( $sev_label, $sev_color ) = wpopsec_severity_meta( $row->severity ); ?>
 						<tr>
+							<td>
+								<span class="wpopsec-sev">
+									<span class="wpopsec-sev__num" style="background:<?php echo esc_attr( $sev_color ); ?>"><?php echo esc_html( (int) $row->severity ); ?></span>
+									<span>
+										<span class="wpopsec-sev__label"><?php echo esc_html( $sev_label ); ?></span><br>
+										<span class="wpopsec-sevbar"><i style="width:<?php echo esc_attr( (int) $row->severity * 5 ); ?>%;background:<?php echo esc_attr( $sev_color ); ?>"></i></span>
+									</span>
+								</span>
+							</td>
 							<td><?php echo esc_html( $row->created_at ); ?></td>
 							<td><?php echo esc_html( $row->module ); ?></td>
 							<td><code><?php echo esc_html( $row->event ); ?></code></td>
