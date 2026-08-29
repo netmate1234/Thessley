@@ -31,6 +31,10 @@ class WPOpsec_UI {
 			'user-watchdog'  => array( 'admin-users', 'User Watchdog', 'Watches privileged accounts. A hidden administrator is how a backdoor survives removal of the code that planted it.' ),
 			'hardening'      => array( 'admin-tools', 'Hardening', 'Removes the tools an attacker reaches for after getting in.' ),
 			'telegram-alerts' => array( 'testimonial', 'Telegram Alerts', 'Sends a real-time Telegram message when an event exceeds a severity threshold. The Event Log records everything regardless of this setting.' ),
+			'malware-scanner' => array( 'warning', 'Malware Scanner', 'Scans plugin, theme and upload files for webshell, obfuscation and injected-spam signatures.' ),
+			'geo-blocker'     => array( 'admin-site-alt3', 'Geo Blocker', 'Blocks or allows traffic by country, using a compiled IP-to-country dataset checked at the early gate.' ),
+			'activity-log'    => array( 'edit-page', 'Activity Log', 'Records who published, deleted, installed or changed what — the mundane audit trail, not attack detections.' ),
+			'rate-limiter'    => array( 'clock', 'Rate Limiter', 'Throttles requests per IP site-wide, and escalates sustained floods to the local IP blocklist.' ),
 		);
 
 		return $map[ $key ] ?? array( 'shield', 'WP Opsec', '' );

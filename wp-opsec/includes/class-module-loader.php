@@ -27,6 +27,12 @@ class WPOpsec_Module_Loader {
 		'user-watchdog'  => 'WPOpsec_Module_User_Watchdog',
 		'hardening'      => 'WPOpsec_Module_Hardening',
 		'telegram-alerts' => 'WPOpsec_Module_Telegram_Alerts',
+		// New modules: rate-limiter first, since a flood is the thing most
+		// likely to also trip malware-scanner/geo-blocker/activity-log noise.
+		'rate-limiter'    => 'WPOpsec_Module_Rate_Limiter',
+		'geo-blocker'     => 'WPOpsec_Module_Geo_Blocker',
+		'malware-scanner' => 'WPOpsec_Module_Malware_Scanner',
+		'activity-log'    => 'WPOpsec_Module_Activity_Log',
 	);
 
 	public static function init() {
@@ -114,6 +120,15 @@ class WPOpsec_Module_Loader {
 
 		$vuln_findings = count( (array) ( $vuln['findings'] ?? array() ) );
 		$integrity     = self::integrity_issue_count();
+
+		$mal_last     = get_option( 'wpopsec_malware_last_result', array() );
+		$mal_findings = count( (array) ( $mal_last['findings'] ?? array() ) );
+		$geo_stats    = get_option( 'wpopsec_geo_stats', array() );
+		$geo_selected = count( (array) get_option( 'wpopsec_geo_countries', array() ) );
+		$geo_enforce  = get_option( 'wpopsec_geo_enforce_mode', 'log' );
+		$al_count     = count( (array) get_option( 'wpopsec_activity_categories', array( 'content', 'plugins_themes', 'settings' ) ) );
+		$rl_on        = (bool) get_option( 'wpopsec_ratelimit_enabled', true );
+		$rl_mode      = get_option( 'wpopsec_ratelimit_mode', 'log' );
 
 		return array(
 			array(
@@ -228,6 +243,42 @@ class WPOpsec_Module_Loader {
 					? ( get_option( 'wpopsec_telegram_chat_id', '' ) ? 'good' : 'warn' )
 					: 'warn',
 				'note'  => sprintf( 'alerts above %d', (int) get_option( 'wpopsec_telegram_threshold', 15 ) ),
+			),
+			array(
+				'key'   => 'malware-scanner',
+				'title' => 'Malware Scanner',
+				'icon'  => 'warning',
+				'page'  => 'wp-opsec-malware-scanner',
+				'state' => $mal_last ? ( $mal_findings ? sprintf( '%d finding(s)', $mal_findings ) : 'Clean' ) : 'Not run',
+				'level' => $mal_last ? ( $mal_findings ? 'bad' : 'good' ) : 'warn',
+				'note'  => $mal_last ? sprintf( '%d file(s) scanned', (int) ( $mal_last['scanned_count'] ?? 0 ) ) : 'never scanned',
+			),
+			array(
+				'key'   => 'geo-blocker',
+				'title' => 'Geo Blocker',
+				'icon'  => 'admin-site-alt3',
+				'page'  => 'wp-opsec-geo-blocker',
+				'state' => $geo_selected ? sprintf( '%d country(ies)', $geo_selected ) : 'Not configured',
+				'level' => $geo_selected ? ( 'block' === $geo_enforce ? 'good' : 'warn' ) : 'warn',
+				'note'  => $geo_stats ? sprintf( '%s ranges indexed', number_format_i18n( (int) ( $geo_stats['count'] ?? 0 ) ) ) : 'no dataset yet',
+			),
+			array(
+				'key'   => 'activity-log',
+				'title' => 'Activity Log',
+				'icon'  => 'edit-page',
+				'page'  => 'wp-opsec-activity-log',
+				'state' => $al_count ? sprintf( '%d categor(ies)', $al_count ) : 'Disabled',
+				'level' => $al_count ? 'good' : 'warn',
+				'note'  => 'posts, plugins, themes, settings',
+			),
+			array(
+				'key'   => 'rate-limiter',
+				'title' => 'Rate Limiter',
+				'icon'  => 'clock',
+				'page'  => 'wp-opsec-rate-limiter',
+				'state' => ! $rl_on ? 'Disabled' : ( 'block' === $rl_mode ? 'Blocking' : 'Log only' ),
+				'level' => ! $rl_on ? 'warn' : ( 'block' === $rl_mode ? 'good' : 'warn' ),
+				'note'  => sprintf( '%s req/min per IP', number_format_i18n( (int) get_option( 'wpopsec_ratelimit_per_minute', 300 ) ) ),
 			),
 		);
 	}
