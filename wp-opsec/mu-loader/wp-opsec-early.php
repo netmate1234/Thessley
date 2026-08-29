@@ -205,6 +205,79 @@ if ( ! function_exists( 'wpopsec_log_event' ) ) {
 			array( '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s' )
 		);
 		$wpdb->suppress_errors( false );
+
+		wpopsec_maybe_telegram_alert( $module, $event, $action, $detail, $severity, $ip );
+	}
+}
+
+if ( ! function_exists( 'wpopsec_maybe_telegram_alert' ) ) {
+	/**
+	 * Fires from wpopsec_log_event() itself rather than a WP action hook.
+	 *
+	 * A real block (mode=block) calls wp_die()/exit immediately after
+	 * logging, at mu-plugin time, before regular plugins have loaded — so
+	 * 'plugins_loaded' never fires and nothing hooked there would ever run
+	 * for exactly the events worth alerting on. Being inline in the one
+	 * choke-point function is the only way this reaches those requests too.
+	 */
+	function wpopsec_maybe_telegram_alert( $module, $event, $action, $detail, $severity, $ip ) {
+		if ( ! get_option( 'wpopsec_telegram_enabled', false ) ) {
+			return;
+		}
+
+		$threshold = (int) get_option( 'wpopsec_telegram_threshold', 15 );
+		if ( $severity <= $threshold ) {
+			return;
+		}
+
+		$token   = trim( (string) get_option( 'wpopsec_telegram_bot_token', '' ) );
+		$chat_id = trim( (string) get_option( 'wpopsec_telegram_chat_id', '' ) );
+		if ( '' === $token || '' === $chat_id ) {
+			return;
+		}
+
+		// A scanner throwing several distinct high-severity payloads in one
+		// burst could otherwise fire a message per payload in the same
+		// second — a short cooldown keeps the first (most useful) alert
+		// immediate without risking Telegram's rate limit on the rest. This
+		// only throttles the notification channel; the event log still
+		// records every event regardless.
+		$lock_key = 'wpopsec_tg_lock';
+		if ( false !== get_transient( $lock_key ) ) {
+			return;
+		}
+		set_transient( $lock_key, 1, 5 );
+
+		list( $label ) = wpopsec_severity_meta( $severity );
+		$site = wp_specialchars_decode( get_option( 'blogname' ), ENT_QUOTES );
+
+		$lines = array(
+			sprintf( '<b>%s</b> — severity %d/20 (%s)', esc_html( $site ), $severity, esc_html( $label ) ),
+			sprintf( '<b>Module:</b> %s   <b>Event:</b> <code>%s</code>', esc_html( $module ), esc_html( $event ) ),
+			sprintf( '<b>Action:</b> %s   <b>IP:</b> <code>%s</code>', esc_html( $action ), esc_html( $ip ) ),
+		);
+		if ( '' !== $detail ) {
+			$lines[] = esc_html( $detail );
+		}
+		$lines[] = current_time( 'mysql' );
+		$text    = implode( "\n", $lines );
+
+		wp_remote_post(
+			'https://api.telegram.org/bot' . rawurlencode( $token ) . '/sendMessage',
+			array(
+				'timeout'  => 3,
+				// Fire-and-forget: this can run inside the early gate right
+				// before wp_die(), and a slow/unreachable Telegram API must
+				// never be what makes a blocked request hang.
+				'blocking' => false,
+				'body'     => array(
+					'chat_id'                  => $chat_id,
+					'text'                     => $text,
+					'parse_mode'               => 'HTML',
+					'disable_web_page_preview' => true,
+				),
+			)
+		);
 	}
 }
 

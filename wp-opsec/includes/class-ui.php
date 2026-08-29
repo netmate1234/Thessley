@@ -30,6 +30,7 @@ class WPOpsec_UI {
 			'auto-update'    => array( 'update', 'Auto Updates', 'About 60% of compromises exploit an already-patched flaw. Installing the update is the fix.' ),
 			'user-watchdog'  => array( 'admin-users', 'User Watchdog', 'Watches privileged accounts. A hidden administrator is how a backdoor survives removal of the code that planted it.' ),
 			'hardening'      => array( 'admin-tools', 'Hardening', 'Removes the tools an attacker reaches for after getting in.' ),
+			'telegram-alerts' => array( 'testimonial', 'Telegram Alerts', 'Sends a real-time Telegram message when an event exceeds a severity threshold. The Event Log records everything regardless of this setting.' ),
 		);
 
 		return $map[ $key ] ?? array( 'shield', 'WP Opsec', '' );

@@ -26,6 +26,7 @@ class WPOpsec_Module_Loader {
 		'auto-update'    => 'WPOpsec_Module_Auto_Update',
 		'user-watchdog'  => 'WPOpsec_Module_User_Watchdog',
 		'hardening'      => 'WPOpsec_Module_Hardening',
+		'telegram-alerts' => 'WPOpsec_Module_Telegram_Alerts',
 	);
 
 	public static function init() {
@@ -216,6 +217,17 @@ class WPOpsec_Module_Loader {
 				'note'  => class_exists( 'WPOpsec_Module_Hardening' ) && WPOpsec_Module_Hardening::uploads_guard_active()
 					? 'uploads guarded'
 					: 'uploads unguarded',
+			),
+			array(
+				'key'   => 'telegram-alerts',
+				'title' => 'Telegram Alerts',
+				'icon'  => 'testimonial',
+				'page'  => 'wp-opsec-telegram',
+				'state' => get_option( 'wpopsec_telegram_enabled', false ) ? 'Enabled' : 'Disabled',
+				'level' => get_option( 'wpopsec_telegram_enabled', false )
+					? ( get_option( 'wpopsec_telegram_chat_id', '' ) ? 'good' : 'warn' )
+					: 'warn',
+				'note'  => sprintf( 'alerts above %d', (int) get_option( 'wpopsec_telegram_threshold', 15 ) ),
 			),
 		);
 	}
