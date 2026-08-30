@@ -378,10 +378,8 @@ if ( ! function_exists( 'wpopsec_parse_cidr_file' ) ) {
 if ( ! function_exists( 'wpopsec_trusted_ranges' ) ) {
 	/**
 	 * Trusted networks — e.g. known search-engine crawler ranges you never
-	 * want blocked — from up to two sources, merged: an operator-supplied
-	 * local file (wpopsec_trusted_networks_file) and a daily-downloaded
-	 * cache of a remote URL (wpopsec_trusted_networks_url). Either, both,
-	 * or neither may be configured.
+	 * want blocked — from a daily-downloaded cache of an operator-supplied
+	 * URL (wpopsec_trusted_networks_url). Optional; empty if unconfigured.
 	 */
 	function wpopsec_trusted_ranges() {
 		static $ranges = null;
@@ -389,8 +387,7 @@ if ( ! function_exists( 'wpopsec_trusted_ranges' ) ) {
 			return $ranges;
 		}
 
-		$ranges = wpopsec_parse_cidr_file( get_option( 'wpopsec_trusted_networks_file', '' ) );
-		$ranges = array_merge( $ranges, wpopsec_parse_cidr_file( wpopsec_trusted_networks_remote_file() ) );
+		$ranges = wpopsec_parse_cidr_file( wpopsec_trusted_networks_remote_file() );
 
 		return $ranges;
 	}

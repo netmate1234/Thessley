@@ -177,9 +177,6 @@ class WPOpsec_Module_IP_Blocklist {
 		$sources        = array_values( array_intersect( $posted_sources, array_keys( WPOpsec_IP_Blocklist_Fetcher::SOURCES ) ) );
 		update_option( 'wpopsec_ip_blocklist_sources', $sources );
 
-		$trusted_file = isset( $_POST['trusted_networks_file'] ) ? trim( wp_unslash( $_POST['trusted_networks_file'] ) ) : '';
-		update_option( 'wpopsec_trusted_networks_file', $trusted_file );
-
 		$trusted_url_raw = isset( $_POST['trusted_networks_url'] ) ? trim( wp_unslash( $_POST['trusted_networks_url'] ) ) : '';
 		$trusted_url     = ( '' !== $trusted_url_raw && false !== filter_var( $trusted_url_raw, FILTER_VALIDATE_URL ) ) ? $trusted_url_raw : '';
 		$url_changed     = $trusted_url !== get_option( 'wpopsec_trusted_networks_url', '' );
@@ -233,7 +230,6 @@ class WPOpsec_Module_IP_Blocklist {
 		$mode            = get_option( 'wpopsec_ip_blocklist_mode', 'log' );
 		$allowlist       = get_option( 'wpopsec_ip_allowlist', array() );
 		$enabled_sources = get_option( 'wpopsec_ip_blocklist_sources', WPOpsec_IP_Blocklist_Fetcher::DEFAULT_ENABLED );
-		$trusted_file    = get_option( 'wpopsec_trusted_networks_file', '' );
 		$trusted_url     = get_option( 'wpopsec_trusted_networks_url', '' );
 		$trusted_remote_stats = get_option( 'wpopsec_trusted_networks_remote_stats', array() );
 		$local           = get_option( 'wpopsec_local_blocklist', array() );
@@ -393,25 +389,7 @@ class WPOpsec_Module_IP_Blocklist {
 				);
 
 				WPOpsec_UI::row(
-					'Trusted networks file',
-					function () use ( $trusted_file ) {
-						?>
-						<input type="text" name="trusted_networks_file" value="<?php echo esc_attr( $trusted_file ); ?>" style="width:100%;max-width:420px" placeholder="/etc/eagleeye/crawler-nets.conf">
-						<?php
-						if ( '' !== $trusted_file ) {
-							echo ' ';
-							if ( is_readable( $trusted_file ) ) {
-								WPOpsec_UI::badge( count( wpopsec_trusted_ranges() ) . ' networks loaded', 'good', 'yes-alt' );
-							} else {
-								WPOpsec_UI::badge( 'not readable', 'bad', 'warning' );
-							}
-						}
-					},
-					'Optional path to a CIDR-per-line file (e.g. known crawler ranges) that is always exempt — from these feeds, from local escalation, and from the xmlrpc block.'
-				);
-
-				WPOpsec_UI::row(
-					'Trusted networks URL',
+					'Trusted networks',
 					function () use ( $trusted_url, $trusted_remote_stats ) {
 						?>
 						<input type="url" name="trusted_networks_url" value="<?php echo esc_attr( $trusted_url ); ?>" style="width:100%;max-width:420px" placeholder="https://dashboard.eagleeye-intelligence.com/wp-content/uploads/wp-opsec/crawler-nets.conf">
@@ -431,7 +409,7 @@ class WPOpsec_Module_IP_Blocklist {
 						?>
 						<?php
 					},
-					'Same effect as the local file above, merged with it — a CIDR-per-line list downloaded once a day (also re-fetched immediately when this URL changes) and cached locally, so other installs can point here instead of each server keeping its own copy in sync by hand.'
+					'Optional URL to a CIDR-per-line file (e.g. known crawler ranges) that is always exempt — from these feeds, from local escalation, and from the xmlrpc block. Downloaded once a day (also re-fetched immediately when this URL changes) and cached locally, so every install can point at one centrally-maintained file instead of each server keeping its own copy in sync by hand.'
 				);
 				?>
 			<?php WPOpsec_UI::section_end(); ?>
