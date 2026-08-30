@@ -346,26 +346,24 @@ if ( ! function_exists( 'wpopsec_ip_is_reserved' ) ) {
 	}
 }
 
-if ( ! function_exists( 'wpopsec_trusted_ranges' ) ) {
+if ( ! function_exists( 'wpopsec_trusted_networks_remote_file' ) ) {
 	/**
-	 * Optional operator-supplied trusted-networks file (CIDR per line, '#'
-	 * comments) — e.g. known search-engine crawler ranges you never want
-	 * blocked. Path is configurable per install (wpopsec_trusted_networks_file
-	 * option), not hardcoded, so this stays a general plugin feature rather
-	 * than something tied to one specific host's file layout.
+	 * Local cache of a CIDR-per-line list fetched daily from
+	 * wpopsec_trusted_networks_url — lets every install point at one
+	 * centrally-maintained file (e.g. hosted on the main site) instead of
+	 * each server needing its own local copy kept in sync by hand.
 	 */
-	function wpopsec_trusted_ranges() {
-		static $ranges = null;
-		if ( null !== $ranges ) {
-			return $ranges;
-		}
+	function wpopsec_trusted_networks_remote_file() {
+		return WPMU_PLUGIN_DIR . '/wp-opsec-checks/data/trusted-networks-remote.conf';
+	}
+}
 
+if ( ! function_exists( 'wpopsec_parse_cidr_file' ) ) {
+	function wpopsec_parse_cidr_file( $path ) {
 		$ranges = array();
-		$path   = get_option( 'wpopsec_trusted_networks_file', '' );
-		if ( '' === $path || ! is_readable( $path ) ) {
+		if ( ! is_readable( $path ) ) {
 			return $ranges;
 		}
-
 		foreach ( file( $path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES ) ?: array() as $line ) {
 			$line = trim( $line );
 			if ( '' === $line || '#' === $line[0] || false === strpos( $line, '/' ) ) {
@@ -373,6 +371,26 @@ if ( ! function_exists( 'wpopsec_trusted_ranges' ) ) {
 			}
 			$ranges[] = wpopsec_cidr_to_range( $line );
 		}
+		return $ranges;
+	}
+}
+
+if ( ! function_exists( 'wpopsec_trusted_ranges' ) ) {
+	/**
+	 * Trusted networks — e.g. known search-engine crawler ranges you never
+	 * want blocked — from up to two sources, merged: an operator-supplied
+	 * local file (wpopsec_trusted_networks_file) and a daily-downloaded
+	 * cache of a remote URL (wpopsec_trusted_networks_url). Either, both,
+	 * or neither may be configured.
+	 */
+	function wpopsec_trusted_ranges() {
+		static $ranges = null;
+		if ( null !== $ranges ) {
+			return $ranges;
+		}
+
+		$ranges = wpopsec_parse_cidr_file( get_option( 'wpopsec_trusted_networks_file', '' ) );
+		$ranges = array_merge( $ranges, wpopsec_parse_cidr_file( wpopsec_trusted_networks_remote_file() ) );
 
 		return $ranges;
 	}

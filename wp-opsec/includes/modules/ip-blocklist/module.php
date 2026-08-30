@@ -60,7 +60,67 @@ class WPOpsec_Module_IP_Blocklist {
 		// once it's past expires_at unless another IP happens to get added.
 		wpopsec_local_blocklist_rebuild();
 
+		self::refresh_trusted_networks_url();
+
 		return $stats;
+	}
+
+	/**
+	 * Downloads the optional remote trusted-networks list and caches it
+	 * locally, so every install can point at one centrally-maintained file
+	 * (e.g. hosted on the main site) instead of each server needing its own
+	 * local copy kept in sync by hand. A failed fetch keeps the last-good
+	 * cache rather than clearing trust on a transient network hiccup.
+	 */
+	private static function refresh_trusted_networks_url() {
+		$url = trim( (string) get_option( 'wpopsec_trusted_networks_url', '' ) );
+		$dest = wpopsec_trusted_networks_remote_file();
+
+		if ( '' === $url ) {
+			if ( file_exists( $dest ) ) {
+				unlink( $dest );
+			}
+			delete_option( 'wpopsec_trusted_networks_remote_stats' );
+			return;
+		}
+
+		$response = wp_remote_get( $url, array( 'timeout' => 20 ) );
+		if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
+			update_option( 'wpopsec_trusted_networks_remote_stats', array(
+				'error'      => is_wp_error( $response ) ? $response->get_error_message() : 'HTTP ' . wp_remote_retrieve_response_code( $response ),
+				'checked_at' => time(),
+			), false );
+			return;
+		}
+
+		$body = wp_remote_retrieve_body( $response );
+		$dir  = dirname( $dest );
+		if ( ! file_exists( $dir ) ) {
+			wp_mkdir_p( $dir );
+		}
+
+		$tmp = $dest . '.tmp-' . wp_generate_password( 8, false );
+		file_put_contents( $tmp, $body, LOCK_EX );
+		$count = count( wpopsec_parse_cidr_file( $tmp ) );
+
+		if ( $count < 1 ) {
+			// Empty or unparseable response — don't let a bad fetch silently
+			// wipe out a previously-working trusted list.
+			unlink( $tmp );
+			update_option( 'wpopsec_trusted_networks_remote_stats', array(
+				'error'      => 'downloaded file had no valid CIDR lines, previous cache kept',
+				'checked_at' => time(),
+			), false );
+			return;
+		}
+
+		rename( $tmp, $dest );
+
+		update_option( 'wpopsec_trusted_networks_remote_stats', array(
+			'count'      => $count,
+			'updated_at' => time(),
+			'url'        => $url,
+		), false );
 	}
 
 	private static function deploy_check_file() {
@@ -120,6 +180,17 @@ class WPOpsec_Module_IP_Blocklist {
 		$trusted_file = isset( $_POST['trusted_networks_file'] ) ? trim( wp_unslash( $_POST['trusted_networks_file'] ) ) : '';
 		update_option( 'wpopsec_trusted_networks_file', $trusted_file );
 
+		$trusted_url_raw = isset( $_POST['trusted_networks_url'] ) ? trim( wp_unslash( $_POST['trusted_networks_url'] ) ) : '';
+		$trusted_url     = ( '' !== $trusted_url_raw && false !== filter_var( $trusted_url_raw, FILTER_VALIDATE_URL ) ) ? $trusted_url_raw : '';
+		$url_changed     = $trusted_url !== get_option( 'wpopsec_trusted_networks_url', '' );
+		update_option( 'wpopsec_trusted_networks_url', $trusted_url );
+
+		if ( $url_changed ) {
+			// Fetch immediately on save rather than waiting for tomorrow's
+			// cron, same reasoning as activate()'s immediate refresh().
+			self::refresh_trusted_networks_url();
+		}
+
 		wp_safe_redirect( add_query_arg( 'saved', '1', wp_get_referer() ) );
 		exit;
 	}
@@ -163,6 +234,8 @@ class WPOpsec_Module_IP_Blocklist {
 		$allowlist       = get_option( 'wpopsec_ip_allowlist', array() );
 		$enabled_sources = get_option( 'wpopsec_ip_blocklist_sources', WPOpsec_IP_Blocklist_Fetcher::DEFAULT_ENABLED );
 		$trusted_file    = get_option( 'wpopsec_trusted_networks_file', '' );
+		$trusted_url     = get_option( 'wpopsec_trusted_networks_url', '' );
+		$trusted_remote_stats = get_option( 'wpopsec_trusted_networks_remote_stats', array() );
 		$local           = get_option( 'wpopsec_local_blocklist', array() );
 
 		WPOpsec_UI::open( 'ip-blocklist' );
@@ -335,6 +408,30 @@ class WPOpsec_Module_IP_Blocklist {
 						}
 					},
 					'Optional path to a CIDR-per-line file (e.g. known crawler ranges) that is always exempt — from these feeds, from local escalation, and from the xmlrpc block.'
+				);
+
+				WPOpsec_UI::row(
+					'Trusted networks URL',
+					function () use ( $trusted_url, $trusted_remote_stats ) {
+						?>
+						<input type="url" name="trusted_networks_url" value="<?php echo esc_attr( $trusted_url ); ?>" style="width:100%;max-width:420px" placeholder="https://dashboard.eagleeye-intelligence.com/wp-content/uploads/wp-opsec/crawler-nets.conf">
+						<?php
+						if ( '' !== $trusted_url ) {
+							echo ' ';
+							if ( ! empty( $trusted_remote_stats['error'] ) ) {
+								WPOpsec_UI::badge( 'fetch failed: ' . $trusted_remote_stats['error'], 'bad', 'warning' );
+							} elseif ( ! empty( $trusted_remote_stats['count'] ) ) {
+								WPOpsec_UI::badge(
+									sprintf( '%d networks — updated %s', $trusted_remote_stats['count'], human_time_diff( $trusted_remote_stats['updated_at'] ) . ' ago' ),
+									'good',
+									'yes-alt'
+								);
+							}
+						}
+						?>
+						<?php
+					},
+					'Same effect as the local file above, merged with it — a CIDR-per-line list downloaded once a day (also re-fetched immediately when this URL changes) and cached locally, so other installs can point here instead of each server keeping its own copy in sync by hand.'
 				);
 				?>
 			<?php WPOpsec_UI::section_end(); ?>
