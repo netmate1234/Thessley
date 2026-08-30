@@ -36,6 +36,7 @@ if ( ! function_exists( 'wpopsec_query_guard_patterns' ) ) {
 			array( 'id' => 'cmdi_shell_functions', 'category' => 'cmdi', 'regex' => '/\b(system|exec|passthru|shell_exec|proc_open|popen)\s*\(/i' ),
 			array( 'id' => 'cmdi_command_chain', 'category' => 'cmdi', 'regex' => '/;\s*(cat|ls|whoami|id|uname|wget|curl|nc)\b/i' ),
 			array( 'id' => 'cmdi_backtick_exec', 'category' => 'cmdi', 'regex' => '/`[^`\n]{1,80}`/' ),
+			array( 'id' => 'cmdi_base64_payload', 'category' => 'cmdi', 'regex' => '/base64_decode\s*\(/i' ),
 
 			// Misc
 			array( 'id' => 'other_null_byte', 'category' => 'other', 'regex' => '/%00|\x00/' ),
