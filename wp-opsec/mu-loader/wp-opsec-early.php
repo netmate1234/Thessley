@@ -433,6 +433,14 @@ if ( ! function_exists( 'wpopsec_local_blocklist_add' ) ) {
 		if ( false === $long || wpopsec_ip_is_exempt( $long ) ) {
 			return false;
 		}
+		if ( in_array( $ip, (array) get_option( 'wpopsec_ip_allowlist', array() ), true ) ) {
+			// An explicitly never-block IP shouldn't even appear in the Local
+			// Blocklist list — relying only on the enforcement check skipping
+			// it there is fragile (a future check.php could get the order
+			// wrong) and confusing in the admin UI (an IP sitting in "blocked"
+			// that never actually gets blocked).
+			return false;
+		}
 
 		$list        = get_option( 'wpopsec_local_blocklist', array() );
 		$list[ $ip ] = array(
