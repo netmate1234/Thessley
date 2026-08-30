@@ -52,6 +52,22 @@ if ( ! function_exists( 'wpopsec_geo_lookup' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wpopsec_geo_country_label' ) ) {
+	/**
+	 * Only called on an actual match (rare), so loading the small names
+	 * map here — rather than carrying the full country list into every
+	 * request — costs nothing on the hot path.
+	 */
+	function wpopsec_geo_country_label( $idx ) {
+		static $labels = null;
+		if ( null === $labels ) {
+			$file   = WPMU_PLUGIN_DIR . '/wp-opsec-checks/data/geo-country-names.php';
+			$labels = is_readable( $file ) ? (array) include $file : array();
+		}
+		return $labels[ $idx ] ?? "index {$idx}";
+	}
+}
+
 wpopsec_register_check(
 	function () {
 		$indices = get_option( 'wpopsec_geo_country_indices', array() );
@@ -86,13 +102,14 @@ wpopsec_register_check(
 		}
 
 		$enforce = get_option( 'wpopsec_geo_enforce_mode', 'log' );
+		$label   = wpopsec_geo_country_label( $idx );
 
 		if ( 'block' !== $enforce ) {
-			wpopsec_log_event( 'geo-blocker', 'country_match', 'logged', "country index {$idx}, mode={$mode} (log-only)", 6 );
+			wpopsec_log_event( 'geo-blocker', 'country_match', 'logged', "country {$label}, mode={$mode} (log-only)", 6 );
 			return null;
 		}
 
-		wpopsec_log_event( 'geo-blocker', 'country_match', 'blocked', "country index {$idx}, mode={$mode}", 8 );
+		wpopsec_log_event( 'geo-blocker', 'country_match', 'blocked', "country {$label}, mode={$mode}", 8 );
 
 		return array( 'reason' => 'Access denied.' );
 	}
