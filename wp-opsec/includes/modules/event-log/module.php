@@ -359,10 +359,11 @@ class WPOpsec_Module_Event_Log {
 							<code class="wpopsec-nowrap"><?php echo esc_html( $row->ip ); ?></code>
 							<?php
 							$ip_info = self::ip_info( $row->ip );
-							if ( $ip_info['country'] || $ip_info['host'] ) {
-								echo '<br><span class="wpopsec-muted" style="font-size:11px;word-break:break-all">';
-								echo esc_html( trim( $ip_info['country'] . ( $ip_info['host'] ? ' · ' . $ip_info['host'] : '' ), ' ·' ) );
-								echo '</span>';
+							if ( $ip_info['country'] ) {
+								echo '<br><span class="wpopsec-muted" style="font-size:11px;word-break:break-all">' . esc_html( $ip_info['country'] ) . '</span>';
+							}
+							if ( $ip_info['host'] ) {
+								echo '<br><span class="wpopsec-muted" style="font-size:11px;word-break:break-all">' . esc_html( $ip_info['host'] ) . '</span>';
 							}
 							?>
 						</td>
