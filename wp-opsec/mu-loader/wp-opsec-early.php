@@ -250,9 +250,15 @@ if ( ! function_exists( 'wpopsec_maybe_telegram_alert' ) ) {
 
 		list( $label ) = wpopsec_severity_meta( $severity );
 		$site = wp_specialchars_decode( get_option( 'blogname' ), ENT_QUOTES );
+		$host = wp_parse_url( get_option( 'siteurl' ), PHP_URL_HOST ) ?: '';
 
 		$lines = array(
-			sprintf( '<b>%s</b> — severity %d/20 (%s)', esc_html( $site ), $severity, esc_html( $label ) ),
+			// blogname alone reads fine on one site, but with multiple
+			// wp-opsec installs alerting into the same chat it's easy to
+			// miss which one fired — the domain is what actually
+			// disambiguates them at a glance, and doubles as a reminder of
+			// which admin to open.
+			sprintf( '<b>%s</b>%s — severity %d/20 (%s)', esc_html( $site ), $host ? ' (' . esc_html( $host ) . ')' : '', $severity, esc_html( $label ) ),
 			sprintf( '<b>Module:</b> %s   <b>Event:</b> <code>%s</code>', esc_html( $module ), esc_html( $event ) ),
 			sprintf( '<b>Action:</b> %s   <b>IP:</b> <code>%s</code>', esc_html( $action ), esc_html( $ip ) ),
 		);

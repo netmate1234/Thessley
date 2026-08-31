@@ -82,13 +82,18 @@ class WPOpsec_Module_Telegram_Alerts {
 		}
 
 		$site = wp_specialchars_decode( get_option( 'blogname' ), ENT_QUOTES );
+		$host = wp_parse_url( get_option( 'siteurl' ), PHP_URL_HOST ) ?: '';
 		$result = self::api_call(
 			$token,
 			'sendMessage',
 			array(
 				'chat_id'    => $chat_id,
 				'parse_mode' => 'HTML',
-				'text'       => sprintf( "<b>%s</b>\nWP Opsec test message — if you can read this, alerts are wired up correctly.", esc_html( $site ) ),
+				'text'       => sprintf(
+					"<b>%s</b>%s\nWP Opsec test message — if you can read this, alerts are wired up correctly.",
+					esc_html( $site ),
+					$host ? ' (' . esc_html( $host ) . ')' : ''
+				),
 			)
 		);
 
