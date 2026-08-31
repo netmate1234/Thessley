@@ -24,20 +24,9 @@ class WPOpsec_Module_Geo_Map {
 	public static function deactivate() {}
 
 	public static function register() {
-		add_action( 'admin_menu', array( __CLASS__, 'admin_menu' ) );
 		return __CLASS__;
 	}
 
-	public static function admin_menu() {
-		add_submenu_page(
-			'wp-opsec',
-			'Event Map',
-			'Event Map',
-			'manage_options',
-			'wp-opsec-geo-map',
-			array( __CLASS__, 'render_page' )
-		);
-	}
 
 	/**
 	 * @return array<string,int> ISO 3166-1 alpha-2 code (uppercase) => event count
@@ -144,7 +133,10 @@ class WPOpsec_Module_Geo_Map {
 
 		?>
 		<form method="get" style="margin-bottom:14px">
-			<input type="hidden" name="page" value="wp-opsec-geo-map">
+			<?php wp_parse_str( WPOpsec_Menu_Router::query( 'geo-map' ), $route ); ?>
+			<?php foreach ( $route as $k => $v ) : ?>
+				<input type="hidden" name="<?php echo esc_attr( $k ); ?>" value="<?php echo esc_attr( $v ); ?>">
+			<?php endforeach; ?>
 			<label>Window:
 				<select name="days" onchange="this.form.submit()">
 					<?php foreach ( array( 1 => '24 hours', 7 => '7 days', 30 => '30 days', 90 => '90 days' ) as $val => $label ) : ?>

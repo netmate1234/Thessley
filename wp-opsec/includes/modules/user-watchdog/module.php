@@ -34,7 +34,6 @@ class WPOpsec_Module_User_Watchdog {
 	}
 
 	public static function register() {
-		add_action( 'admin_menu', array( __CLASS__, 'admin_menu' ) );
 		add_action( 'admin_post_wpopsec_uw_save_settings', array( __CLASS__, 'handle_save_settings' ) );
 		add_action( 'admin_post_wpopsec_uw_scan_now', array( __CLASS__, 'handle_scan_now' ) );
 		add_action( 'admin_post_wpopsec_uw_acknowledge', array( __CLASS__, 'handle_acknowledge' ) );
@@ -173,7 +172,7 @@ class WPOpsec_Module_User_Watchdog {
 					'Detail: ' . $message,
 					'Time:   ' . current_time( 'mysql' ),
 					'',
-					'Review: ' . admin_url( 'admin.php?page=wp-opsec-user-watchdog' ),
+					'Review: ' . WPOpsec_Menu_Router::url( 'user-watchdog' ),
 					'',
 					'If this was not you or another administrator, treat the site as compromised:',
 					'check Users for accounts you do not recognise, and run a File Integrity scan.',
@@ -383,22 +382,6 @@ class WPOpsec_Module_User_Watchdog {
 		exit;
 	}
 
-	public static function admin_menu() {
-		$alerts = (array) get_option( 'wpopsec_user_watchdog_alerts', array() );
-		$title  = 'User Watchdog';
-		if ( $alerts ) {
-			$title .= sprintf( ' <span class="awaiting-mod"><span class="pending-count">%d</span></span>', count( $alerts ) );
-		}
-
-		add_submenu_page(
-			'wp-opsec',
-			'User Watchdog',
-			$title,
-			'manage_options',
-			'wp-opsec-user-watchdog',
-			array( __CLASS__, 'render_page' )
-		);
-	}
 
 	public static function render_page() {
 		$alerts   = array_reverse( (array) get_option( 'wpopsec_user_watchdog_alerts', array() ) );

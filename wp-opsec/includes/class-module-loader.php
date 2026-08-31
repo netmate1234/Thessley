@@ -66,6 +66,7 @@ class WPOpsec_Module_Loader {
 		}
 
 		add_action( 'admin_menu', array( __CLASS__, 'admin_menu' ), 5 );
+		WPOpsec_Menu_Router::register();
 
 		foreach ( self::$modules as $module => $class ) {
 			self::load_module( $module );
@@ -152,7 +153,6 @@ class WPOpsec_Module_Loader {
 				'key'   => 'ip-blocklist',
 				'title' => 'IP Blocklist',
 				'icon'  => 'shield-alt',
-				'page'  => 'wp-opsec-ip-blocklist',
 				'state' => 'block' === $ip_mode ? 'Blocking' : 'Log only',
 				'level' => 'block' === $ip_mode ? 'good' : 'warn',
 				'note'  => sprintf(
@@ -164,7 +164,6 @@ class WPOpsec_Module_Loader {
 				'key'   => 'query-guard',
 				'title' => 'Query Guard',
 				'icon'  => 'filter',
-				'page'  => 'wp-opsec-query-guard',
 				'state' => 'block' === $qg_mode ? 'Blocking' : 'Log only',
 				'level' => 'block' === $qg_mode ? 'good' : 'warn',
 				'note'  => get_option( 'wpopsec_query_guard_scan_post', true ) ? 'GET + POST scanning' : 'GET only',
@@ -173,7 +172,6 @@ class WPOpsec_Module_Loader {
 				'key'   => 'login-guard',
 				'title' => 'Login Guard',
 				'icon'  => 'lock',
-				'page'  => 'wp-opsec-login-guard',
 				'state' => $lg_on ? 'Enabled' : 'Disabled',
 				'level' => $lg_on ? 'good' : 'bad',
 				'note'  => sprintf(
@@ -186,7 +184,6 @@ class WPOpsec_Module_Loader {
 				'key'   => 'headers',
 				'title' => 'Security Headers',
 				'icon'  => 'shield',
-				'page'  => 'wp-opsec-headers',
 				'state' => $headers ? sprintf( '%d active', count( $headers ) ) : 'None',
 				'level' => $headers ? 'good' : 'bad',
 				'note'  => isset( $headers['Strict-Transport-Security'] ) ? 'HSTS on' : 'HSTS off',
@@ -195,7 +192,6 @@ class WPOpsec_Module_Loader {
 				'key'   => 'user-enum',
 				'title' => 'User Enumeration',
 				'icon'  => 'hidden',
-				'page'  => 'wp-opsec-user-enum',
 				'state' => $ue_on ? 'Protected' : 'Open',
 				'level' => $ue_on ? 'good' : 'bad',
 				'note'  => get_option( 'wpopsec_user_enum_block_rest_users', true ) ? 'REST users locked' : 'REST users public',
@@ -204,7 +200,6 @@ class WPOpsec_Module_Loader {
 				'key'   => 'file-integrity',
 				'title' => 'File Integrity',
 				'icon'  => 'media-code',
-				'page'  => 'wp-opsec-file-integrity',
 				'state' => $integrity > 0 ? sprintf( '%d change(s)', $integrity ) : ( $fi_base ? 'Clean' : 'No baseline' ),
 				'level' => $integrity > 0 ? 'bad' : ( $fi_base ? 'good' : 'warn' ),
 				'note'  => $fi_base ? sprintf( 'baseline %s', date_i18n( 'M j', $fi_base ) ) : 'take a baseline',
@@ -213,7 +208,6 @@ class WPOpsec_Module_Loader {
 				'key'   => 'vuln-scanner',
 				'title' => 'Vulnerability Scan',
 				'icon'  => 'search',
-				'page'  => 'wp-opsec-vuln-scanner',
 				'state' => $vuln ? ( $vuln_findings ? sprintf( '%d flagged', $vuln_findings ) : 'Clean' ) : 'Not run',
 				'level' => $vuln ? ( $vuln_findings ? 'bad' : 'good' ) : 'warn',
 				'note'  => $vuln ? sprintf( '%d components checked', (int) ( $vuln['scanned_count'] ?? 0 ) ) : 'never scanned',
@@ -222,7 +216,6 @@ class WPOpsec_Module_Loader {
 				'key'   => 'auto-update',
 				'title' => 'Auto Updates',
 				'icon'  => 'update',
-				'page'  => 'wp-opsec-auto-update',
 				'state' => 'off' === $au_plug ? 'Plugins off' : ( 'all' === $au_plug ? 'All plugins' : 'Flagged only' ),
 				'level' => 'off' === $au_plug ? 'warn' : 'good',
 				'note'  => sprintf( 'core: %s', get_option( 'wpopsec_auto_update_core', 'minor' ) ),
@@ -231,7 +224,6 @@ class WPOpsec_Module_Loader {
 				'key'   => 'user-watchdog',
 				'title' => 'User Watchdog',
 				'icon'  => 'admin-users',
-				'page'  => 'wp-opsec-user-watchdog',
 				'state' => $uw_alert ? sprintf( '%d alert(s)', $uw_alert ) : 'Clear',
 				'level' => $uw_alert ? 'bad' : 'good',
 				'note'  => sprintf(
@@ -243,7 +235,6 @@ class WPOpsec_Module_Loader {
 				'key'   => 'hardening',
 				'title' => 'Hardening',
 				'icon'  => 'admin-tools',
-				'page'  => 'wp-opsec-hardening',
 				'state' => $hidden ? sprintf( '%d hidden plugin(s)', $hidden ) : ( $editor ? 'Editor off' : 'Editor on' ),
 				'level' => $hidden ? 'bad' : ( $editor ? 'good' : 'warn' ),
 				'note'  => class_exists( 'WPOpsec_Module_Hardening' ) && WPOpsec_Module_Hardening::uploads_guard_active()
@@ -254,7 +245,6 @@ class WPOpsec_Module_Loader {
 				'key'   => 'telegram-alerts',
 				'title' => 'Telegram Alerts',
 				'icon'  => 'testimonial',
-				'page'  => 'wp-opsec-telegram',
 				'state' => get_option( 'wpopsec_telegram_enabled', false ) ? 'Enabled' : 'Disabled',
 				'level' => get_option( 'wpopsec_telegram_enabled', false )
 					? ( get_option( 'wpopsec_telegram_chat_id', '' ) ? 'good' : 'warn' )
@@ -265,7 +255,6 @@ class WPOpsec_Module_Loader {
 				'key'   => 'malware-scanner',
 				'title' => 'Malware Scanner',
 				'icon'  => 'warning',
-				'page'  => 'wp-opsec-malware-scanner',
 				'state' => $mal_last ? ( $mal_findings ? sprintf( '%d finding(s)', $mal_findings ) : 'Clean' ) : 'Not run',
 				'level' => $mal_last ? ( $mal_findings ? 'bad' : 'good' ) : 'warn',
 				'note'  => $mal_last ? sprintf( '%d file(s) scanned', (int) ( $mal_last['scanned_count'] ?? 0 ) ) : 'never scanned',
@@ -274,7 +263,6 @@ class WPOpsec_Module_Loader {
 				'key'   => 'geo-blocker',
 				'title' => 'Geo Blocker',
 				'icon'  => 'admin-site-alt3',
-				'page'  => 'wp-opsec-geo-blocker',
 				'state' => $geo_selected ? sprintf( '%d country(ies)', $geo_selected ) : 'Not configured',
 				'level' => $geo_selected ? ( 'block' === $geo_enforce ? 'good' : 'warn' ) : 'warn',
 				'note'  => $geo_stats ? sprintf( '%s ranges indexed', number_format_i18n( (int) ( $geo_stats['count'] ?? 0 ) ) ) : 'no dataset yet',
@@ -283,7 +271,6 @@ class WPOpsec_Module_Loader {
 				'key'   => 'activity-log',
 				'title' => 'Activity Log',
 				'icon'  => 'edit-page',
-				'page'  => 'wp-opsec-activity-log',
 				'state' => $al_count ? sprintf( '%d categor(ies)', $al_count ) : 'Disabled',
 				'level' => $al_count ? 'good' : 'warn',
 				'note'  => 'posts, plugins, themes, settings',
@@ -292,7 +279,6 @@ class WPOpsec_Module_Loader {
 				'key'   => 'rate-limiter',
 				'title' => 'Rate Limiter',
 				'icon'  => 'clock',
-				'page'  => 'wp-opsec-rate-limiter',
 				'state' => ! $rl_on ? 'Disabled' : ( 'block' === $rl_mode ? 'Blocking' : 'Log only' ),
 				'level' => ! $rl_on ? 'warn' : ( 'block' === $rl_mode ? 'good' : 'warn' ),
 				'note'  => sprintf( '%s req/min per IP', number_format_i18n( (int) get_option( 'wpopsec_ratelimit_per_minute', 300 ) ) ),
@@ -301,7 +287,6 @@ class WPOpsec_Module_Loader {
 				'key'   => 'geo-map',
 				'title' => 'Event Map',
 				'icon'  => 'admin-site-alt3',
-				'page'  => 'wp-opsec-geo-map',
 				'state' => class_exists( 'WPOpsec_Module_Geo_Map' ) ? sprintf( '%d countries · 7d', count( WPOpsec_Module_Geo_Map::counts_by_country( 7 ) ) ) : 'Unavailable',
 				'level' => 'good', // read-only visualization, nothing to misconfigure
 				'note'  => 'blocked + logged events, by country',
@@ -474,7 +459,7 @@ class WPOpsec_Module_Loader {
 						foreach ( $attention as $a ) {
 							$links[] = sprintf(
 								'<a href="%s">%s <em>(%s)</em></a>',
-								esc_url( admin_url( 'admin.php?page=' . $a['page'] ) ),
+								esc_url( WPOpsec_Menu_Router::url( $a['key'] ) ),
 								esc_html( $a['title'] ),
 								esc_html( strtolower( $a['state'] ) )
 							);
@@ -495,7 +480,7 @@ class WPOpsec_Module_Loader {
 					$total   = $blocked + $logged + $noted;
 					?>
 					<a class="wpopsec-card wpopsec-card--<?php echo esc_attr( $card['level'] ); ?>"
-						href="<?php echo esc_url( admin_url( 'admin.php?page=' . $card['page'] ) ); ?>">
+						href="<?php echo esc_url( WPOpsec_Menu_Router::url( $card['key'] ) ); ?>">
 						<div class="wpopsec-card__top">
 							<span class="wpopsec-card__icon dashicons dashicons-<?php echo esc_attr( $card['icon'] ); ?>"></span>
 							<span class="wpopsec-card__title"><?php echo esc_html( $card['title'] ); ?></span>
@@ -529,7 +514,7 @@ class WPOpsec_Module_Loader {
 
 			<h2 class="wpopsec-h2">
 				Recent activity
-				<a class="wpopsec-h2__link" href="<?php echo esc_url( admin_url( 'admin.php?page=wp-opsec-event-log' ) ); ?>">View full log →</a>
+				<a class="wpopsec-h2__link" href="<?php echo esc_url( WPOpsec_Menu_Router::url( 'event-log' ) ); ?>">View full log →</a>
 			</h2>
 
 			<?php if ( empty( $recent ) ) : ?>

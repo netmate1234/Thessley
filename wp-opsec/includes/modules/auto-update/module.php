@@ -31,7 +31,6 @@ class WPOpsec_Module_Auto_Update {
 	}
 
 	public static function register() {
-		add_action( 'admin_menu', array( __CLASS__, 'admin_menu' ) );
 		add_action( 'admin_post_wpopsec_au_save_settings', array( __CLASS__, 'handle_save_settings' ) );
 		add_action( self::CRON_HOOK, array( __CLASS__, 'sweep' ) );
 
@@ -179,16 +178,6 @@ class WPOpsec_Module_Auto_Update {
 		}
 	}
 
-	public static function admin_menu() {
-		add_submenu_page(
-			'wp-opsec',
-			'Auto Updates',
-			'Auto Updates',
-			'manage_options',
-			'wp-opsec-auto-update',
-			array( __CLASS__, 'render_settings_page' )
-		);
-	}
 
 	public static function handle_save_settings() {
 		check_admin_referer( 'wpopsec_au_save_settings' );

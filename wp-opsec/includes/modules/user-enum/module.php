@@ -17,7 +17,6 @@ class WPOpsec_Module_User_Enum {
 	public static function deactivate() {}
 
 	public static function register() {
-		add_action( 'admin_menu', array( __CLASS__, 'admin_menu' ) );
 		add_action( 'admin_post_wpopsec_ue_save_settings', array( __CLASS__, 'handle_save_settings' ) );
 
 		if ( get_option( 'wpopsec_user_enum_block_author_scan', true ) ) {
@@ -120,16 +119,6 @@ class WPOpsec_Module_User_Enum {
 		return $data;
 	}
 
-	public static function admin_menu() {
-		add_submenu_page(
-			'wp-opsec',
-			'User Enumeration',
-			'User Enumeration',
-			'manage_options',
-			'wp-opsec-user-enum',
-			array( __CLASS__, 'render_settings_page' )
-		);
-	}
 
 	public static function handle_save_settings() {
 		check_admin_referer( 'wpopsec_ue_save_settings' );

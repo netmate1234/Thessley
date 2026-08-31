@@ -40,7 +40,6 @@ class WPOpsec_Module_Query_Guard {
 	public static function register() {
 		self::deploy_check_file();
 
-		add_action( 'admin_menu', array( __CLASS__, 'admin_menu' ) );
 		add_action( 'admin_post_wpopsec_qg_save_settings', array( __CLASS__, 'handle_save_settings' ) );
 		add_action( 'admin_post_wpopsec_qg_refresh_xmlrpc_allow', array( __CLASS__, 'handle_refresh_xmlrpc_allow' ) );
 		add_action( self::XMLRPC_CRON_HOOK, array( __CLASS__, 'refresh_xmlrpc_allowlist' ) );
@@ -229,16 +228,6 @@ class WPOpsec_Module_Query_Guard {
 		}
 	}
 
-	public static function admin_menu() {
-		add_submenu_page(
-			'wp-opsec',
-			'Query Guard',
-			'Query Guard',
-			'manage_options',
-			'wp-opsec-query-guard',
-			array( __CLASS__, 'render_settings_page' )
-		);
-	}
 
 	public static function handle_save_settings() {
 		check_admin_referer( 'wpopsec_qg_save_settings' );
@@ -378,7 +367,7 @@ class WPOpsec_Module_Query_Guard {
 							WPOpsec_UI::badge( 'not fetched yet', 'warn' );
 						}
 					},
-					'Fetched from Automattic&#39;s own published list, refreshed daily. For other providers, add their IPs to the trusted networks file on the <a href="' . esc_url( admin_url( 'admin.php?page=wp-opsec-ip-blocklist' ) ) . '">IP Blocklist</a> page — that list is exempt here too.'
+					'Fetched from Automattic&#39;s own published list, refreshed daily. For other providers, add their IPs to the trusted networks file on the <a href="' . esc_url( WPOpsec_Menu_Router::url( 'ip-blocklist' ) ) . '">IP Blocklist</a> page — that list is exempt here too.'
 				);
 				?>
 			<?php WPOpsec_UI::section_end(); ?>

@@ -38,7 +38,6 @@ class WPOpsec_Module_IP_Blocklist {
 		self::deploy_check_file(); // keep in sync across plugin updates, same pattern as the mu-loader itself
 
 		add_action( self::CRON_HOOK, array( __CLASS__, 'refresh' ) );
-		add_action( 'admin_menu', array( __CLASS__, 'admin_menu' ) );
 		add_action( 'admin_post_wpopsec_refresh_now', array( __CLASS__, 'handle_refresh_now' ) );
 		add_action( 'admin_post_wpopsec_save_settings', array( __CLASS__, 'handle_save_settings' ) );
 		add_action( 'admin_post_wpopsec_add_local', array( __CLASS__, 'handle_add_local' ) );
@@ -135,16 +134,6 @@ class WPOpsec_Module_IP_Blocklist {
 		}
 	}
 
-	public static function admin_menu() {
-		add_submenu_page(
-			'wp-opsec',
-			'IP Blocklist',
-			'IP Blocklist',
-			'manage_options',
-			'wp-opsec-ip-blocklist',
-			array( __CLASS__, 'render_settings_page' )
-		);
-	}
 
 	public static function handle_refresh_now() {
 		check_admin_referer( 'wpopsec_refresh_now' );

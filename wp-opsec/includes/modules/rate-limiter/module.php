@@ -28,7 +28,6 @@ class WPOpsec_Module_Rate_Limiter {
 
 	public static function register() {
 		self::deploy_check_file();
-		add_action( 'admin_menu', array( __CLASS__, 'admin_menu' ) );
 		add_action( 'admin_post_wpopsec_rl_save_settings', array( __CLASS__, 'handle_save_settings' ) );
 		return __CLASS__;
 	}
@@ -44,16 +43,6 @@ class WPOpsec_Module_Rate_Limiter {
 		}
 	}
 
-	public static function admin_menu() {
-		add_submenu_page(
-			'wp-opsec',
-			'Rate Limiter',
-			'Rate Limiter',
-			'manage_options',
-			'wp-opsec-rate-limiter',
-			array( __CLASS__, 'render_page' )
-		);
-	}
 
 	public static function handle_save_settings() {
 		check_admin_referer( 'wpopsec_rl_save_settings' );

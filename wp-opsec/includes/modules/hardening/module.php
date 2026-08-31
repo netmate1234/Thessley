@@ -27,7 +27,6 @@ class WPOpsec_Module_Hardening {
 	}
 
 	public static function register() {
-		add_action( 'admin_menu', array( __CLASS__, 'admin_menu' ) );
 		add_action( 'admin_post_wpopsec_hd_save_settings', array( __CLASS__, 'handle_save_settings' ) );
 		add_action( 'admin_post_wpopsec_hd_scan_now', array( __CLASS__, 'handle_scan_now' ) );
 		add_action( self::CRON_HOOK, array( __CLASS__, 'scan_hidden_plugins' ) );
@@ -214,16 +213,6 @@ class WPOpsec_Module_Hardening {
 		exit;
 	}
 
-	public static function admin_menu() {
-		add_submenu_page(
-			'wp-opsec',
-			'Hardening',
-			'Hardening',
-			'manage_options',
-			'wp-opsec-hardening',
-			array( __CLASS__, 'render_page' )
-		);
-	}
 
 	public static function render_page() {
 		$hidden_result = get_option( 'wpopsec_hardening_hidden_result', array() );

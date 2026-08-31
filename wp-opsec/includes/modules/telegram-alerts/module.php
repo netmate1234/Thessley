@@ -20,7 +20,6 @@ class WPOpsec_Module_Telegram_Alerts {
 	public static function deactivate() {}
 
 	public static function register() {
-		add_action( 'admin_menu', array( __CLASS__, 'admin_menu' ) );
 		add_action( 'admin_post_wpopsec_tg_save_settings', array( __CLASS__, 'handle_save_settings' ) );
 		add_action( 'admin_post_wpopsec_tg_test', array( __CLASS__, 'handle_test' ) );
 		add_action( 'admin_post_wpopsec_tg_detect_chat', array( __CLASS__, 'handle_detect_chat' ) );
@@ -46,16 +45,6 @@ class WPOpsec_Module_Telegram_Alerts {
 		return array( 'ok' => true, 'result' => $body['result'] );
 	}
 
-	public static function admin_menu() {
-		add_submenu_page(
-			'wp-opsec',
-			'Telegram Alerts',
-			'Telegram Alerts',
-			'manage_options',
-			'wp-opsec-telegram',
-			array( __CLASS__, 'render_page' )
-		);
-	}
 
 	public static function handle_save_settings() {
 		check_admin_referer( 'wpopsec_tg_save_settings' );

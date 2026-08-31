@@ -66,7 +66,6 @@ class WPOpsec_Module_Geo_Blocker {
 	public static function register() {
 		self::deploy_check_file();
 
-		add_action( 'admin_menu', array( __CLASS__, 'admin_menu' ) );
 		add_action( self::CRON_HOOK, array( __CLASS__, 'refresh' ) );
 		add_action( 'admin_post_wpopsec_geo_save_settings', array( __CLASS__, 'handle_save_settings' ) );
 		add_action( 'admin_post_wpopsec_geo_refresh_now', array( __CLASS__, 'handle_refresh_now' ) );
@@ -227,16 +226,6 @@ class WPOpsec_Module_Geo_Blocker {
 		exit;
 	}
 
-	public static function admin_menu() {
-		add_submenu_page(
-			'wp-opsec',
-			'Geo Blocking',
-			'Geo Blocking',
-			'manage_options',
-			'wp-opsec-geo-blocker',
-			array( __CLASS__, 'render_page' )
-		);
-	}
 
 	public static function render_page() {
 		$stats     = get_option( 'wpopsec_geo_stats', array() );

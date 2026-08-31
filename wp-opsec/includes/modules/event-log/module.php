@@ -31,7 +31,6 @@ class WPOpsec_Module_Event_Log {
 	public static function register() {
 		self::maybe_upgrade_table();
 
-		add_action( 'admin_menu', array( __CLASS__, 'admin_menu' ) );
 		add_action( self::CRON_HOOK, array( __CLASS__, 'prune' ) );
 		add_action( 'admin_post_wpopsec_el_save_settings', array( __CLASS__, 'handle_save_settings' ) );
 		add_action( 'admin_post_wpopsec_el_clear', array( __CLASS__, 'handle_clear' ) );
@@ -117,16 +116,6 @@ class WPOpsec_Module_Event_Log {
 		);
 	}
 
-	public static function admin_menu() {
-		add_submenu_page(
-			'wp-opsec',
-			'Event Log',
-			'Event Log',
-			'manage_options',
-			'wp-opsec-event-log',
-			array( __CLASS__, 'render_page' )
-		);
-	}
 
 	public static function handle_save_settings() {
 		check_admin_referer( 'wpopsec_el_save_settings' );
@@ -287,7 +276,7 @@ class WPOpsec_Module_Event_Log {
 			WPOpsec_UI::notice(
 				'error',
 				'<p><strong>' . esc_html( number_format_i18n( $high_open ) ) . '</strong> event(s) at severity 14+ in the last 7 days. '
-				. '<a href="' . esc_url( add_query_arg( array( 'page' => 'wp-opsec-event-log', 'f_sev' => 14, 'sort' => 'severity' ), admin_url( 'admin.php' ) ) ) . '">Review them →</a></p>',
+				. '<a href="' . esc_url( WPOpsec_Menu_Router::url( 'event-log', array( 'f_sev' => 14, 'sort' => 'severity' ) ) ) . '">Review them →</a></p>',
 				true
 			);
 		}
@@ -295,7 +284,10 @@ class WPOpsec_Module_Event_Log {
 		WPOpsec_UI::section( 'Events', 'list-view', sprintf( '%s matching', number_format_i18n( $result['total'] ) ) );
 		?>
 		<form method="get" class="wpopsec-actions" style="margin-bottom:14px">
-			<input type="hidden" name="page" value="wp-opsec-event-log">
+			<?php wp_parse_str( WPOpsec_Menu_Router::query( 'event-log' ), $route ); ?>
+			<?php foreach ( $route as $k => $v ) : ?>
+				<input type="hidden" name="<?php echo esc_attr( $k ); ?>" value="<?php echo esc_attr( $v ); ?>">
+			<?php endforeach; ?>
 			<select name="f_module">
 				<option value="">All modules</option>
 				<?php foreach ( $modules as $m ) : ?>

@@ -20,6 +20,7 @@ define( 'WPOPSEC_CHECKS_DIR', WPMU_PLUGIN_DIR . '/wp-opsec-checks' );
 
 require_once WPOPSEC_PLUGIN_DIR . 'includes/class-ui.php';
 require_once WPOPSEC_PLUGIN_DIR . 'includes/class-module-loader.php';
+require_once WPOPSEC_PLUGIN_DIR . 'includes/class-menu-router.php';
 
 register_activation_hook( __FILE__, array( 'WPOpsec_Module_Loader', 'activate' ) );
 register_deactivation_hook( __FILE__, array( 'WPOpsec_Module_Loader', 'deactivate' ) );

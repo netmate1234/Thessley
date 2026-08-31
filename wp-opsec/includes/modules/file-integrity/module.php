@@ -44,7 +44,6 @@ class WPOpsec_Module_File_Integrity {
 			self::install_table();
 		}
 
-		add_action( 'admin_menu', array( __CLASS__, 'admin_menu' ) );
 		add_action( self::CRON_HOOK, array( __CLASS__, 'run_scan' ) );
 		add_action( 'admin_post_wpopsec_fi_scan_now', array( __CLASS__, 'handle_scan_now' ) );
 		add_action( 'admin_post_wpopsec_fi_rebaseline', array( __CLASS__, 'handle_rebaseline' ) );
@@ -445,16 +444,6 @@ class WPOpsec_Module_File_Integrity {
 		exit;
 	}
 
-	public static function admin_menu() {
-		add_submenu_page(
-			'wp-opsec',
-			'File Integrity',
-			'File Integrity',
-			'manage_options',
-			'wp-opsec-file-integrity',
-			array( __CLASS__, 'render_page' )
-		);
-	}
 
 	private static function render_file_list( $label, $files, $tone = 'warn' ) {
 		if ( empty( $files ) ) {

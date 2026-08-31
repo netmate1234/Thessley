@@ -31,7 +31,6 @@ class WPOpsec_Module_Activity_Log {
 	public static function deactivate() {}
 
 	public static function register() {
-		add_action( 'admin_menu', array( __CLASS__, 'admin_menu' ) );
 		add_action( 'admin_post_wpopsec_al_save_settings', array( __CLASS__, 'handle_save_settings' ) );
 
 		$enabled = get_option( 'wpopsec_activity_categories', array( 'content', 'plugins_themes', 'settings' ) );
@@ -175,16 +174,6 @@ class WPOpsec_Module_Activity_Log {
 		);
 	}
 
-	public static function admin_menu() {
-		add_submenu_page(
-			'wp-opsec',
-			'Activity Log',
-			'Activity Log',
-			'manage_options',
-			'wp-opsec-activity-log',
-			array( __CLASS__, 'render_page' )
-		);
-	}
 
 	public static function handle_save_settings() {
 		check_admin_referer( 'wpopsec_al_save_settings' );
@@ -225,7 +214,7 @@ class WPOpsec_Module_Activity_Log {
 		);
 
 		WPOpsec_UI::section( 'Recent activity', 'clock', 'showing latest 50 — full history in the ' );
-		echo '<p class="wpopsec-help" style="margin-top:0"><a href="' . esc_url( add_query_arg( array( 'page' => 'wp-opsec-event-log', 'f_module' => 'activity-log' ), admin_url( 'admin.php' ) ) ) . '">Event Log, filtered to this module</a>, which also supports pagination and search.</p>';
+		echo '<p class="wpopsec-help" style="margin-top:0"><a href="' . esc_url( WPOpsec_Menu_Router::url( 'event-log', array( 'f_module' => 'activity-log' ) ) ) . '">Event Log, filtered to this module</a>, which also supports pagination and search.</p>';
 
 		if ( empty( $recent ) ) {
 			echo '<div class="wpopsec-empty"><span class="dashicons dashicons-info-outline"></span><p>No activity recorded yet.</p></div>';

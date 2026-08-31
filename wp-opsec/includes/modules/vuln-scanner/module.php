@@ -32,7 +32,6 @@ class WPOpsec_Module_Vuln_Scanner {
 	}
 
 	public static function register() {
-		add_action( 'admin_menu', array( __CLASS__, 'admin_menu' ) );
 		add_action( self::CRON_HOOK, array( __CLASS__, 'run_scan' ) );
 		add_action( 'admin_post_wpopsec_vs_scan_now', array( __CLASS__, 'handle_scan_now' ) );
 		add_action( 'admin_post_wpopsec_vs_save_settings', array( __CLASS__, 'handle_save_settings' ) );
@@ -358,16 +357,6 @@ class WPOpsec_Module_Vuln_Scanner {
 		exit;
 	}
 
-	public static function admin_menu() {
-		add_submenu_page(
-			'wp-opsec',
-			'Vulnerability Scan',
-			'Vulnerability Scan',
-			'manage_options',
-			'wp-opsec-vuln-scanner',
-			array( __CLASS__, 'render_page' )
-		);
-	}
 
 	private static function kind_tone( $kind ) {
 		$map = array(

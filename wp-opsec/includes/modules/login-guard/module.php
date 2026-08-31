@@ -30,7 +30,6 @@ class WPOpsec_Module_Login_Guard {
 	}
 
 	public static function register() {
-		add_action( 'admin_menu', array( __CLASS__, 'admin_menu' ) );
 		add_action( 'admin_post_wpopsec_lg_save_settings', array( __CLASS__, 'handle_save_settings' ) );
 		add_action( self::CRON_HOOK, array( __CLASS__, 'prune' ) );
 
@@ -267,16 +266,6 @@ class WPOpsec_Module_Login_Guard {
 		update_option( 'wpopsec_login_guard_locked', array(), false );
 	}
 
-	public static function admin_menu() {
-		add_submenu_page(
-			'wp-opsec',
-			'Login Guard',
-			'Login Guard',
-			'manage_options',
-			'wp-opsec-login-guard',
-			array( __CLASS__, 'render_settings_page' )
-		);
-	}
 
 	public static function handle_save_settings() {
 		check_admin_referer( 'wpopsec_lg_save_settings' );
