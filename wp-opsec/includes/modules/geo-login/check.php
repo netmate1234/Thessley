@@ -58,6 +58,15 @@ wpopsec_register_check(
 
 		wpopsec_log_event( 'geo-login', 'login_country_denied', 'blocked', "country {$label}", 13 );
 
+		// A login attempt is a much stronger signal than an ordinary page
+		// view, so escalate to the shared blocklist: this IP gets denied
+		// site-wide, not just at the login form, on every future request.
+		// Gated on enforce mode already being "block" (not just detecting a
+		// hit) for the same reason query-guard does this — a still-tuning
+		// allowlist shouldn't cause real blocks via a side channel while
+		// the module itself is in log-only mode.
+		wpopsec_local_blocklist_add( $ip, "geo-login: {$label}" );
+
 		return array( 'reason' => 'Admin login is not available from your location.' );
 	}
 );
