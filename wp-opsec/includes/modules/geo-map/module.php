@@ -17,8 +17,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class WPOpsec_Module_Geo_Map {
 
-	/** 5-step intensity scale, light to dark, independent of the severity palette. */
-	const BUCKET_COLORS = array( '#c7e3ff', '#7fb8f2', '#3d84d6', '#b26e00', '#8b0a3e' );
+	/** 5-step red intensity scale — light for a handful of hits, deep red for the worst offenders. */
+	const BUCKET_COLORS = array( '#ffe3e0', '#ffab9e', '#f96f5c', '#dc2f2f', '#7a0c14' );
 
 	public static function activate() {}
 	public static function deactivate() {}
@@ -185,9 +185,15 @@ class WPOpsec_Module_Geo_Map {
 		.wpopsec-geo-map-wrap svg { width:100%; height:auto; max-height:520px; }
 		.wpopsec-geo-map-wrap svg path { fill:#e2e4e8; stroke:#fff; stroke-width:0.4; }
 		<?php foreach ( self::BUCKET_COLORS as $i => $color ) : ?>
-		.wpopsec-geo-map-wrap svg path.wpopsec-geo-b<?php echo (int) $i; ?> { fill:<?php echo esc_html( $color ); ?>; cursor:pointer; }
+		<?php /* Some countries (US, CA, AU, JP, GB, ...) are a <g id="xx"> wrapping several
+		unlabelled <path> children rather than a single <path id="xx">, so the class lands on
+		the <g> — the descendant selector is what actually reaches those child shapes; the
+		plain "path.wpopsec-geo-bN" selector alone only covers the single-shape countries. */ ?>
+		.wpopsec-geo-map-wrap svg path.wpopsec-geo-b<?php echo (int) $i; ?>,
+		.wpopsec-geo-map-wrap svg g.wpopsec-geo-b<?php echo (int) $i; ?> path { fill:<?php echo esc_html( $color ); ?>; cursor:pointer; }
 		<?php endforeach; ?>
-		.wpopsec-geo-map-wrap svg path.wpopsec-geo-hit:hover { stroke:#1d2327; stroke-width:1.2; }
+		.wpopsec-geo-map-wrap svg path.wpopsec-geo-hit:hover,
+		.wpopsec-geo-map-wrap svg g.wpopsec-geo-hit:hover path { stroke:#1d2327; stroke-width:1.2; }
 		.wpopsec-geo-tip { position:fixed; display:none; pointer-events:none; z-index:9999;
 			background:#1d2327; color:#fff; font-size:12px; padding:5px 9px; border-radius:5px;
 			box-shadow:0 2px 8px rgba(0,0,0,.25); white-space:nowrap; }
