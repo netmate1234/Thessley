@@ -33,6 +33,7 @@ class WPOpsec_Module_Loader {
 		'geo-blocker'     => 'WPOpsec_Module_Geo_Blocker',
 		'malware-scanner' => 'WPOpsec_Module_Malware_Scanner',
 		'activity-log'    => 'WPOpsec_Module_Activity_Log',
+		'geo-map'         => 'WPOpsec_Module_Geo_Map',
 	);
 
 	public static function init() {
@@ -279,6 +280,15 @@ class WPOpsec_Module_Loader {
 				'state' => ! $rl_on ? 'Disabled' : ( 'block' === $rl_mode ? 'Blocking' : 'Log only' ),
 				'level' => ! $rl_on ? 'warn' : ( 'block' === $rl_mode ? 'good' : 'warn' ),
 				'note'  => sprintf( '%s req/min per IP', number_format_i18n( (int) get_option( 'wpopsec_ratelimit_per_minute', 300 ) ) ),
+			),
+			array(
+				'key'   => 'geo-map',
+				'title' => 'World Map',
+				'icon'  => 'admin-site-alt3',
+				'page'  => 'wp-opsec-geo-map',
+				'state' => class_exists( 'WPOpsec_Module_Geo_Map' ) ? sprintf( '%d countries · 7d', count( WPOpsec_Module_Geo_Map::counts_by_country( 7 ) ) ) : 'Unavailable',
+				'level' => 'good', // read-only visualization, nothing to misconfigure
+				'note'  => 'blocked + logged events, by country',
 			),
 		);
 	}
