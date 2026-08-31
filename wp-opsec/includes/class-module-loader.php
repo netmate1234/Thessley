@@ -11,31 +11,45 @@ if ( ! defined( 'ABSPATH' ) ) {
 class WPOpsec_Module_Loader {
 
 	/** @var array<string,string> module directory name => class name, in load order */
+	/**
+	 * Order here drives both activation sequence and admin-menu position
+	 * (register()/activate() run in this order, and each module's own
+	 * add_submenu_page() call happens in that same sequence) — so this
+	 * list is grouped into rough categories for the sidebar, not just
+	 * build order. The one hard constraint: vuln-scanner must stay ahead
+	 * of auto-update, since "update what was flagged" mode reads the
+	 * scanner's last result. Everything else here is free to reorder.
+	 */
 	private static $modules = array(
-		// event-log first: it owns the table the others log into.
-		'event-log'      => 'WPOpsec_Module_Event_Log',
-		// geo-map right after: purely a read-only view of the same table,
-		// belongs next to it in the admin menu.
-		'geo-map'        => 'WPOpsec_Module_Geo_Map',
-		'ip-blocklist'   => 'WPOpsec_Module_IP_Blocklist',
-		'query-guard'    => 'WPOpsec_Module_Query_Guard',
-		'login-guard'    => 'WPOpsec_Module_Login_Guard',
-		'headers'        => 'WPOpsec_Module_Headers',
-		'user-enum'      => 'WPOpsec_Module_User_Enum',
-		'file-integrity' => 'WPOpsec_Module_File_Integrity',
-		'vuln-scanner'   => 'WPOpsec_Module_Vuln_Scanner',
-		// vuln-scanner before auto-update: "update what was flagged" mode
-		// reads the scanner's last result.
-		'auto-update'    => 'WPOpsec_Module_Auto_Update',
-		'user-watchdog'  => 'WPOpsec_Module_User_Watchdog',
-		'hardening'      => 'WPOpsec_Module_Hardening',
-		'telegram-alerts' => 'WPOpsec_Module_Telegram_Alerts',
-		// New modules: rate-limiter first, since a flood is the thing most
-		// likely to also trip malware-scanner/geo-blocker/activity-log noise.
-		'rate-limiter'    => 'WPOpsec_Module_Rate_Limiter',
-		'geo-blocker'     => 'WPOpsec_Module_Geo_Blocker',
-		'malware-scanner' => 'WPOpsec_Module_Malware_Scanner',
+		// Overview — read/audit views over the shared events table.
+		// event-log first: it owns that table.
+		'event-log'       => 'WPOpsec_Module_Event_Log',
+		'geo-map'         => 'WPOpsec_Module_Geo_Map',
 		'activity-log'    => 'WPOpsec_Module_Activity_Log',
+
+		// Perimeter — blocks by IP/identity before WordPress finishes loading.
+		'ip-blocklist'    => 'WPOpsec_Module_IP_Blocklist',
+		'geo-blocker'     => 'WPOpsec_Module_Geo_Blocker',
+		'rate-limiter'    => 'WPOpsec_Module_Rate_Limiter',
+
+		// Request inspection — looks at what a request is doing, not just who it's from.
+		'query-guard'     => 'WPOpsec_Module_Query_Guard',
+		'login-guard'     => 'WPOpsec_Module_Login_Guard',
+
+		// Integrity & detection — is anything already wrong.
+		'file-integrity'  => 'WPOpsec_Module_File_Integrity',
+		'malware-scanner' => 'WPOpsec_Module_Malware_Scanner',
+		'vuln-scanner'    => 'WPOpsec_Module_Vuln_Scanner',
+		'user-watchdog'   => 'WPOpsec_Module_User_Watchdog',
+
+		// Hardening — reduces what an attacker can do after getting in.
+		'headers'         => 'WPOpsec_Module_Headers',
+		'user-enum'       => 'WPOpsec_Module_User_Enum',
+		'hardening'       => 'WPOpsec_Module_Hardening',
+
+		// Ops — keeping the above current and knowing when it fires.
+		'auto-update'     => 'WPOpsec_Module_Auto_Update',
+		'telegram-alerts' => 'WPOpsec_Module_Telegram_Alerts',
 	);
 
 	public static function init() {
