@@ -195,6 +195,47 @@ class WPOpsec_Module_Event_Log {
 		return array( 'rows' => $rows ?: array(), 'total' => $total );
 	}
 
+	/**
+	 * Country (reusing geo-blocker's compiled index, if that module has
+	 * ever been activated) and reverse DNS, for display only — never on
+	 * the request path, only here on the admin page. Reverse DNS is
+	 * cached per IP for a week: gethostbyaddr() has no timeout parameter
+	 * in PHP, so repeating it on every page view for the same IPs would
+	 * make a slow/unresolvable one slow down every future page load too.
+	 */
+	private static function ip_info( $ip ) {
+		$info = array( 'country' => '', 'host' => '' );
+
+		if ( wpopsec_ip_is_reserved( $ip ) ) {
+			return $info; // LAN/loopback — nothing meaningful to resolve
+		}
+
+		if ( function_exists( 'wpopsec_geo_lookup' ) && function_exists( 'wpopsec_geo_country_label' ) ) {
+			$file = WPMU_PLUGIN_DIR . '/wp-opsec-checks/data/geo-country-index.bin';
+			$long = ip2long( $ip );
+			if ( false !== $long ) {
+				$idx = wpopsec_geo_lookup( $file, $long );
+				if ( null !== $idx ) {
+					$info['country'] = wpopsec_geo_country_label( $idx );
+				}
+			}
+		}
+
+		$cache_key = 'wpopsec_rdns_' . md5( $ip );
+		$cached    = get_transient( $cache_key );
+		if ( false !== $cached ) {
+			$info['host'] = $cached;
+			return $info;
+		}
+
+		$host = gethostbyaddr( $ip );
+		$host = ( false !== $host && $host !== $ip ) ? $host : '';
+		set_transient( $cache_key, $host, WEEK_IN_SECONDS );
+		$info['host'] = $host;
+
+		return $info;
+	}
+
 	public static function render_page() {
 		global $wpdb;
 
@@ -289,7 +330,7 @@ class WPOpsec_Module_Event_Log {
 					<th style="width:110px">Module</th>
 					<th style="width:170px">Event</th>
 					<th style="width:90px">Action</th>
-					<th style="width:120px">IP</th>
+					<th style="width:170px">IP</th>
 					<th>Request / detail</th>
 				</tr>
 			</thead>
@@ -314,7 +355,17 @@ class WPOpsec_Module_Event_Log {
 							}
 							?>
 						</td>
-						<td class="wpopsec-nowrap"><code><?php echo esc_html( $row->ip ); ?></code></td>
+						<td style="max-width:170px">
+							<code class="wpopsec-nowrap"><?php echo esc_html( $row->ip ); ?></code>
+							<?php
+							$ip_info = self::ip_info( $row->ip );
+							if ( $ip_info['country'] || $ip_info['host'] ) {
+								echo '<br><span class="wpopsec-muted" style="font-size:11px">';
+								echo esc_html( trim( $ip_info['country'] . ( $ip_info['host'] ? ' · ' . $ip_info['host'] : '' ), ' ·' ) );
+								echo '</span>';
+							}
+							?>
+						</td>
 						<td class="wpopsec-muted">
 							<?php if ( $row->uri ) : ?>
 								<code style="font-size:11px"><?php echo esc_html( $row->uri ); ?></code><br>
