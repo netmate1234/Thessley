@@ -112,8 +112,8 @@ class WPOpsec_Module_Loader {
 
 	public static function admin_menu() {
 		add_menu_page(
-			'WP Opsec',
-			'WP Opsec',
+			'EagleEye Opsec',
+			'EagleEye Opsec',
 			'manage_options',
 			'wp-opsec',
 			array( __CLASS__, 'render_dashboard' ),
@@ -411,7 +411,7 @@ class WPOpsec_Module_Loader {
 		<div class="wrap wpopsec wpopsec-dash">
 			<h1 class="wpopsec-title">
 				<span class="dashicons dashicons-shield"></span>
-				WP Opsec
+				EagleEye Opsec
 			</h1>
 
 			<div class="wpopsec-hero">

@@ -90,7 +90,7 @@ class WPOpsec_Module_Telegram_Alerts {
 				'chat_id'    => $chat_id,
 				'parse_mode' => 'HTML',
 				'text'       => sprintf(
-					"<b>%s</b>%s\nWP Opsec test message — if you can read this, alerts are wired up correctly.",
+					"<b>%s</b>%s\nEagleEye Opsec test message — if you can read this, alerts are wired up correctly.",
 					esc_html( $site ),
 					$host ? ' (' . esc_html( $host ) . ')' : ''
 				),
