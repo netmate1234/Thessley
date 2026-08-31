@@ -31,8 +31,8 @@ class WPOpsec_Module_Geo_Map {
 	public static function admin_menu() {
 		add_submenu_page(
 			'wp-opsec',
-			'World Map',
-			'World Map',
+			'Event Map',
+			'Event Map',
 			'manage_options',
 			'wp-opsec-geo-map',
 			array( __CLASS__, 'render_page' )
@@ -186,7 +186,7 @@ class WPOpsec_Module_Geo_Map {
 			<?php WPOpsec_UI::section_end(); ?>
 		<?php endif; ?>
 
-		<p class="wpopsec-help">Country resolution reuses the Geo Blocker module's dataset (DB-IP Country Lite, CC BY 4.0) — enable that module at least once for this map to have data. World map: <a href="https://github.com/flekschas/simple-world-map" target="_blank" rel="noopener">flekschas/simple-world-map</a>, CC BY-SA 3.0.</p>
+		<p class="wpopsec-help">Country resolution reuses the Geo Blocker module's dataset (DB-IP Country Lite, CC BY 4.0) — enable that module at least once for this map to have data. Map graphic: <a href="https://github.com/flekschas/simple-world-map" target="_blank" rel="noopener">flekschas/simple-world-map</a>, CC BY-SA 3.0.</p>
 
 		<style>
 		.wpopsec-geo-map-wrap { max-width:100%; overflow-x:auto; }

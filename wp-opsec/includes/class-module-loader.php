@@ -14,6 +14,9 @@ class WPOpsec_Module_Loader {
 	private static $modules = array(
 		// event-log first: it owns the table the others log into.
 		'event-log'      => 'WPOpsec_Module_Event_Log',
+		// geo-map right after: purely a read-only view of the same table,
+		// belongs next to it in the admin menu.
+		'geo-map'        => 'WPOpsec_Module_Geo_Map',
 		'ip-blocklist'   => 'WPOpsec_Module_IP_Blocklist',
 		'query-guard'    => 'WPOpsec_Module_Query_Guard',
 		'login-guard'    => 'WPOpsec_Module_Login_Guard',
@@ -33,7 +36,6 @@ class WPOpsec_Module_Loader {
 		'geo-blocker'     => 'WPOpsec_Module_Geo_Blocker',
 		'malware-scanner' => 'WPOpsec_Module_Malware_Scanner',
 		'activity-log'    => 'WPOpsec_Module_Activity_Log',
-		'geo-map'         => 'WPOpsec_Module_Geo_Map',
 	);
 
 	public static function init() {
@@ -283,7 +285,7 @@ class WPOpsec_Module_Loader {
 			),
 			array(
 				'key'   => 'geo-map',
-				'title' => 'World Map',
+				'title' => 'Event Map',
 				'icon'  => 'admin-site-alt3',
 				'page'  => 'wp-opsec-geo-map',
 				'state' => class_exists( 'WPOpsec_Module_Geo_Map' ) ? sprintf( '%d countries · 7d', count( WPOpsec_Module_Geo_Map::counts_by_country( 7 ) ) ) : 'Unavailable',

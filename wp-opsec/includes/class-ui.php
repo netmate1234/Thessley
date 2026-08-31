@@ -35,7 +35,7 @@ class WPOpsec_UI {
 			'geo-blocker'     => array( 'admin-site-alt3', 'Geo Blocker', 'Blocks or allows traffic by country, using a compiled IP-to-country dataset checked at the early gate.' ),
 			'activity-log'    => array( 'edit-page', 'Activity Log', 'Records who published, deleted, installed or changed what — the mundane audit trail, not attack detections.' ),
 			'rate-limiter'    => array( 'clock', 'Rate Limiter', 'Throttles requests per IP site-wide, and escalates sustained floods to the local IP blocklist.' ),
-			'geo-map'         => array( 'admin-site-alt3', 'World Map', 'Blocked and logged events tinted on a world map by country, reusing Geo Blocker\'s dataset. Read-only — nothing here affects enforcement.' ),
+			'geo-map'         => array( 'admin-site-alt3', 'Event Map', 'Blocked and logged events tinted on a world map by country, reusing Geo Blocker\'s dataset. Read-only — nothing here affects enforcement.' ),
 		);
 
 		return $map[ $key ] ?? array( 'shield', 'WP Opsec', '' );
