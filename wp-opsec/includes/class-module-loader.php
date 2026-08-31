@@ -30,6 +30,9 @@ class WPOpsec_Module_Loader {
 		// Perimeter — blocks by IP/identity before WordPress finishes loading.
 		'ip-blocklist'    => 'WPOpsec_Module_IP_Blocklist',
 		'geo-blocker'     => 'WPOpsec_Module_Geo_Blocker',
+		// geo-login right after geo-blocker: it reuses that module's
+		// compiled country dataset and class, so must load after it.
+		'geo-login'       => 'WPOpsec_Module_Geo_Login',
 		'rate-limiter'    => 'WPOpsec_Module_Rate_Limiter',
 
 		// Request inspection — looks at what a request is doing, not just who it's from.
@@ -144,6 +147,8 @@ class WPOpsec_Module_Loader {
 		$geo_stats    = get_option( 'wpopsec_geo_stats', array() );
 		$geo_selected = count( (array) get_option( 'wpopsec_geo_countries', array() ) );
 		$geo_enforce  = get_option( 'wpopsec_geo_enforce_mode', 'log' );
+		$gl_selected  = count( (array) get_option( 'wpopsec_geo_login_countries', array() ) );
+		$gl_enforce   = get_option( 'wpopsec_geo_login_enforce_mode', 'log' );
 		$al_count     = count( (array) get_option( 'wpopsec_activity_categories', array( 'content', 'plugins_themes', 'settings' ) ) );
 		$rl_on        = (bool) get_option( 'wpopsec_ratelimit_enabled', true );
 		$rl_mode      = get_option( 'wpopsec_ratelimit_mode', 'log' );
@@ -266,6 +271,14 @@ class WPOpsec_Module_Loader {
 				'state' => $geo_selected ? sprintf( '%d country(ies)', $geo_selected ) : 'Not configured',
 				'level' => $geo_selected ? ( 'block' === $geo_enforce ? 'good' : 'warn' ) : 'warn',
 				'note'  => $geo_stats ? sprintf( '%s ranges indexed', number_format_i18n( (int) ( $geo_stats['count'] ?? 0 ) ) ) : 'no dataset yet',
+			),
+			array(
+				'key'   => 'geo-login',
+				'title' => 'Geo Login',
+				'icon'  => 'lock',
+				'state' => $gl_selected ? sprintf( '%d country(ies)', $gl_selected ) : 'Not configured',
+				'level' => $gl_selected ? ( 'block' === $gl_enforce ? 'good' : 'warn' ) : 'warn',
+				'note'  => 'wp-login.php only',
 			),
 			array(
 				'key'   => 'activity-log',

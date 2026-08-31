@@ -1,0 +1,63 @@
+<?php
+// Copied verbatim into wp-content/mu-plugins/wp-opsec-checks/ by the
+// geo-login module on activation. Runs inside wp-opsec-early.php.
+//
+// Reuses geo-blocker's compiled country index and lookup function
+// (wpopsec_geo_lookup(), defined by geo-blocker's own check file) rather
+// than compiling a second copy of the same ~358,000-range dataset. If
+// geo-blocker has never been active, wpopsec_geo_lookup() simply doesn't
+// exist yet and this check no-ops — nothing to restrict without it.
+
+if ( ! function_exists( 'wpopsec_geo_login_is_login_request' ) ) {
+	/**
+	 * Matches the path itself, not basename(): the same /wp-login.php/foo
+	 * and //wp-login.php bypasses that applied to xmlrpc.php apply here.
+	 */
+	function wpopsec_geo_login_is_login_request() {
+		$uri  = (string) ( $_SERVER['REQUEST_URI'] ?? '' );
+		$path = rawurldecode( strtok( $uri, '?' ) );
+		$path = preg_replace( '#/+#', '/', $path );
+		return (bool) preg_match( '#(?:^|/)wp-login\.php(?:/|$)#i', (string) $path );
+	}
+}
+
+wpopsec_register_check(
+	function () {
+		if ( ! function_exists( 'wpopsec_geo_lookup' ) || ! wpopsec_geo_login_is_login_request() ) {
+			return null;
+		}
+
+		$indices = get_option( 'wpopsec_geo_login_country_indices', array() );
+		if ( empty( $indices ) ) {
+			return null; // no allowlist configured — nothing to restrict
+		}
+
+		$ip = wpopsec_client_ip();
+		if ( '' === $ip || false === strpos( $ip, '.' ) || wpopsec_ip_is_exempt( $ip ) ) {
+			return null; // LAN/reserved/trusted always allowed — never self-lock
+		}
+
+		$needle = ip2long( $ip );
+		if ( false === $needle ) {
+			return null;
+		}
+
+		$file = WPMU_PLUGIN_DIR . '/wp-opsec-checks/data/geo-country-index.bin';
+		$idx  = wpopsec_geo_lookup( $file, $needle );
+		if ( null === $idx || in_array( $idx, $indices, true ) ) {
+			return null; // unknown IP (fail open) or an allowed country
+		}
+
+		$label   = function_exists( 'wpopsec_geo_country_label' ) ? wpopsec_geo_country_label( $idx ) : "index {$idx}";
+		$enforce = get_option( 'wpopsec_geo_login_enforce_mode', 'log' );
+
+		if ( 'block' !== $enforce ) {
+			wpopsec_log_event( 'geo-login', 'login_country_denied', 'logged', "country {$label} (log-only)", 9 );
+			return null;
+		}
+
+		wpopsec_log_event( 'geo-login', 'login_country_denied', 'blocked', "country {$label}", 13 );
+
+		return array( 'reason' => 'Admin login is not available from your location.' );
+	}
+);
