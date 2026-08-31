@@ -314,6 +314,29 @@ class WPOpsec_Module_Event_Log {
 			<?php submit_button( 'Filter', 'secondary', 'submit', false ); ?>
 		</form>
 
+		<div class="wpopsec-actions" style="margin:-6px 0 14px">
+			<label style="font-size:13px;font-weight:normal">
+				<input type="checkbox" id="wpopsec-el-autorefresh"> Auto-refresh every 30s
+			</label>
+		</div>
+		<script>
+		(function () {
+			var cb  = document.getElementById( 'wpopsec-el-autorefresh' );
+			var key = 'wpopsec_el_autorefresh';
+			var timer = null;
+			function schedule() {
+				if ( timer ) { clearTimeout( timer ); }
+				timer = setTimeout( function () { location.reload(); }, 30000 );
+			}
+			try { cb.checked = localStorage.getItem( key ) === '1'; } catch ( e ) {}
+			if ( cb.checked ) { schedule(); }
+			cb.addEventListener( 'change', function () {
+				try { localStorage.setItem( key, cb.checked ? '1' : '0' ); } catch ( e ) {}
+				if ( cb.checked ) { schedule(); } else if ( timer ) { clearTimeout( timer ); }
+			} );
+		})();
+		</script>
+
 		<table class="wpopsec-table">
 			<thead>
 				<tr>
