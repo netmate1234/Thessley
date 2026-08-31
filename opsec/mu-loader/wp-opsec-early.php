@@ -1,6 +1,6 @@
 <?php
 /**
- * EagleEye Opsec — early request gate.
+ * Opsec — early request gate.
  *
  * Deployed as a must-use plugin so it runs before the rest of WordPress
  * bootstraps. Self-contained: does not depend on the main wp-opsec plugin

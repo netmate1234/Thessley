@@ -4,7 +4,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Shared presentation helpers for every EagleEye Opsec screen.
+ * Shared presentation helpers for every Opsec screen.
  *
  * All styling is inlined and all icons come from the Dashicons font that
  * wp-admin already loads, so the plugin's own screens keep working under a
@@ -18,7 +18,7 @@ class WPOpsec_UI {
 	/** Page-level icon + copy for each screen, keyed by module. */
 	public static function meta( $key ) {
 		$map = array(
-			'dashboard'      => array( 'shield', 'EagleEye Opsec', '' ),
+			'dashboard'      => array( 'shield', 'Opsec', '' ),
 			'event-log'      => array( 'list-view', 'Event Log', 'Everything the modules have seen, newest first. Severity runs 1–20; anything 18+ means something already happened rather than an attempt that was stopped.' ),
 			'ip-blocklist'   => array( 'shield-alt', 'IP Blocklist', 'Blocks traffic from IPs on public reputation feeds, plus a local list other modules can escalate into.' ),
 			'query-guard'    => array( 'filter', 'Query Guard', 'Inspects query strings and request bodies for attack signatures before WordPress finishes loading.' ),
@@ -39,7 +39,7 @@ class WPOpsec_UI {
 			'geo-login'       => array( 'lock', 'Geo Login', 'Restricts wp-login.php to an allow-list of countries. Your LAN, reserved space, and the trusted-networks file are always exempt, so this can\'t lock out your own network.' ),
 		);
 
-		return $map[ $key ] ?? array( 'shield', 'EagleEye Opsec', '' );
+		return $map[ $key ] ?? array( 'shield', 'Opsec', '' );
 	}
 
 	/** Opens .wrap and renders the page header. Pair with self::close(). */

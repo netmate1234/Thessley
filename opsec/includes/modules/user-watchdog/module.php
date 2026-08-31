@@ -166,7 +166,7 @@ class WPOpsec_Module_User_Watchdog {
 			implode(
 				"\n",
 				array(
-					'EagleEye Opsec detected a change to a privileged account.',
+					'Opsec detected a change to a privileged account.',
 					'',
 					'Type:   ' . $type,
 					'Detail: ' . $message,
