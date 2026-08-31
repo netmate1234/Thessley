@@ -360,7 +360,7 @@ class WPOpsec_Module_Event_Log {
 							<?php
 							$ip_info = self::ip_info( $row->ip );
 							if ( $ip_info['country'] || $ip_info['host'] ) {
-								echo '<br><span class="wpopsec-muted" style="font-size:11px">';
+								echo '<br><span class="wpopsec-muted" style="font-size:11px;word-break:break-all">';
 								echo esc_html( trim( $ip_info['country'] . ( $ip_info['host'] ? ' · ' . $ip_info['host'] : '' ), ' ·' ) );
 								echo '</span>';
 							}
