@@ -510,7 +510,7 @@ class WPOpsec_Module_Vuln_Scanner {
 					'WPScan API token',
 					function () use ( $token ) {
 						?>
-						<input type="password" name="wpscan_token" value="<?php echo esc_attr( $token ); ?>" style="width:26em" autocomplete="off">
+						<input type="text" name="wpscan_token" value="<?php echo esc_attr( $token ); ?>" style="width:26em" autocomplete="off">
 						<?php
 						if ( '' !== $token ) {
 							echo ' ';
