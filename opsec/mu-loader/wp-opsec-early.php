@@ -330,7 +330,6 @@ if ( ! function_exists( 'wpopsec_maybe_unwantedip_report' ) ) {
 		}
 		set_transient( $lock_key, 1, HOUR_IN_SECONDS );
 
-		list( $label ) = wpopsec_severity_meta( $severity );
 		$severity_word = $severity >= 18 ? 'critical' : ( $severity >= 14 ? 'high' : ( $severity >= 10 ? 'medium' : 'low' ) );
 
 		// Turns internal slugs like "geo-login"/"login_country_denied" into
@@ -379,9 +378,10 @@ if ( ! function_exists( 'wpopsec_maybe_unwantedip_report' ) ) {
 						// never renders the title field anywhere a human looks —
 						// only description. "title" above is kept because the API
 						// requires it and the read endpoint does return it, but
-						// everything a person would actually need to see has to
-						// live here too, or it's effectively invisible.
-						'description' => sprintf( '%s. %s (Opsec severity %d/20, %s)', $title, $detail, $severity, $label ),
+						// the category alone (not this install's specific reason
+						// or its 1-20 severity score, which mean nothing without
+						// Opsec's own scale) is what belongs on a shared record.
+						'description' => $title,
 					)
 				),
 			)
