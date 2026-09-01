@@ -73,40 +73,62 @@ class WPOpsec_Module_Geo_Blocker {
 		return __CLASS__;
 	}
 
-	/** DB-IP publishes monthly; try the current month, fall back a month if not out yet. */
-	private static function download_csv() {
+	/**
+	 * DB-IP publishes monthly; try the current month, fall back a month if
+	 * not out yet. Streams straight to a local temp file via WP's own
+	 * download_url() (used by core for the same reason: a ~15MB response
+	 * body never has to sit in PHP memory just to be written back out).
+	 */
+	private static function download_csv_gz() {
+		if ( ! function_exists( 'download_url' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+		}
+
 		foreach ( array( 0, 1, 2 ) as $months_back ) {
-			$ts  = strtotime( "-{$months_back} months" );
-			$url = self::SOURCE_BASE . date( 'Y-m', $ts ) . '.csv.gz';
-
-			$response = wp_remote_get( $url, array( 'timeout' => 60 ) );
-			if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
-				continue;
-			}
-
-			$gz = @gzdecode( wp_remote_retrieve_body( $response ) );
-			if ( false !== $gz && strlen( $gz ) > 1000 ) {
-				return $gz;
+			$ts   = strtotime( "-{$months_back} months" );
+			$url  = self::SOURCE_BASE . date( 'Y-m', $ts ) . '.csv.gz';
+			$path = download_url( $url, 60 );
+			if ( ! is_wp_error( $path ) ) {
+				return $path;
 			}
 		}
 		return false;
 	}
 
+	/**
+	 * Parses the gzipped CSV a line at a time via gzgets() — never holds
+	 * the ~15MB decompressed CSV, or a ~358k-element array of its lines,
+	 * in memory at once. Each valid row is kept as its already-packed
+	 * 9-byte binary record instead of a 3-element PHP array; a plain array
+	 * carries per-element/per-array overhead that dwarfs the 9 bytes of
+	 * actual data at this row count, so this alone cuts the peak array
+	 * size by roughly an order of magnitude.
+	 */
 	public static function refresh() {
-		$csv = self::download_csv();
-		if ( false === $csv ) {
+		$gz_path = self::download_csv_gz();
+		if ( false === $gz_path ) {
 			wpopsec_log_event( 'geo-blocker', 'refresh_failed', 'noted', 'could not download the DB-IP country dataset', 6 );
 			return false;
 		}
 
-		$indices = WPOpsec_Geo_Country_Codes::indices();
-		$ranges  = array();
+		$gz = @gzopen( $gz_path, 'rb' );
+		if ( false === $gz ) {
+			unlink( $gz_path );
+			wpopsec_log_event( 'geo-blocker', 'refresh_failed', 'noted', 'downloaded dataset was not readable gzip', 6 );
+			return false;
+		}
 
-		foreach ( preg_split( '/\r\n|\r|\n/', $csv ) as $line ) {
+		$indices    = WPOpsec_Geo_Country_Codes::indices();
+		$records    = array();
+		$prev_start = -1;
+		$sorted     = true;
+
+		while ( false !== ( $line = gzgets( $gz ) ) ) {
+			$line = rtrim( $line, "\r\n" );
 			if ( '' === $line || false !== strpos( $line, ':' ) ) {
 				continue; // blank line, or IPv6 (always contains a colon) — IPv4-only, matching the rest of the plugin
 			}
-			$fields = explode( ',', $line );
+			$fields = explode( ',', $line, 4 );
 			if ( count( $fields ) < 3 ) {
 				continue;
 			}
@@ -116,30 +138,46 @@ class WPOpsec_Module_Geo_Blocker {
 			if ( false === $start || false === $end || null === $idx ) {
 				continue;
 			}
-			$ranges[] = array( $start, $end, $idx );
-		}
 
-		if ( count( $ranges ) < 1000 ) {
+			if ( $start < $prev_start ) {
+				$sorted = false;
+			}
+			$prev_start = $start;
+
+			$records[] = pack( 'NNC', $start, $end, $idx );
+		}
+		gzclose( $gz );
+		unlink( $gz_path );
+
+		$count = count( $records );
+		if ( $count < 1000 ) {
 			// Sanity floor: a parse gone wrong (format change upstream)
 			// should never silently replace a good index with an empty one.
-			wpopsec_log_event( 'geo-blocker', 'refresh_suspicious', 'noted', sprintf( 'only %d ranges parsed, keeping previous index', count( $ranges ) ), 8 );
+			wpopsec_log_event( 'geo-blocker', 'refresh_suspicious', 'noted', sprintf( 'only %d ranges parsed, keeping previous index', $count ), 8 );
 			return false;
 		}
 
-		// DB-IP ships pre-sorted, but this runs once a month — the cost of
-		// verifying that invariant instead of trusting it blindly is trivial.
-		usort( $ranges, function ( $a, $b ) { return $a[0] <=> $b[0]; } );
+		if ( ! $sorted ) {
+			// DB-IP ships pre-sorted; only pay for an actual sort on the
+			// (rare) run where that invariant doesn't hold, instead of
+			// unconditionally re-sorting a third of a million records every
+			// refresh. Comparing the packed binary records byte-for-byte is
+			// equivalent to a numeric comparison on the big-endian start
+			// (then end, then country index) they're packed from.
+			usort( $records, 'strcmp' );
+		}
 
-		self::write_index( $ranges );
+		self::write_index( $records );
 		self::write_names_map();
 
-		update_option( 'wpopsec_geo_stats', array( 'count' => count( $ranges ), 'updated_at' => time() ), false );
-		wpopsec_log_event( 'geo-blocker', 'refreshed', 'noted', sprintf( '%d ranges compiled', count( $ranges ) ), 2 );
+		update_option( 'wpopsec_geo_stats', array( 'count' => $count, 'updated_at' => time() ), false );
+		wpopsec_log_event( 'geo-blocker', 'refreshed', 'noted', sprintf( '%d ranges compiled', $count ), 2 );
 
-		return count( $ranges );
+		return $count;
 	}
 
-	private static function write_index( array $ranges ) {
+	/** @param string[] $records each element an already-packed 9-byte 'NNC' record. */
+	private static function write_index( array $records ) {
 		$file = self::data_file();
 		$dir  = dirname( $file );
 		if ( ! file_exists( $dir ) ) {
@@ -148,8 +186,8 @@ class WPOpsec_Module_Geo_Blocker {
 
 		$tmp = $file . '.tmp-' . bin2hex( random_bytes( 4 ) );
 		$fh  = fopen( $tmp, 'wb' );
-		foreach ( $ranges as $r ) {
-			fwrite( $fh, pack( 'NNC', $r[0], $r[1], $r[2] ) );
+		foreach ( $records as $rec ) {
+			fwrite( $fh, $rec );
 		}
 		fclose( $fh );
 		rename( $tmp, $file );
