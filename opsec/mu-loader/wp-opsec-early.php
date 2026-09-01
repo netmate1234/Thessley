@@ -328,10 +328,18 @@ if ( ! function_exists( 'wpopsec_maybe_email_alert' ) ) {
 		$site = wp_specialchars_decode( get_option( 'blogname' ), ENT_QUOTES );
 		$host = wp_parse_url( get_option( 'siteurl' ), PHP_URL_HOST ) ?: '';
 
-		$subject = sprintf( '[%s] severity %d/20 (%s) — %s', $site, $severity, $label, $event );
+		// mail()'s headers must be plain ASCII or RFC 2047 encoded-words —
+		// raw UTF-8 bytes in the Subject (e.g. an em dash, or a non-ASCII
+		// blogname) make some MTAs auto-negotiate the SMTPUTF8 extension,
+		// which not every relay/smarthost supports, silently bouncing the
+		// message. mb_encode_mimeheader() only touches the string at all
+		// when it actually contains non-ASCII, so this is a no-op for a
+		// plain-ASCII subject.
+		$subject_raw = sprintf( '[%s] severity %d/20 (%s) - %s', $site, $severity, $label, $event );
+		$subject     = mb_encode_mimeheader( $subject_raw, 'UTF-8', 'B', "\r\n" );
 
 		$lines = array(
-			sprintf( '%s%s — severity %d/20 (%s)', $site, $host ? " ({$host})" : '', $severity, $label ),
+			sprintf( '%s%s - severity %d/20 (%s)', $site, $host ? " ({$host})" : '', $severity, $label ),
 			sprintf( 'Module: %s   Event: %s', $module, $event ),
 			sprintf( 'Action: %s   IP: %s', $action, $ip ),
 		);
@@ -341,8 +349,12 @@ if ( ! function_exists( 'wpopsec_maybe_email_alert' ) ) {
 		$lines[] = current_time( 'mysql' );
 		$body    = implode( "\n", $lines );
 
+		// The body itself is fine as raw UTF-8 (unlike the Subject, it isn't
+		// a header) as long as Content-Type declares the charset.
 		$from_domain = $host ?: 'localhost';
-		$headers     = 'From: Opsec <wordpress@' . $from_domain . '>';
+		$headers     = "From: Opsec <wordpress@{$from_domain}>\r\n"
+			. "MIME-Version: 1.0\r\n"
+			. 'Content-Type: text/plain; charset=UTF-8';
 
 		@mail( $to, $subject, $body, $headers );
 	}
