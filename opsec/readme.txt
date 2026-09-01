@@ -4,7 +4,7 @@ Tags: security, firewall, malware, geo-blocking, brute-force
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.1.3
+Stable tag: 0.1.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -81,6 +81,12 @@ The early-request checks (IP Blocklist, Geo Blocker, Geo Login, Rate Limiter, Qu
 DB-IP's free Country Lite database (CC BY 4.0), refreshed automatically on a schedule.
 
 == Changelog ==
+
+= 0.1.4 =
+* Telegram Alerts renamed to Alerts, with email added as a second, independently-configured notification channel alongside Telegram.
+* Fixed email alerts silently bouncing when the subject line contained non-ASCII characters.
+* Dashboard now shows a "not fully protected yet" checklist for core baseline modules, separate from optional integrations.
+* WPScan API token field now shows in clear text instead of masked.
 
 = 0.1.3 =
 * IP Sharing's API key field now shows in clear text instead of masked, so it can be checked or copied at a glance.
