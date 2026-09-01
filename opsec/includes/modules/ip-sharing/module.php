@@ -231,7 +231,7 @@ class WPOpsec_Module_IP_Sharing {
 					'API key',
 					function () use ( $key ) {
 						?>
-						<input type="password" name="api_key" value="<?php echo esc_attr( $key ); ?>" style="width:100%;max-width:420px" autocomplete="off">
+						<input type="text" name="api_key" value="<?php echo esc_attr( $key ); ?>" style="width:100%;max-width:420px" autocomplete="off">
 						<?php
 					},
 					'Filled in automatically by "Sign up" below — there\'s no signup form on the site itself, since your account identity is this server\'s own public IP. Paste one in by hand only if you already have a key from elsewhere (e.g. reissued by the site owner).'
