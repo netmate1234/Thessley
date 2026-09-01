@@ -517,9 +517,23 @@ if ( ! function_exists( 'wpopsec_ip_is_trusted' ) ) {
 }
 
 if ( ! function_exists( 'wpopsec_ip_is_exempt' ) ) {
-	/** Combined "never enforce against this IP" check — reserved + operator-trusted. */
+	/**
+	 * Combined "never enforce against this IP" check — reserved,
+	 * operator-trusted (CIDR file/URL), or explicitly allowlisted. This is
+	 * the one check nearly every blocking module already calls, so an IP
+	 * added to the allowlist (Perimeter > Whitelist) is honored everywhere
+	 * automatically, not just by whichever module happens to check for it.
+	 *
+	 * Accepts either a dotted-decimal string or an ip2long() integer — most
+	 * callers pass whichever form they already have on hand.
+	 */
 	function wpopsec_ip_is_exempt( $ip ) {
-		return wpopsec_ip_is_reserved( $ip ) || wpopsec_ip_is_trusted( $ip );
+		if ( wpopsec_ip_is_reserved( $ip ) || wpopsec_ip_is_trusted( $ip ) ) {
+			return true;
+		}
+
+		$ip_string = is_int( $ip ) ? long2ip( $ip ) : (string) $ip;
+		return in_array( $ip_string, (array) get_option( 'wpopsec_ip_allowlist', array() ), true );
 	}
 }
 
@@ -538,15 +552,14 @@ if ( ! function_exists( 'wpopsec_local_blocklist_file' ) ) {
 if ( ! function_exists( 'wpopsec_local_blocklist_add' ) ) {
 	function wpopsec_local_blocklist_add( $ip, $reason, $ttl_seconds = DAY_IN_SECONDS ) {
 		$long = ip2long( $ip );
+		// wpopsec_ip_is_exempt() now covers the allowlist too, not just
+		// reserved/trusted — an explicitly never-block IP shouldn't even
+		// appear in the Local Blocklist list in the first place: relying
+		// only on the enforcement check skipping it there is fragile (a
+		// future check.php could get the order wrong) and confusing in the
+		// admin UI (an IP sitting in "blocked" that never actually gets
+		// blocked).
 		if ( false === $long || wpopsec_ip_is_exempt( $long ) ) {
-			return false;
-		}
-		if ( in_array( $ip, (array) get_option( 'wpopsec_ip_allowlist', array() ), true ) ) {
-			// An explicitly never-block IP shouldn't even appear in the Local
-			// Blocklist list — relying only on the enforcement check skipping
-			// it there is fragile (a future check.php could get the order
-			// wrong) and confusing in the admin UI (an IP sitting in "blocked"
-			// that never actually gets blocked).
 			return false;
 		}
 

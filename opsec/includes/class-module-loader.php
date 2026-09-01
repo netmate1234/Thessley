@@ -29,6 +29,7 @@ class WPOpsec_Module_Loader {
 
 		// Perimeter — blocks by IP/identity before WordPress finishes loading.
 		'ip-blocklist'    => 'WPOpsec_Module_IP_Blocklist',
+		'whitelist'       => 'WPOpsec_Module_Whitelist',
 		'geo-blocker'     => 'WPOpsec_Module_Geo_Blocker',
 		// geo-login right after geo-blocker: it reuses that module's
 		// compiled country dataset and class, so must load after it.

@@ -24,9 +24,8 @@ wpopsec_register_check(
 			return null; // no IPv4 to check (IPv6 not covered by these sources)
 		}
 
-		$allowlist = get_option( 'wpopsec_ip_allowlist', array() );
-		if ( in_array( $ip, (array) $allowlist, true ) ) {
-			return null; // never block an explicitly trusted IP, e.g. your own
+		if ( wpopsec_ip_is_exempt( $ip ) ) {
+			return null; // LAN/reserved/trusted/allowlisted — same shared rule every other module follows
 		}
 
 		$needle = ip2long( $ip );

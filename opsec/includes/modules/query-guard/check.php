@@ -84,7 +84,10 @@ wpopsec_register_check(
 		// tools, remote publishers, etc.) goes through the general trusted-
 		// networks file rather than us guessing at more hardcoded IP data.
 		if ( false !== $ip_long ) {
-			if ( wpopsec_ip_is_trusted( $ip_long ) ) {
+			// wpopsec_ip_is_exempt() covers trusted-CIDR (what this checked
+			// before), plus reserved space and the explicit allowlist —
+			// strictly wider, never narrower, than the previous check.
+			if ( wpopsec_ip_is_exempt( $ip_long ) ) {
 				return null;
 			}
 			if ( get_option( 'wpopsec_qg_allow_jetpack', true ) ) {
@@ -128,6 +131,16 @@ wpopsec_register_check(
 	function () {
 		$qs = isset( $_SERVER['QUERY_STRING'] ) ? (string) $_SERVER['QUERY_STRING'] : '';
 		if ( '' === $qs ) {
+			return null;
+		}
+
+		// Unlike most checks, this one previously had no exemption at all —
+		// deliberately, since an attack signature is an attack signature
+		// regardless of source. An explicit allowlist entry overrides that:
+		// an admin who's said "never block this IP" means it, even here.
+		// LAN/reserved/trusted-CIDR IPs remain covered too, just as a
+		// side effect of using the same shared check every other module does.
+		if ( wpopsec_ip_is_exempt( wpopsec_client_ip() ) ) {
 			return null;
 		}
 

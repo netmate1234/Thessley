@@ -46,6 +46,9 @@ class WPOpsec_Module_User_Enum {
 		if ( self::viewer_may_list_users() ) {
 			return;
 		}
+		if ( wpopsec_ip_is_exempt( wpopsec_client_ip() ) ) {
+			return;
+		}
 		if ( ! isset( $_GET['author'] ) ) {
 			return;
 		}
@@ -76,6 +79,9 @@ class WPOpsec_Module_User_Enum {
 	 */
 	public static function block_rest_users( $response, $handler, $request ) {
 		if ( is_wp_error( $response ) || self::viewer_may_list_users() ) {
+			return $response;
+		}
+		if ( wpopsec_ip_is_exempt( wpopsec_client_ip() ) ) {
 			return $response;
 		}
 

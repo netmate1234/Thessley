@@ -21,6 +21,7 @@ class WPOpsec_UI {
 			'dashboard'      => array( 'shield', 'Opsec', '' ),
 			'event-log'      => array( 'list-view', 'Event Log', 'Everything the modules have seen, newest first. Severity runs 1–20; anything 18+ means something already happened rather than an attempt that was stopped.' ),
 			'ip-blocklist'   => array( 'shield-alt', 'IP Blocklist', 'Blocks traffic from IPs on public reputation feeds, plus a local list other modules can escalate into.' ),
+			'whitelist'      => array( 'yes-alt', 'Whitelist', 'IPs that are exempt from every blocking module — IP Blocklist, Geo Blocker, Geo Login, Rate Limiter, Login Guard, Query Guard, and User Enumeration all honor this same list.' ),
 			'query-guard'    => array( 'filter', 'Query Guard', 'Inspects query strings and request bodies for attack signatures before WordPress finishes loading.' ),
 			'login-guard'    => array( 'lock', 'Login Guard', 'Rate-limits failed logins per IP. Your LAN and anything in the trusted networks file is never locked out.' ),
 			'headers'        => array( 'shield', 'Security Headers', 'Response headers that harden the browser side. The two that can break a site are off by default.' ),

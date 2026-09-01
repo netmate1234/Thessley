@@ -33,6 +33,7 @@ class WPOpsec_Menu_Router {
 				'title' => 'Perimeter',
 				'tabs'  => array(
 					'ip-blocklist' => array( 'WPOpsec_Module_IP_Blocklist', 'render_settings_page' ),
+				'whitelist'    => array( 'WPOpsec_Module_Whitelist', 'render_page' ),
 					'geo-blocker'  => array( 'WPOpsec_Module_Geo_Blocker', 'render_page' ),
 					'geo-login'    => array( 'WPOpsec_Module_Geo_Login', 'render_page' ),
 					'rate-limiter' => array( 'WPOpsec_Module_Rate_Limiter', 'render_page' ),

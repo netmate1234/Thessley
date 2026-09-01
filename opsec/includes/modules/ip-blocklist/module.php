@@ -155,13 +155,6 @@ class WPOpsec_Module_IP_Blocklist {
 		$mode = ( isset( $_POST['mode'] ) && 'block' === $_POST['mode'] ) ? 'block' : 'log';
 		update_option( 'wpopsec_ip_blocklist_mode', $mode );
 
-		$allowlist_raw = isset( $_POST['allowlist'] ) ? wp_unslash( $_POST['allowlist'] ) : '';
-		$allowlist     = array_filter( array_map( 'trim', preg_split( '/[\r\n,]+/', $allowlist_raw ) ) );
-		$allowlist     = array_values( array_filter( $allowlist, function ( $ip ) {
-			return false !== filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 );
-		} ) );
-		update_option( 'wpopsec_ip_allowlist', $allowlist );
-
 		$posted_sources = isset( $_POST['sources'] ) ? (array) wp_unslash( $_POST['sources'] ) : array();
 		$sources        = array_values( array_intersect( $posted_sources, array_keys( WPOpsec_IP_Blocklist_Fetcher::SOURCES ) ) );
 		update_option( 'wpopsec_ip_blocklist_sources', $sources );
@@ -217,7 +210,6 @@ class WPOpsec_Module_IP_Blocklist {
 	public static function render_settings_page() {
 		$stats           = get_option( 'wpopsec_ip_blocklist_stats', array() );
 		$mode            = get_option( 'wpopsec_ip_blocklist_mode', 'log' );
-		$allowlist       = get_option( 'wpopsec_ip_allowlist', array() );
 		$enabled_sources = get_option( 'wpopsec_ip_blocklist_sources', WPOpsec_IP_Blocklist_Fetcher::DEFAULT_ENABLED );
 		$trusted_url     = get_option( 'wpopsec_trusted_networks_url', '' );
 		$trusted_remote_stats = get_option( 'wpopsec_trusted_networks_remote_stats', array() );
@@ -369,12 +361,12 @@ class WPOpsec_Module_IP_Blocklist {
 
 				WPOpsec_UI::row(
 					'Never-block IPs',
-					function () use ( $allowlist ) {
+					function () {
 						?>
-						<textarea name="allowlist" rows="4" style="width:100%;max-width:420px"><?php echo esc_textarea( implode( "\n", $allowlist ) ); ?></textarea>
+						<a href="<?php echo esc_url( WPOpsec_Menu_Router::url( 'whitelist' ) ); ?>">Manage on the Whitelist tab →</a>
 						<?php
 					},
-					'One IPv4 per line. Always allowed regardless of any list.'
+					'Moved here since it applies to every blocking module, not just this one — geo-blocking, rate limiting, login guard, and the rest all honor it too.'
 				);
 
 				WPOpsec_UI::row(
