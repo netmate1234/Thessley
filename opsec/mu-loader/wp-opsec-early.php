@@ -207,6 +207,7 @@ if ( ! function_exists( 'wpopsec_log_event' ) ) {
 		$wpdb->suppress_errors( false );
 
 		wpopsec_maybe_telegram_alert( $module, $event, $action, $detail, $severity, $ip );
+		wpopsec_maybe_unwantedip_report( $module, $event, $action, $detail, $severity, $ip );
 	}
 }
 
@@ -281,6 +282,86 @@ if ( ! function_exists( 'wpopsec_maybe_telegram_alert' ) ) {
 					'text'                     => $text,
 					'parse_mode'               => 'HTML',
 					'disable_web_page_preview' => true,
+				),
+			)
+		);
+	}
+}
+
+if ( ! function_exists( 'wpopsec_maybe_unwantedip_report' ) ) {
+	/**
+	 * Shares a blocked IP with unwantedip.eagleeye-intelligence.com — a
+	 * self-hosted, cross-host reputation tracker, not a third-party service.
+	 * Fires from wpopsec_log_event() itself for the same reason the Telegram
+	 * alert does: a real block calls wp_die() at mu-plugin time, before
+	 * 'plugins_loaded' — nothing hooked later would ever see these events.
+	 *
+	 * Only reports actual blocks, never log-only detections — the shared
+	 * tracker is for "this IP did something and was stopped", not every
+	 * signature this install happens to be tuning.
+	 */
+	function wpopsec_maybe_unwantedip_report( $module, $event, $action, $detail, $severity, $ip ) {
+		if ( 'blocked' !== $action ) {
+			return;
+		}
+		if ( ! get_option( 'wpopsec_unwantedip_enabled', false ) ) {
+			return;
+		}
+
+		$api_key = trim( (string) get_option( 'wpopsec_unwantedip_api_key', '' ) );
+		if ( '' === $api_key ) {
+			return;
+		}
+
+		// Never report LAN/reserved/trusted addresses — they're never a
+		// genuine attacker by definition, and the service only accepts
+		// public IPv4 anyway.
+		if ( '' === $ip || false === strpos( $ip, '.' ) || wpopsec_ip_is_exempt( $ip ) ) {
+			return;
+		}
+
+		// A sustained flood from one IP would otherwise file the same
+		// report dozens of times a minute — one report per IP per hour is
+		// plenty for a reputation tracker; the local Event Log already has
+		// the full detail for this install's own records.
+		$lock_key = 'wpopsec_uip_lock_' . md5( $ip );
+		if ( false !== get_transient( $lock_key ) ) {
+			return;
+		}
+		set_transient( $lock_key, 1, HOUR_IN_SECONDS );
+
+		list( $label ) = wpopsec_severity_meta( $severity );
+		$severity_word = $severity >= 18 ? 'critical' : ( $severity >= 14 ? 'high' : ( $severity >= 10 ? 'medium' : 'low' ) );
+
+		$site = wp_specialchars_decode( get_option( 'blogname' ), ENT_QUOTES );
+		$host = wp_parse_url( get_option( 'siteurl' ), PHP_URL_HOST ) ?: '';
+
+		wp_remote_post(
+			'https://unwantedip.eagleeye-intelligence.com/api/v1/report',
+			array(
+				'timeout'  => 3,
+				// Fire-and-forget, same reasoning as the Telegram call: this
+				// can run right before wp_die(), and a slow/unreachable
+				// remote API must never delay a blocked request.
+				'blocking' => false,
+				'headers'  => array(
+					'Content-Type' => 'application/json',
+					'X-API-Key'    => $api_key,
+				),
+				'body'     => wp_json_encode(
+					array(
+						'ip'          => $ip,
+						'title'       => sprintf( '%s: %s', $module, $event ),
+						'severity'    => $severity_word,
+						'description' => sprintf(
+							'%s%s — severity %d/20 (%s). %s',
+							$site,
+							$host ? " ({$host})" : '',
+							$severity,
+							$label,
+							$detail
+						),
+					)
 				),
 			)
 		);

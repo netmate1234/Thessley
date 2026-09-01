@@ -53,6 +53,7 @@ class WPOpsec_Module_Loader {
 		// Ops — keeping the above current and knowing when it fires.
 		'auto-update'     => 'WPOpsec_Module_Auto_Update',
 		'telegram-alerts' => 'WPOpsec_Module_Telegram_Alerts',
+		'ip-sharing'      => 'WPOpsec_Module_IP_Sharing',
 	);
 
 	public static function init() {
@@ -255,6 +256,16 @@ class WPOpsec_Module_Loader {
 					? ( get_option( 'wpopsec_telegram_chat_id', '' ) ? 'good' : 'warn' )
 					: 'warn',
 				'note'  => sprintf( 'alerts above %d', (int) get_option( 'wpopsec_telegram_threshold', 15 ) ),
+			),
+			array(
+				'key'   => 'ip-sharing',
+				'title' => 'IP Sharing',
+				'icon'  => 'shield-alt',
+				'state' => get_option( 'wpopsec_unwantedip_enabled', false ) ? 'Enabled' : 'Disabled',
+				'level' => get_option( 'wpopsec_unwantedip_enabled', false )
+					? ( get_option( 'wpopsec_unwantedip_api_key', '' ) ? 'good' : 'warn' )
+					: 'warn',
+				'note'  => 'blocked IPs only',
 			),
 			array(
 				'key'   => 'malware-scanner',

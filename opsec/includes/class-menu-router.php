@@ -67,6 +67,7 @@ class WPOpsec_Menu_Router {
 				'tabs'  => array(
 					'auto-update'     => array( 'WPOpsec_Module_Auto_Update', 'render_settings_page' ),
 					'telegram-alerts' => array( 'WPOpsec_Module_Telegram_Alerts', 'render_page' ),
+				'ip-sharing'      => array( 'WPOpsec_Module_IP_Sharing', 'render_page' ),
 				),
 			),
 		);
