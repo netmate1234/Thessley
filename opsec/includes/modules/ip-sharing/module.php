@@ -100,9 +100,6 @@ class WPOpsec_Module_IP_Sharing {
 			exit;
 		}
 
-		$site = wp_specialchars_decode( get_option( 'blogname' ), ENT_QUOTES );
-		$host = wp_parse_url( get_option( 'siteurl' ), PHP_URL_HOST ) ?: '';
-
 		$response = wp_remote_post(
 			self::API . '/report',
 			array(
@@ -115,10 +112,12 @@ class WPOpsec_Module_IP_Sharing {
 					array(
 						// TEST-NET-1 (RFC 5737) — reserved for documentation, never a
 						// real attacker, and easy to spot/ignore in report history.
+						// No site name/domain here, matching the real report path —
+						// this is public data, not a private alert.
 						'ip'          => '203.0.113.1',
 						'title'       => 'Opsec test report',
 						'severity'    => 'low',
-						'description' => sprintf( 'Test report from %s%s — if this appears, reporting is wired up correctly.', $site, $host ? " ({$host})" : '' ),
+						'description' => 'Test report — if this appears, reporting is wired up correctly.',
 					)
 				),
 			)

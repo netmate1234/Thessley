@@ -333,9 +333,30 @@ if ( ! function_exists( 'wpopsec_maybe_unwantedip_report' ) ) {
 		list( $label ) = wpopsec_severity_meta( $severity );
 		$severity_word = $severity >= 18 ? 'critical' : ( $severity >= 14 ? 'high' : ( $severity >= 10 ? 'medium' : 'low' ) );
 
-		$site = wp_specialchars_decode( get_option( 'blogname' ), ENT_QUOTES );
-		$host = wp_parse_url( get_option( 'siteurl' ), PHP_URL_HOST ) ?: '';
+		// Turns internal slugs like "geo-login"/"login_country_denied" into
+		// "Geo Login"/"Login Country Denied" — readable without knowing this
+		// plugin's naming, and generic enough to cover any module/event
+		// without a hand-maintained mapping table for every one of them.
+		$humanize = function ( $slug ) {
+			return ucwords( str_replace( array( '-', '_' ), ' ', (string) $slug ) );
+		};
 
+		// Anything gating wp-login.php itself — geo-based or attempt-count
+		// based — is an unwanted login attempt from the reader's point of
+		// view regardless of *why* this install stopped it, and "brute
+		// force attempt" is the category anyone skimming a shared IP
+		// reputation tracker actually recognizes. The specific reason
+		// (which country, how many failed attempts) still goes in the
+		// description below, just not as the headline category.
+		$login_modules = array( 'geo-login', 'login-guard' );
+		$title         = in_array( $module, $login_modules, true )
+			? 'WordPress Login Brute Force Attempt'
+			: sprintf( '%s — %s', $humanize( $module ), $humanize( $event ) );
+
+		// Deliberately no blogname/domain here, unlike the Telegram alert —
+		// that's a private message to the site owner; this is data shared
+		// with a public reputation tracker, and which of your sites caught
+		// something is not information that belongs on a public record.
 		wp_remote_post(
 			'https://unwantedip.eagleeye-intelligence.com/api/v1/report',
 			array(
@@ -351,16 +372,9 @@ if ( ! function_exists( 'wpopsec_maybe_unwantedip_report' ) ) {
 				'body'     => wp_json_encode(
 					array(
 						'ip'          => $ip,
-						'title'       => sprintf( '%s: %s', $module, $event ),
+						'title'       => $title,
 						'severity'    => $severity_word,
-						'description' => sprintf(
-							'%s%s — severity %d/20 (%s). %s',
-							$site,
-							$host ? " ({$host})" : '',
-							$severity,
-							$label,
-							$detail
-						),
+						'description' => sprintf( '%s (Opsec severity %d/20, %s)', $detail, $severity, $label ),
 					)
 				),
 			)
