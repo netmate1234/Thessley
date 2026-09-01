@@ -408,11 +408,41 @@ class WPOpsec_Module_Loader {
 		$s_level = $score >= 85 ? 'good' : ( $score >= 60 ? 'warn' : 'bad' );
 		$s_label = $score >= 85 ? 'Strong' : ( $score >= 60 ? 'Needs attention' : 'Weak' );
 
+		// Core protection: the baseline modules a site should turn on
+		// regardless of what it is — as opposed to optional integrations
+		// (Telegram, IP Sharing, Geo Blocker/Login, Activity Log) that many
+		// sites will legitimately never want, and User Watchdog/Event Map
+		// whose "not good" states are live alerts or read-only views, not
+		// unfinished setup. Keeping this list separate from the general
+		// attention line means the headline banner only ever nags about
+		// things actually worth finishing, not things worth ignoring.
+		$core_keys = array(
+			'ip-blocklist',
+			'query-guard',
+			'login-guard',
+			'headers',
+			'user-enum',
+			'file-integrity',
+			'malware-scanner',
+			'vuln-scanner',
+			'rate-limiter',
+			'hardening',
+		);
+
+		$core_gaps = array_values(
+			array_filter(
+				$cards,
+				function ( $c ) use ( $core_keys ) {
+					return in_array( $c['key'], $core_keys, true ) && 'good' !== $c['level'];
+				}
+			)
+		);
+
 		$attention = array_values(
 			array_filter(
 				$cards,
-				function ( $c ) {
-					return 'good' !== $c['level'];
+				function ( $c ) use ( $core_keys ) {
+					return 'good' !== $c['level'] && ! in_array( $c['key'], $core_keys, true );
 				}
 			)
 		);
@@ -475,11 +505,44 @@ class WPOpsec_Module_Loader {
 				</div>
 			</div>
 
+			<?php if ( $core_gaps ) : ?>
+				<div class="wpopsec-protect wpopsec-protect--bad">
+					<div class="wpopsec-protect__head">
+						<span class="dashicons dashicons-shield-alt"></span>
+						<div>
+							<strong>You're not fully protected yet</strong>
+							<span><?php echo esc_html( sprintf( '%d of %d core module(s) still need attention.', count( $core_gaps ), count( $core_keys ) ) ); ?></span>
+						</div>
+					</div>
+					<ul class="wpopsec-protect__list">
+						<?php foreach ( $core_gaps as $g ) : ?>
+							<li>
+								<a href="<?php echo esc_url( WPOpsec_Menu_Router::url( $g['key'] ) ); ?>">
+									<span class="dashicons dashicons-arrow-right-alt2"></span>
+									<strong><?php echo esc_html( $g['title'] ); ?></strong>
+									<em><?php echo esc_html( $g['state'] ); ?></em>
+								</a>
+							</li>
+						<?php endforeach; ?>
+					</ul>
+				</div>
+			<?php else : ?>
+				<div class="wpopsec-protect wpopsec-protect--good">
+					<div class="wpopsec-protect__head">
+						<span class="dashicons dashicons-yes-alt"></span>
+						<div>
+							<strong>Core protection fully configured</strong>
+							<span>Every baseline module is on and enforcing.</span>
+						</div>
+					</div>
+				</div>
+			<?php endif; ?>
+
 			<?php if ( $attention ) : ?>
 				<div class="wpopsec-attention">
-					<span class="dashicons dashicons-warning"></span>
+					<span class="dashicons dashicons-info"></span>
 					<div>
-						<strong>Worth a look:</strong>
+						<strong>Optional, not yet set up:</strong>
 						<?php
 						$links = array();
 						foreach ( $attention as $a ) {
@@ -636,11 +699,29 @@ class WPOpsec_Module_Loader {
 		.wpopsec-spark__bar:hover { background:#2271b1; }
 
 		.wpopsec-attention { display:flex; gap:10px; align-items:flex-start;
-			background:#fcf9e8; border:1px solid #f0e2a1; border-left:4px solid #dba617;
+			background:#f0f6fc; border:1px solid #c5d9ed; border-left:4px solid var(--blue);
 			border-radius:6px; padding:12px 14px; margin-bottom:20px; }
-		.wpopsec-attention .dashicons { color:#dba617; }
+		.wpopsec-attention .dashicons { color:var(--blue); }
 		.wpopsec-attention a { text-decoration:none; }
 		.wpopsec-attention em { color:var(--muted); font-style:normal; font-size:12px; }
+
+		.wpopsec-protect { border-radius:8px; padding:16px 18px; margin-bottom:16px; }
+		.wpopsec-protect--bad { background:#fdeaf1; border:1px solid #f3c2d2; border-left:4px solid var(--bad); }
+		.wpopsec-protect--good { background:#edf7f2; border:1px solid #b6e0cb; border-left:4px solid var(--ok); }
+		.wpopsec-protect__head { display:flex; gap:12px; align-items:flex-start; }
+		.wpopsec-protect__head .dashicons { font-size:24px; width:24px; height:24px; margin-top:1px; }
+		.wpopsec-protect--bad .wpopsec-protect__head .dashicons { color:var(--bad); }
+		.wpopsec-protect--good .wpopsec-protect__head .dashicons { color:var(--ok); }
+		.wpopsec-protect__head strong { display:block; font-size:15px; color:var(--ink); }
+		.wpopsec-protect__head span { font-size:13px; color:var(--muted); }
+		.wpopsec-protect__list { list-style:none; margin:12px 0 0; padding:0;
+			display:grid; gap:6px; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); }
+		.wpopsec-protect__list a { display:flex; align-items:center; gap:6px; text-decoration:none;
+			background:var(--card); border:1px solid var(--line); border-radius:6px;
+			padding:8px 10px; font-size:13px; color:var(--ink); }
+		.wpopsec-protect__list a:hover { border-color:var(--bad); }
+		.wpopsec-protect__list .dashicons { font-size:15px; width:15px; height:15px; color:var(--bad); flex:none; }
+		.wpopsec-protect__list em { margin-left:auto; font-style:normal; font-size:11px; color:var(--muted); white-space:nowrap; }
 
 		.wpopsec-h2 { display:flex; align-items:baseline; gap:12px; font-size:15px;
 			text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin:24px 0 12px; }
