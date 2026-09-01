@@ -7,7 +7,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Shares blocked IPs with unwantedip.eagleeye-intelligence.com — a
  * self-hosted, cross-host reputation tracker (not a third-party service).
  * The actual send call (wpopsec_maybe_unwantedip_report()) lives in the
- * mu-loader, not here, for the same reason Telegram Alerts works that
+ * mu-loader, not here, for the same reason Alerts works that
  * way: a real block calls wp_die() at mu-plugin time, before regular
  * plugins have loaded, so nothing hooked here would ever see those
  * events. This module is just the admin UI and settings around that.

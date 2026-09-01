@@ -53,7 +53,7 @@ class WPOpsec_Module_Loader {
 
 		// Ops — keeping the above current and knowing when it fires.
 		'auto-update'     => 'WPOpsec_Module_Auto_Update',
-		'telegram-alerts' => 'WPOpsec_Module_Telegram_Alerts',
+		'alerts'          => 'WPOpsec_Module_Alerts',
 		'ip-sharing'      => 'WPOpsec_Module_IP_Sharing',
 		'scan-all'        => 'WPOpsec_Module_Scan_All',
 	);
@@ -250,14 +250,12 @@ class WPOpsec_Module_Loader {
 					: 'uploads unguarded',
 			),
 			array(
-				'key'   => 'telegram-alerts',
-				'title' => 'Telegram Alerts',
+				'key'   => 'alerts',
+				'title' => 'Alerts',
 				'icon'  => 'testimonial',
-				'state' => get_option( 'wpopsec_telegram_enabled', false ) ? 'Enabled' : 'Disabled',
-				'level' => get_option( 'wpopsec_telegram_enabled', false )
-					? ( get_option( 'wpopsec_telegram_chat_id', '' ) ? 'good' : 'warn' )
-					: 'warn',
-				'note'  => sprintf( 'alerts above %d', (int) get_option( 'wpopsec_telegram_threshold', 15 ) ),
+				'state' => self::alerts_ready_count() ? sprintf( '%d channel(s)', self::alerts_ready_count() ) : ( self::alerts_any_enabled() ? 'Needs setup' : 'Disabled' ),
+				'level' => self::alerts_ready_count() ? 'good' : 'warn',
+				'note'  => self::alerts_channel_summary(),
 			),
 			array(
 				'key'   => 'ip-sharing',
@@ -318,6 +316,35 @@ class WPOpsec_Module_Loader {
 				'note'  => 'blocked + logged events, by country',
 			),
 		);
+	}
+
+	private static function alerts_tg_ready() {
+		return get_option( 'wpopsec_telegram_enabled', false )
+			&& get_option( 'wpopsec_telegram_bot_token', '' )
+			&& get_option( 'wpopsec_telegram_chat_id', '' );
+	}
+
+	private static function alerts_email_ready() {
+		return get_option( 'wpopsec_email_enabled', false )
+			&& ( get_option( 'wpopsec_email_address', '' ) || get_option( 'admin_email' ) );
+	}
+
+	private static function alerts_ready_count() {
+		return ( self::alerts_tg_ready() ? 1 : 0 ) + ( self::alerts_email_ready() ? 1 : 0 );
+	}
+
+	private static function alerts_any_enabled() {
+		return get_option( 'wpopsec_telegram_enabled', false ) || get_option( 'wpopsec_email_enabled', false );
+	}
+
+	private static function alerts_channel_summary() {
+		$on = array_filter(
+			array(
+				get_option( 'wpopsec_telegram_enabled', false ) ? 'Telegram' : null,
+				get_option( 'wpopsec_email_enabled', false ) ? 'Email' : null,
+			)
+		);
+		return $on ? implode( ' + ', $on ) : 'no channel configured';
 	}
 
 	private static function integrity_issue_count() {

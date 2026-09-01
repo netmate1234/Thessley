@@ -207,6 +207,7 @@ if ( ! function_exists( 'wpopsec_log_event' ) ) {
 		$wpdb->suppress_errors( false );
 
 		wpopsec_maybe_telegram_alert( $module, $event, $action, $detail, $severity, $ip );
+		wpopsec_maybe_email_alert( $module, $event, $action, $detail, $severity, $ip );
 		wpopsec_maybe_unwantedip_report( $module, $event, $action, $detail, $severity, $ip );
 	}
 }
@@ -285,6 +286,65 @@ if ( ! function_exists( 'wpopsec_maybe_telegram_alert' ) ) {
 				),
 			)
 		);
+	}
+}
+
+if ( ! function_exists( 'wpopsec_maybe_email_alert' ) ) {
+	/**
+	 * Same trigger point as wpopsec_maybe_telegram_alert() and for the same
+	 * reason, but can't reuse wp_mail(): mu-plugins load and run (see the
+	 * bottom of this file) before wp-includes/pluggable.php does, so
+	 * wp_mail() isn't defined yet at this call site — not just on the rare
+	 * early-block path, every single call. PHP's own mail() is the only
+	 * option that's actually available here, so unlike the Telegram send
+	 * this one is synchronous — a slow local MTA can add latency to a
+	 * blocked request, which is the accepted tradeoff for having email as
+	 * an inline channel at all instead of not offering the fast path here.
+	 */
+	function wpopsec_maybe_email_alert( $module, $event, $action, $detail, $severity, $ip ) {
+		if ( ! get_option( 'wpopsec_email_enabled', false ) ) {
+			return;
+		}
+
+		$threshold = (int) get_option( 'wpopsec_email_threshold', 15 );
+		if ( $severity <= $threshold ) {
+			return;
+		}
+
+		$to = trim( (string) get_option( 'wpopsec_email_address', '' ) ) ?: get_option( 'admin_email' );
+		if ( '' === $to ) {
+			return;
+		}
+
+		// Same burst-suppression reasoning as the Telegram lock, separate key
+		// so the two channels don't throttle each other.
+		$lock_key = 'wpopsec_email_lock';
+		if ( false !== get_transient( $lock_key ) ) {
+			return;
+		}
+		set_transient( $lock_key, 1, 5 );
+
+		list( $label ) = wpopsec_severity_meta( $severity );
+		$site = wp_specialchars_decode( get_option( 'blogname' ), ENT_QUOTES );
+		$host = wp_parse_url( get_option( 'siteurl' ), PHP_URL_HOST ) ?: '';
+
+		$subject = sprintf( '[%s] severity %d/20 (%s) — %s', $site, $severity, $label, $event );
+
+		$lines = array(
+			sprintf( '%s%s — severity %d/20 (%s)', $site, $host ? " ({$host})" : '', $severity, $label ),
+			sprintf( 'Module: %s   Event: %s', $module, $event ),
+			sprintf( 'Action: %s   IP: %s', $action, $ip ),
+		);
+		if ( '' !== $detail ) {
+			$lines[] = $detail;
+		}
+		$lines[] = current_time( 'mysql' );
+		$body    = implode( "\n", $lines );
+
+		$from_domain = $host ?: 'localhost';
+		$headers     = 'From: Opsec <wordpress@' . $from_domain . '>';
+
+		@mail( $to, $subject, $body, $headers );
 	}
 }
 

@@ -48,7 +48,7 @@ Opsec is a modular security plugin. Each feature is a self-contained module you 
 **Ops**
 
 * **Auto Updates** — per-plugin auto-update control, including a "flagged only" mode driven by the Vulnerability Scan's findings.
-* **Telegram Alerts** — a real-time Telegram message when an event crosses a severity threshold you set.
+* **Alerts** — a real-time Telegram message and/or email when an event crosses a severity threshold you set, independently per channel.
 
 = External services this plugin can connect to =
 
@@ -58,7 +58,7 @@ Each of these is either a standard security data feed or something you explicitl
 * DB-IP.com Country Lite dataset, CC BY 4.0 (Geo Blocker / Geo Login modules)
 * api.wordpress.org (core checksum verification — File Integrity module)
 * Jetpack's published IP list (xmlrpc.php allowlist — Query Guard module)
-* Telegram Bot API — only if you enable and configure Telegram Alerts yourself
+* Telegram Bot API — only if you enable and configure Telegram alerts yourself
 
 == Installation ==
 
