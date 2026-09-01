@@ -210,6 +210,13 @@ class WPOpsec_Module_IP_Blocklist {
 		<?php
 		WPOpsec_UI::section_end();
 
+		uasort(
+			$local,
+			function ( $a, $b ) {
+				return ( $b['added_at'] ?? 0 ) <=> ( $a['added_at'] ?? 0 );
+			}
+		);
+
 		$lb_q = isset( $_GET['lb_q'] ) ? trim( wp_unslash( $_GET['lb_q'] ) ) : '';
 
 		$local_filtered = $local;
