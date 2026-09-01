@@ -371,10 +371,17 @@ if ( ! function_exists( 'wpopsec_maybe_unwantedip_report' ) ) {
 				),
 				'body'     => wp_json_encode(
 					array(
-						'ip'          => $ip,
-						'title'       => $title,
-						'severity'    => $severity_word,
-						'description' => sprintf( '%s (Opsec severity %d/20, %s)', $detail, $severity, $label ),
+						'ip'       => $ip,
+						'title'    => $title,
+						'severity' => $severity_word,
+						// unwantedip's own web UI (the "My Reports"/"All Reports"
+						// tables, checked directly in its report-listing template)
+						// never renders the title field anywhere a human looks —
+						// only description. "title" above is kept because the API
+						// requires it and the read endpoint does return it, but
+						// everything a person would actually need to see has to
+						// live here too, or it's effectively invisible.
+						'description' => sprintf( '%s. %s (Opsec severity %d/20, %s)', $title, $detail, $severity, $label ),
 					)
 				),
 			)
