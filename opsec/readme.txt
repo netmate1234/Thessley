@@ -4,7 +4,7 @@ Tags: security, firewall, malware, geo-blocking, brute-force
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.1.1
+Stable tag: 0.1.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -81,6 +81,13 @@ The early-request checks (IP Blocklist, Geo Blocker, Geo Login, Rate Limiter, Qu
 DB-IP's free Country Lite database (CC BY 4.0), refreshed automatically on a schedule.
 
 == Changelog ==
+
+= 0.1.2 =
+* New Whitelist tab: individually-listed IPs and the trusted-networks CIDR feed both moved here from IP Blocklist, now exempt from every blocking module (IP Blocklist, Geo Blocker, Geo Login, Rate Limiter, Login Guard, Query Guard, User Enumeration).
+* Trusted-networks URL now defaults to the hosted crawler-nets.conf feed and downloads automatically on install.
+* Local blocklist table gained pagination, IP/reason search, and newest-first sorting.
+* Geo Blocker's country-index refresh rewritten to stream the download and parse line-by-line instead of holding the full dataset in memory — peak memory cut roughly 64% on the ~357k-range DB-IP dataset.
+* IP Sharing's enabled toggle now defaults to on, so reporting goes live as soon as an API key is added.
 
 = 0.1.1 =
 * Geo Login, Event Map, Activity Log, Rate Limiter, Malware Scanner modules added.
