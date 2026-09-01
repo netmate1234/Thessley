@@ -41,6 +41,16 @@ class WPOpsec_IP_Blocklist_Fetcher {
 			'url'   => 'https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level2.netset',
 			'type'  => 'cidr_list',
 		),
+		'unwantedip_wp'  => array(
+			'label' => 'unwantedip.eagleeye-intelligence.com (WordPress-targeting IPs, 90d)',
+			'url'   => 'https://unwantedip.eagleeye-intelligence.com/api/v1/feed/wordpress',
+			'type'  => 'ip_list',
+			// Requires the same API key as the IP Sharing tab — set up there
+			// first, since a key with report-write access also gets read
+			// access to this feed. Silently skipped (not a fetch failure) if
+			// no key is configured, same as any other not-yet-set-up source.
+			'auth'  => 'unwantedip_key',
+		),
 	);
 
 	const DEFAULT_ENABLED = array( 'cins', 'dshield' );
@@ -57,7 +67,16 @@ class WPOpsec_IP_Blocklist_Fetcher {
 				continue;
 			}
 
-			$body = self::download( $source['url'] );
+			$headers = array();
+			if ( 'unwantedip_key' === ( $source['auth'] ?? '' ) ) {
+				$key = trim( (string) get_option( 'wpopsec_unwantedip_api_key', '' ) );
+				if ( '' === $key ) {
+					continue; // not set up yet — not a fetch failure, just nothing to fetch with
+				}
+				$headers['X-API-Key'] = $key;
+			}
+
+			$body = self::download( $source['url'], $headers );
 			if ( false === $body ) {
 				continue;
 			}
@@ -85,12 +104,13 @@ class WPOpsec_IP_Blocklist_Fetcher {
 		}
 	}
 
-	private static function download( $url ) {
+	private static function download( $url, array $headers = array() ) {
 		$response = wp_remote_get(
 			$url,
 			array(
 				'timeout'    => 30,
 				'user-agent' => 'wp-opsec/' . WPOPSEC_VERSION,
+				'headers'    => $headers,
 			)
 		);
 

@@ -321,7 +321,7 @@ class WPOpsec_Module_IP_Blocklist {
 							<?php
 						}
 					},
-					'Changes take effect on the next refresh. Private and reserved IP space is always excluded, whatever a feed says — a bogon source address only ever means a LAN client or a proxy hop.'
+					'Changes take effect on the next refresh. Private and reserved IP space is always excluded, whatever a feed says — a bogon source address only ever means a LAN client or a proxy hop. The unwantedip source needs an API key from the <a href="' . esc_url( WPOpsec_Menu_Router::url( 'ip-sharing' ) ) . '">IP Sharing tab</a> first — it\'s silently skipped, not treated as a failed fetch, until one is set.'
 				);
 
 				WPOpsec_UI::row(
