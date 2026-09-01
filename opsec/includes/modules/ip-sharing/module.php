@@ -19,7 +19,14 @@ class WPOpsec_Module_IP_Sharing {
 
 	const API = 'https://unwantedip.eagleeye-intelligence.com/api/v1';
 
-	public static function activate() {}
+	public static function activate() {
+		// Pre-arms the toggle so reporting goes live the moment a key exists
+		// — but doesn't do anything by itself: wpopsec_maybe_unwantedip_report()
+		// (mu-loader) requires both this AND a saved API key, and getting a
+		// key means calling out to unwantedip's signup endpoint, which is a
+		// real account creation and needs a human to actually click it.
+		add_option( 'wpopsec_unwantedip_enabled', true );
+	}
 	public static function deactivate() {}
 
 	public static function register() {
