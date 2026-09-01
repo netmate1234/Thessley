@@ -210,16 +210,47 @@ class WPOpsec_Module_IP_Blocklist {
 		<?php
 		WPOpsec_UI::section_end();
 
+		$lb_q = isset( $_GET['lb_q'] ) ? trim( wp_unslash( $_GET['lb_q'] ) ) : '';
+
+		$local_filtered = $local;
+		if ( '' !== $lb_q ) {
+			$local_filtered = array_filter(
+				$local,
+				function ( $entry, $ip ) use ( $lb_q ) {
+					return false !== stripos( $ip, $lb_q ) || false !== stripos( $entry['reason'] ?? '', $lb_q );
+				},
+				ARRAY_FILTER_USE_BOTH
+			);
+		}
+
+		$lb_per_page = 25;
+		$lb_total    = count( $local_filtered );
+		$lb_pages    = max( 1, (int) ceil( $lb_total / $lb_per_page ) );
+		$lb_page     = isset( $_GET['lb_page'] ) ? max( 1, (int) $_GET['lb_page'] ) : 1;
+		$lb_page     = min( $lb_page, $lb_pages );
+		$local_page  = array_slice( $local_filtered, ( $lb_page - 1 ) * $lb_per_page, $lb_per_page, true );
+
 		WPOpsec_UI::section( 'Local blocklist', 'list-view', sprintf( '%d entry(s)', count( $local ) ) );
 		echo '<p class="wpopsec-help" style="margin-top:0">IPs added here — manually, or auto-escalated by Query Guard and Login Guard — are checked alongside the feeds above, and expire automatically.</p>';
-		if ( empty( $local ) ) {
-			echo '<div class="wpopsec-empty"><span class="dashicons dashicons-yes-alt"></span><p>No local entries.</p></div>';
+		?>
+		<form method="get" style="margin:0 0 10px;display:flex;gap:6px;align-items:center">
+			<input type="hidden" name="page" value="<?php echo esc_attr( wp_unslash( $_GET['page'] ?? '' ) ); ?>">
+			<input type="hidden" name="tab" value="<?php echo esc_attr( wp_unslash( $_GET['tab'] ?? '' ) ); ?>">
+			<input type="text" name="lb_q" value="<?php echo esc_attr( $lb_q ); ?>" placeholder="Search IP or reason&hellip;" style="width:220px">
+			<?php submit_button( 'Search', 'secondary', 'submit', false ); ?>
+			<?php if ( '' !== $lb_q ) : ?>
+				<a href="<?php echo esc_url( remove_query_arg( array( 'lb_q', 'lb_page' ) ) ); ?>" class="button">Clear</a>
+			<?php endif; ?>
+		</form>
+		<?php
+		if ( empty( $local_page ) ) {
+			echo '<div class="wpopsec-empty"><span class="dashicons dashicons-yes-alt"></span><p>' . ( '' !== $lb_q ? 'No matches.' : 'No local entries.' ) . '</p></div>';
 		} else {
 			?>
 			<table class="wpopsec-table">
 				<thead><tr><th style="width:140px">IP</th><th>Reason</th><th style="width:130px">Added</th><th style="width:130px">Expires</th><th style="width:90px"></th></tr></thead>
 				<tbody>
-				<?php foreach ( $local as $ip => $entry ) : ?>
+				<?php foreach ( $local_page as $ip => $entry ) : ?>
 					<tr>
 						<td><code><?php echo esc_html( $ip ); ?></code></td>
 						<td class="wpopsec-muted"><?php echo esc_html( $entry['reason'] ?? '' ); ?></td>
@@ -237,6 +268,17 @@ class WPOpsec_Module_IP_Blocklist {
 				<?php endforeach; ?>
 				</tbody>
 			</table>
+			<?php if ( $lb_pages > 1 ) : ?>
+				<div class="wpopsec-actions" style="margin-top:10px;justify-content:flex-start;gap:10px;align-items:center">
+					<?php if ( $lb_page > 1 ) : ?>
+						<a class="button" href="<?php echo esc_url( add_query_arg( 'lb_page', $lb_page - 1 ) ); ?>">&laquo; Prev</a>
+					<?php endif; ?>
+					<span class="wpopsec-muted">Page <?php echo (int) $lb_page; ?> of <?php echo (int) $lb_pages; ?> (<?php echo (int) $lb_total; ?> entr<?php echo 1 === $lb_total ? 'y' : 'ies'; ?>)</span>
+					<?php if ( $lb_page < $lb_pages ) : ?>
+						<a class="button" href="<?php echo esc_url( add_query_arg( 'lb_page', $lb_page + 1 ) ); ?>">Next &raquo;</a>
+					<?php endif; ?>
+				</div>
+			<?php endif; ?>
 			<?php
 		}
 		?>
