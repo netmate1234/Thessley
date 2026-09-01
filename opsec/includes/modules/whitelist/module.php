@@ -23,9 +23,15 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class WPOpsec_Module_Whitelist {
 
-	const CRON_HOOK = 'wpopsec_trusted_networks_refresh';
+	const CRON_HOOK      = 'wpopsec_trusted_networks_refresh';
+	const DEFAULT_URL    = 'https://dashboard.eagleeye-intelligence.com/wp-content/uploads/wp-opsec/crawler-nets.conf';
 
 	public static function activate() {
+		// add_option() is a no-op if the option already exists, so this only
+		// ever sets the default on a fresh install — it won't override a
+		// site that's pointed elsewhere, or clobber an intentional clear.
+		add_option( 'wpopsec_trusted_networks_url', self::DEFAULT_URL );
+
 		if ( ! wp_next_scheduled( self::CRON_HOOK ) ) {
 			wp_schedule_event( time(), 'daily', self::CRON_HOOK );
 		}
