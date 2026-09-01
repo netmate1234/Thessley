@@ -54,6 +54,7 @@ class WPOpsec_Module_Loader {
 		'auto-update'     => 'WPOpsec_Module_Auto_Update',
 		'telegram-alerts' => 'WPOpsec_Module_Telegram_Alerts',
 		'ip-sharing'      => 'WPOpsec_Module_IP_Sharing',
+		'scan-all'        => 'WPOpsec_Module_Scan_All',
 	);
 
 	public static function init() {

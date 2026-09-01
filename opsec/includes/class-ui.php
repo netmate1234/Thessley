@@ -32,6 +32,7 @@ class WPOpsec_UI {
 			'hardening'      => array( 'admin-tools', 'Hardening', 'Removes the tools an attacker reaches for after getting in.' ),
 			'telegram-alerts' => array( 'testimonial', 'Telegram Alerts', 'Sends a real-time Telegram message when an event exceeds a severity threshold. The Event Log records everything regardless of this setting.' ),
 			'ip-sharing'      => array( 'shield-alt', 'IP Sharing', 'Shares genuine blocks with unwantedip.eagleeye-intelligence.com, a self-hosted IP reputation tracker. Only actual blocks, at most once per IP per hour.' ),
+			'scan-all'        => array( 'search', 'Scan All', 'One button for File Integrity, Malware Scanner, Vulnerability Scan, and User Watchdog — scheduled to run immediately in the background rather than blocking this page.' ),
 			'malware-scanner' => array( 'warning', 'Malware Scanner', 'Scans plugin, theme and upload files for webshell, obfuscation and injected-spam signatures.' ),
 			'geo-blocker'     => array( 'admin-site-alt3', 'Geo Blocker', 'Blocks or allows traffic by country, using a compiled IP-to-country dataset checked at the early gate.' ),
 			'activity-log'    => array( 'edit-page', 'Activity Log', 'Records who published, deleted, installed or changed what — the mundane audit trail, not attack detections.' ),
