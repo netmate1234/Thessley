@@ -183,5 +183,15 @@ wpopsec_register_check(
 		}
 
 		return array( 'reason' => 'Access denied.' );
-	}
+	},
+	// Priority 5: other checks (ip-blocklist, login-guard, rate-limiter,
+	// user-enum...) sit at the default 10, and the early gate stops at the
+	// first one that blocks. A request whose IP happens to also be on a
+	// reputation list or from a blocked country would get wp_die()'d by
+	// one of those before this signature scan ever ran — silently losing
+	// the query-guard log entry even in log-only mode, not just the block.
+	// Running the signature scan first means it always gets to log (or
+	// act on) what it actually detected, independent of what else about
+	// the request also happened to match.
+	5
 );
