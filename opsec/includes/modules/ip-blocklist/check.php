@@ -34,10 +34,14 @@ wpopsec_register_check(
 		}
 
 		$source = null;
+		$label  = '';
 		if ( wpopsec_ip_in_ranges( $needle, $local ) ) {
 			$source = 'local';
+			$label  = 'local blocklist';
 		} elseif ( wpopsec_ip_in_ranges( $needle, $ranges ) ) {
-			$source = 'reputation list';
+			$source     = 'reputation list';
+			$src_labels = wpopsec_ip_reputation_sources( $needle );
+			$label      = $src_labels ? implode( ', ', $src_labels ) : 'reputation list';
 		}
 
 		if ( null === $source ) {
@@ -47,15 +51,44 @@ wpopsec_register_check(
 		$mode = get_option( 'wpopsec_ip_blocklist_mode', 'log' );
 
 		if ( 'block' !== $mode ) {
-			wpopsec_log_event( 'ip-blocklist', 'listed_ip', 'logged', "matched {$source} (log-only mode)" );
+			wpopsec_log_event( 'ip-blocklist', 'listed_ip', 'logged', "matched {$label} (log-only mode)" );
 			return null;
 		}
 
-		wpopsec_log_event( 'ip-blocklist', 'listed_ip', 'blocked', "matched {$source}" );
+		wpopsec_log_event( 'ip-blocklist', 'listed_ip', 'blocked', "matched {$label}" );
 
 		return array( 'reason' => 'Access denied.' );
 	}
 );
+
+if ( ! function_exists( 'wpopsec_ip_reputation_sources' ) ) {
+	/**
+	 * Only called after a reputation-list hit is already decided — never
+	 * on the hot path for the vast majority of requests that don't match
+	 * anything. The merged range file used for the block decision itself
+	 * has no per-source attribution left (overlapping ranges from
+	 * different feeds get coalesced into one span on compile), so this
+	 * re-checks the same IP against each source's own unmerged ranges,
+	 * purely for a readable Event Log line.
+	 *
+	 * @return string[] human labels of every source whose range covers $needle
+	 */
+	function wpopsec_ip_reputation_sources( $needle ) {
+		static $by_source = null;
+		if ( null === $by_source ) {
+			$file      = __DIR__ . '/data/ip-blocklist-by-source.php';
+			$by_source = file_exists( $file ) ? require $file : array();
+		}
+
+		$labels = array();
+		foreach ( $by_source as $label => $source_ranges ) {
+			if ( wpopsec_ip_in_ranges( $needle, $source_ranges ) ) {
+				$labels[] = $label;
+			}
+		}
+		return $labels;
+	}
+}
 
 if ( ! function_exists( 'wpopsec_ip_in_ranges' ) ) {
 	/** @param array<int, array{0:int,1:int}> $ranges sorted, non-overlapping */
