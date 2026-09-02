@@ -19,12 +19,25 @@
 
 if ( ! function_exists( 'wpopsec_register_check' ) ) {
 	/**
-	 * @param callable $check Receives no args, returns null/false to allow,
-	 *                        or array{reason:string} to block the request.
+	 * @param callable $check    Receives no args, returns null/false to
+	 *                           allow, or array{reason:string} to block.
+	 * @param int      $priority Lower runs earlier (WP hook-priority
+	 *                           convention). Default 10. Checks otherwise
+	 *                           run in glob() filesystem order, which is
+	 *                           alphabetical by check filename — an
+	 *                           accident of naming, not a real ordering
+	 *                           guarantee, so anything that actually
+	 *                           depends on running before/after another
+	 *                           check (e.g. a URL-specific check needing
+	 *                           first refusal ahead of a broader one that
+	 *                           would otherwise wp_die() first and pre-empt
+	 *                           it) should set this explicitly rather than
+	 *                           relying on its filename sorting right.
 	 */
-	function wpopsec_register_check( callable $check ) {
+	function wpopsec_register_check( callable $check, $priority = 10 ) {
 		global $wpopsec_checks;
-		$wpopsec_checks[] = $check;
+		static $seq = 0;
+		$wpopsec_checks[] = array( 'priority' => $priority, 'seq' => $seq++, 'check' => $check );
 	}
 }
 
@@ -710,8 +723,18 @@ foreach ( glob( $checks_dir . '/*.php' ) ?: array() as $check_file ) {
 	require $check_file;
 }
 
-foreach ( $GLOBALS['wpopsec_checks'] as $check ) {
-	$result = call_user_func( $check );
+usort(
+	$GLOBALS['wpopsec_checks'],
+	function ( $a, $b ) {
+		// usort() isn't guaranteed stable before PHP 8 (this plugin's floor
+		// is 7.4), so 'seq' (registration order) breaks priority ties
+		// explicitly instead of trusting the engine to preserve it.
+		return $a['priority'] <=> $b['priority'] ?: $a['seq'] <=> $b['seq'];
+	}
+);
+
+foreach ( $GLOBALS['wpopsec_checks'] as $entry ) {
+	$result = call_user_func( $entry['check'] );
 	if ( is_array( $result ) ) {
 		wp_die(
 			esc_html( $result['reason'] ?? 'Forbidden' ),

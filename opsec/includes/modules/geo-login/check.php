@@ -21,6 +21,14 @@ if ( ! function_exists( 'wpopsec_geo_login_is_login_request' ) ) {
 	}
 }
 
+// Priority 5: must run before Geo Blocker's own (default 10) site-wide
+// country check. Both check.php files finish loading — and defining
+// their functions, including geo-blocker's wpopsec_geo_lookup() this
+// relies on — before either one's callback actually runs, so this only
+// changes execution order, not what's available. Without it, a blocked
+// country hitting wp-login.php while Geo Blocker is set to block would
+// get the generic sitewide refusal and wp_die() before this more
+// specific check — and its local-blocklist escalation — ever ran.
 wpopsec_register_check(
 	function () {
 		if ( ! function_exists( 'wpopsec_geo_lookup' ) || ! wpopsec_geo_login_is_login_request() ) {
@@ -68,5 +76,6 @@ wpopsec_register_check(
 		wpopsec_local_blocklist_add( $ip, "geo-login: {$label}" );
 
 		return array( 'reason' => 'Admin login is not available from your location.' );
-	}
+	},
+	5
 );
