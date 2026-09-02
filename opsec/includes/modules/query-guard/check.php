@@ -37,6 +37,15 @@ if ( ! function_exists( 'wpopsec_query_guard_patterns' ) ) {
 			array( 'id' => 'cmdi_command_chain', 'category' => 'cmdi', 'regex' => '/;\s*(cat|ls|whoami|id|uname|wget|curl|nc)\b/i' ),
 			array( 'id' => 'cmdi_backtick_exec', 'category' => 'cmdi', 'regex' => '/`[^`\n]{1,80}`/' ),
 			array( 'id' => 'cmdi_base64_payload', 'category' => 'cmdi', 'regex' => '/base64_decode\s*\(/i' ),
+			// php-cgi argument injection (CVE-2012-1823 / CVE-2024-4577): a
+			// literal "-d" flag lets the caller set arbitrary php.ini
+			// directives (allow_url_include, auto_prepend_file, etc.), and
+			// %AD (soft hyphen) is the standard bypass for filters that
+			// only block a literal "-". Matches the technique itself,
+			// independent of which directive or wrapper follows it — a
+			// payload using this without also tripping the php:// wrapper
+			// signature above would otherwise pass through untouched.
+			array( 'id' => 'cmdi_phpcgi_arg_injection', 'category' => 'cmdi', 'regex' => '/%(?:25)?ADd\b/i' ),
 
 			// Misc
 			array( 'id' => 'other_null_byte', 'category' => 'other', 'regex' => '/%00|\x00/' ),
