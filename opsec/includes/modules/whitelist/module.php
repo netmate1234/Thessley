@@ -24,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class WPOpsec_Module_Whitelist {
 
 	const CRON_HOOK      = 'wpopsec_trusted_networks_refresh';
-	const DEFAULT_URL    = 'https://dashboard.eagleeye-intelligence.com/wp-content/uploads/wp-opsec/crawler-nets.conf';
+	const DEFAULT_URL    = 'https://wp-opsec.eagleeye-intelligence.com/wp-content/uploads/wp-opsec/crawler-nets.conf';
 
 	public static function activate() {
 		// add_option() is a no-op if the option already exists, so this only
