@@ -49,6 +49,17 @@ if ( ! function_exists( 'wpopsec_query_guard_patterns' ) ) {
 
 			// Misc
 			array( 'id' => 'other_null_byte', 'category' => 'other', 'regex' => '/%00|\x00/' ),
+			// CVE-2026-76581 (CVSS 9.8): unauthenticated admin takeover in
+			// WPMU DEV Dashboard's Hub SSO. wdpsso_step1 signs an
+			// unseparated token+state+redirect+domain blob; wdpsso_step2
+			// verifies a shorter field list that omits domain, so moving
+			// domain into redirect lets a forged signature pass. Real,
+			// currently-active mass-scanning traffic (confirmed in this
+			// site's own logs). Query-string category, not an always-on
+			// path signature, since a site that legitimately runs this
+			// plugin's SSO feature has real traffic here — sites that
+			// don't run it lose nothing by blocking it either way.
+			array( 'id' => 'other_wdpsso_hub_sso_cve202676581', 'category' => 'other', 'regex' => '/action=wdpsso_step[12]\b/i' ),
 		);
 	}
 
