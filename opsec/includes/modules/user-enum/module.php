@@ -109,9 +109,37 @@ class WPOpsec_Module_User_Enum {
 	}
 
 	/**
-	 * /wp-json/wp/v2/users lists every account with a published post,
-	 * including slugs, to anonymous callers by default.
+	 * Dedicated user/customer/student-listing REST routes — core's own
+	 * /wp/v2/users plus the equivalent endpoint several popular plugins
+	 * register. Real attack traffic (logged on this exact site) hitting
+	 * wc/v1/customers, ldlms/v1/users, tutor/v1/students,
+	 * ultimate-member/v1/users, and bbp-api/v1/users was going completely
+	 * unblocked, since the original check only ever matched core's own
+	 * route. Each of these exists purely to enumerate people — there's no
+	 * legitimate anonymous use case for listing every customer/student/
+	 * member via a public API, so the same authenticated-only gate core's
+	 * own endpoint gets carries the same low false-positive risk here.
 	 *
+	 * Deliberately NOT extended to generic content endpoints (wp/v2/posts,
+	 * wp/v2/comments, wp/v2/media) even though a _fields=author-only query
+	 * against them can enumerate identity too — those have real legitimate
+	 * anonymous uses (public comment listings, post embeds), and reliably
+	 * telling "cherry-picking only author fields" apart from "a normal
+	 * request that happens to include one" needs more careful heuristic
+	 * design than a route allowlist, not a quick addition here.
+	 */
+	private static function enum_route_patterns() {
+		return array(
+			'#^/wp/v2/users(/|$)#',
+			'#^/wc/v[1-3]/customers(/|$)#',          // WooCommerce
+			'#^/ldlms/v[12]/users(/|$)#',             // LearnDash
+			'#^/tutor/v1/students(/|$)#',             // Tutor LMS
+			'#^/ultimate-member/v[12]/users(/|$)#',   // Ultimate Member
+			'#^/bbp-api/v1/users(/|$)#',               // bbPress API
+		);
+	}
+
+	/**
 	 * Matches on the resolved REST route rather than REQUEST_URI: a raw
 	 * substring test also fired on ordinary front-end URLs that merely
 	 * contained "/wp/v2/users" (a post permalink about the REST API, a
@@ -135,17 +163,27 @@ class WPOpsec_Module_User_Enum {
 		}
 
 		$route = (string) $request->get_route();
-		if ( ! preg_match( '#^/wp/v2/users(/|$)#', $route ) ) {
-			return $response;
-		}
 
 		// /users/me is the caller's own record and needs authentication
-		// anyway — it leaks nothing about other accounts.
+		// anyway — it leaks nothing about other accounts. Scoped to core's
+		// own route only: the other plugins above don't necessarily share
+		// this convention, and guessing wrong risks under-blocking them.
 		if ( preg_match( '#^/wp/v2/users/me(/|$)#', $route ) ) {
 			return $response;
 		}
 
-		wpopsec_log_event( 'user-enum', 'rest_users', 'blocked', 'anonymous REST users query: ' . $route );
+		$matched = false;
+		foreach ( self::enum_route_patterns() as $pattern ) {
+			if ( preg_match( $pattern, $route ) ) {
+				$matched = true;
+				break;
+			}
+		}
+		if ( ! $matched ) {
+			return $response;
+		}
+
+		wpopsec_log_event( 'user-enum', 'rest_users', 'blocked', 'anonymous REST user/customer listing: ' . $route );
 
 		return new WP_Error(
 			'wpopsec_rest_users_forbidden',
