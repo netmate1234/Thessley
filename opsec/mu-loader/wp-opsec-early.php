@@ -578,6 +578,54 @@ if ( ! function_exists( 'wpopsec_parse_cidr_file' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wpopsec_parse_cidr_file_by_heading' ) ) {
+	/**
+	 * Same source file wpopsec_parse_cidr_file() reads, grouped by the
+	 * "# Heading" comment that starts each blank-line-delimited section —
+	 * crawler-nets.conf's own structure (a section is a "# Heading" line,
+	 * then CIDRs and optional dated sub-comments, until the next blank
+	 * line). Only used to attribute a trusted match to a human-readable
+	 * source for the Bot Log — never for the actual exemption decision,
+	 * which stays on the flat range list from wpopsec_parse_cidr_file().
+	 *
+	 * @return array<string,array<int,array{0:int,1:int}>> heading => ranges
+	 */
+	function wpopsec_parse_cidr_file_by_heading( $path ) {
+		$by_heading = array();
+		if ( ! is_readable( $path ) ) {
+			return $by_heading;
+		}
+
+		$heading     = null;
+		$after_blank = true;
+		// Deliberately no FILE_SKIP_EMPTY_LINES here, unlike
+		// wpopsec_parse_cidr_file() — this function's whole job is
+		// noticing blank lines (they mark section boundaries), so
+		// stripping them before the loop even sees them would mean only
+		// the very first heading in the file is ever detected.
+		foreach ( file( $path, FILE_IGNORE_NEW_LINES ) ?: array() as $line ) {
+			$line = trim( $line );
+			if ( '' === $line ) {
+				$after_blank = true;
+				continue;
+			}
+			if ( '#' === ( $line[0] ?? '' ) ) {
+				if ( $after_blank ) {
+					$heading = ltrim( $line, "# \t" );
+				}
+				$after_blank = false;
+				continue;
+			}
+			$after_blank = false;
+			if ( null === $heading || false === strpos( $line, '/' ) ) {
+				continue;
+			}
+			$by_heading[ $heading ][] = wpopsec_cidr_to_range( $line );
+		}
+		return $by_heading;
+	}
+}
+
 if ( ! function_exists( 'wpopsec_trusted_ranges' ) ) {
 	/**
 	 * Trusted networks — e.g. known search-engine crawler ranges you never
@@ -596,6 +644,96 @@ if ( ! function_exists( 'wpopsec_trusted_ranges' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wpopsec_trusted_networks_by_source_file' ) ) {
+	function wpopsec_trusted_networks_by_source_file() {
+		return WPMU_PLUGIN_DIR . '/wp-opsec-checks/data/trusted-networks-by-source.php';
+	}
+}
+
+if ( ! function_exists( 'wpopsec_trusted_network_source' ) ) {
+	/** @return string|null the crawler-nets.conf section heading covering $needle, or null if unattributable */
+	function wpopsec_trusted_network_source( $needle ) {
+		static $by_heading = null;
+		if ( null === $by_heading ) {
+			$file       = wpopsec_trusted_networks_by_source_file();
+			$by_heading = file_exists( $file ) ? require $file : array();
+		}
+		foreach ( $by_heading as $heading => $ranges ) {
+			foreach ( $ranges as $r ) {
+				if ( $needle >= $r[0] && $needle <= $r[1] ) {
+					return $heading;
+				}
+			}
+		}
+		return null;
+	}
+}
+
+if ( ! function_exists( 'wpopsec_bot_log_table' ) ) {
+	function wpopsec_bot_log_table() {
+		global $wpdb;
+		return $wpdb->prefix . 'wpopsec_bot_log';
+	}
+}
+
+if ( ! function_exists( 'wpopsec_bot_log_sighting' ) ) {
+	/**
+	 * Called from wpopsec_ip_is_trusted() itself, right where it finds a
+	 * match — not a separate check re-deciding anything. A verified match
+	 * here can never be blocked by anything else in this codebase: every
+	 * module checks exemption before ever reaching a block decision, so
+	 * there's no "was this later blocked" to correlate — every row this
+	 * writes is, definitionally, a pass. Whether a given IP was *also*
+	 * blocked at some other time (e.g. before it was whitelisted, or a
+	 * different non-trusted IP spoofing the same bot's user-agent) is
+	 * answered by cross-checking the main Event Log at render time
+	 * instead, not by tracking state here.
+	 */
+	function wpopsec_bot_log_sighting( $needle, $ip_string ) {
+		static $logged_this_request = array();
+		if ( isset( $logged_this_request[ $ip_string ] ) ) {
+			return; // wpopsec_ip_is_trusted() can be called more than once
+			        // per request (each module checks exemption itself) —
+			        // one row per IP per request, not one per call.
+		}
+		$logged_this_request[ $ip_string ] = true;
+
+		$source = wpopsec_trusted_network_source( $needle );
+		if ( null === $source ) {
+			return; // matched, but no section header covers it — nothing useful to attribute
+		}
+
+		// Not every trusted section is a crawler — friend IPs, protected
+		// own infrastructure, an ISP's customer range, a backup server —
+		// those are operator-trusted people/servers, not "bots", and
+		// logging every hit from the admin's own IP as a "bot sighting"
+		// would just be noise in a log meant to answer "which crawlers
+		// visited". Exclude by prefix rather than maintain a bot allowlist,
+		// so a newly-added crawler vendor is included automatically.
+		$non_bot_prefixes = array( 'RFC1918', 'Protected servers', 'Friend IPs', 'VOO ', 'JetBackup', 'Martin' );
+		foreach ( $non_bot_prefixes as $prefix ) {
+			if ( 0 === stripos( $source, $prefix ) ) {
+				return;
+			}
+		}
+
+		global $wpdb;
+		$table = wpopsec_bot_log_table();
+		$wpdb->suppress_errors( true );
+		$wpdb->insert(
+			$table,
+			array(
+				'created_at' => current_time( 'mysql' ),
+				'bot_name'   => substr( $source, 0, 128 ),
+				'ip'         => substr( $ip_string, 0, 45 ),
+				'uri'        => substr( (string) ( $_SERVER['REQUEST_URI'] ?? '' ), 0, 255 ),
+			),
+			array( '%s', '%s', '%s', '%s' )
+		);
+		$wpdb->suppress_errors( false );
+	}
+}
+
 if ( ! function_exists( 'wpopsec_ip_is_trusted' ) ) {
 	function wpopsec_ip_is_trusted( $ip ) {
 		$long = is_int( $ip ) ? $ip : ip2long( $ip );
@@ -604,6 +742,9 @@ if ( ! function_exists( 'wpopsec_ip_is_trusted' ) ) {
 		}
 		foreach ( wpopsec_trusted_ranges() as $r ) {
 			if ( $long >= $r[0] && $long <= $r[1] ) {
+				if ( function_exists( 'wpopsec_bot_log_sighting' ) ) {
+					wpopsec_bot_log_sighting( $long, is_int( $ip ) ? long2ip( $long ) : (string) $ip );
+				}
 				return true;
 			}
 		}

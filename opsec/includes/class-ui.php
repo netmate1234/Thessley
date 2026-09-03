@@ -37,6 +37,7 @@ class WPOpsec_UI {
 			'malware-scanner' => array( 'warning', 'Malware Scanner', 'Scans plugin, theme and upload files for webshell, obfuscation and injected-spam signatures.' ),
 			'geo-blocker'     => array( 'admin-site-alt3', 'Geo Blocker', 'Blocks or allows traffic by country, using a compiled IP-to-country dataset checked at the early gate.' ),
 			'activity-log'    => array( 'edit-page', 'Activity Log', 'Records who published, deleted, installed or changed what — the mundane audit trail, not attack detections.' ),
+			'bot-log'         => array( 'networking', 'Bot Log', 'Every verified visit from a known crawler on the trusted-networks list (Googlebot, Bingbot, and the rest) — separate from the Event Log, since this is expected traffic, not something to review for attacks.' ),
 			'rate-limiter'    => array( 'clock', 'Rate Limiter', 'Throttles requests per IP site-wide, and escalates sustained floods to the local IP blocklist.' ),
 			'geo-map'         => array( 'admin-site-alt3', 'Event Map', 'Blocked and logged events tinted on a world map by country, reusing Geo Blocker\'s dataset. Read-only — nothing here affects enforcement.' ),
 			'geo-login'       => array( 'lock', 'Geo Login', 'Restricts wp-login.php to an allow-list of countries. Your LAN, reserved space, and the trusted-networks file are always exempt, so this can\'t lock out your own network.' ),

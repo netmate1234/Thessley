@@ -38,6 +38,7 @@ class WPOpsec_Module_Loader {
 		'event-log'       => 'WPOpsec_Module_Event_Log',
 		'geo-map'         => 'WPOpsec_Module_Geo_Map',
 		'activity-log'    => 'WPOpsec_Module_Activity_Log',
+		'bot-log'         => 'WPOpsec_Module_Bot_Log',
 
 		// Perimeter — blocks by IP/identity before WordPress finishes loading.
 		'ip-blocklist'    => 'WPOpsec_Module_IP_Blocklist',

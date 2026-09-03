@@ -27,6 +27,7 @@ class WPOpsec_Menu_Router {
 					'event-log'    => array( 'WPOpsec_Module_Event_Log', 'render_page' ),
 					'geo-map'      => array( 'WPOpsec_Module_Geo_Map', 'render_page' ),
 					'activity-log' => array( 'WPOpsec_Module_Activity_Log', 'render_page' ),
+					'bot-log'      => array( 'WPOpsec_Module_Bot_Log', 'render_page' ),
 				),
 			),
 			'perimeter' => array(
