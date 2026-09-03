@@ -136,6 +136,8 @@ class WPOpsec_Module_User_Enum {
 			'#^/tutor/v1/students(/|$)#',             // Tutor LMS
 			'#^/ultimate-member/v[12]/users(/|$)#',   // Ultimate Member
 			'#^/bbp-api/v1/users(/|$)#',               // bbPress API
+			'#^/mepr/v1/members(/|$)#',                // MemberPress
+			'#^/buddypress/v1/members(/|$)#',          // BuddyPress
 		);
 	}
 

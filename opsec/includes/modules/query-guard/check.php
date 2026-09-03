@@ -195,7 +195,16 @@ wpopsec_register_check(
 		status_header( 403 );
 		nocache_headers();
 		exit;
-	}
+	},
+	// Priority 5, same reasoning and same real-world evidence as the
+	// signature-scan check below: at the default 10, an IP that's also
+	// on a reputation list or from a blocked country gets caught by
+	// ip-blocklist first (its check.php file sorts alphabetically before
+	// this one), silently losing this check's own xmlrpc_access log
+	// entry and local-blocklist escalation. Confirmed live: a real
+	// /xmlrpc.php hit was attributed to ip-blocklist's generic "matched
+	// unwantedip..." instead of this check's own specific detection.
+	5
 );
 
 wpopsec_register_check(
