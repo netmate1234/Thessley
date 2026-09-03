@@ -4,7 +4,7 @@ Tags: security, firewall, malware, geo-blocking, brute-force
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.1.5
+Stable tag: 0.1.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -81,6 +81,10 @@ The early-request checks (IP Blocklist, Geo Blocker, Geo Login, Rate Limiter, Qu
 DB-IP's free Country Lite database (CC BY 4.0), refreshed automatically on a schedule.
 
 == Changelog ==
+
+= 0.1.6 =
+* New Query Guard signature for the php-cgi %ADd argument-injection technique (CVE-2012-1823 / CVE-2024-4577).
+* Query Guard's signature scan now runs ahead of the default-priority checks, so its detections get logged even when another module (IP Blocklist, Login Guard, etc.) ultimately blocks the same request first.
 
 = 0.1.5 =
 * New IP Blocklist source: unwantedip.eagleeye-intelligence.com's WordPress-targeting IP feed (requires the same API key as IP Sharing).
