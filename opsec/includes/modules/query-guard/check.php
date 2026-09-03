@@ -65,6 +65,40 @@ if ( ! function_exists( 'wpopsec_query_guard_patterns' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wpopsec_query_guard_path_patterns' ) ) {
+	/**
+	 * Matched against the URL path, not the query string — and always
+	 * checked regardless of the category toggles above, unlike everything
+	 * else in this file. A query-string pattern (e.g. an XSS event-handler
+	 * regex) has some real, if small, false-positive surface against
+	 * legitimate content, which is what the categories exist to let an
+	 * admin tune. These don't: every path here is a known vulnerable or
+	 * webshell-probe file with no legitimate reason to ever be requested
+	 * on a real WordPress site, so there's nothing to weigh — a hit is a
+	 * hit. A request with no query string at all previously skipped this
+	 * whole check entirely, missing exactly this class of attack: e.g.
+	 * PHPUnit's eval-stdin.php RCE probe (CVE-2017-9841) is a bare path
+	 * with no query string, so it never reached any pattern here before.
+	 */
+	function wpopsec_query_guard_path_patterns() {
+		return array(
+			array( 'id' => 'path_phpunit_evalstdin', 'regex' => '#/eval-stdin\.php(?:$|[/?])#i' ),
+			array( 'id' => 'path_dotenv_exposed', 'regex' => '#(?:^|/)\.env(?:$|[/?])#i' ),
+			array( 'id' => 'path_git_config_exposed', 'regex' => '#/\.git/config(?:$|[/?])#i' ),
+			array( 'id' => 'path_wpconfig_backup', 'regex' => '#/wp-config\.php(?:\.bak|~|\.save|\.old|\.orig|\.swp)(?:$|[/?])#i' ),
+		);
+	}
+
+	function wpopsec_query_guard_scan_path( $path ) {
+		foreach ( wpopsec_query_guard_path_patterns() as $pattern ) {
+			if ( preg_match( $pattern['regex'], $path ) ) {
+				return $pattern;
+			}
+		}
+		return null;
+	}
+}
+
 wpopsec_register_check(
 	function () {
 		if ( ! get_option( 'wpopsec_query_guard_block_xmlrpc', false ) ) {
@@ -138,11 +172,6 @@ wpopsec_register_check(
 
 wpopsec_register_check(
 	function () {
-		$qs = isset( $_SERVER['QUERY_STRING'] ) ? (string) $_SERVER['QUERY_STRING'] : '';
-		if ( '' === $qs ) {
-			return null;
-		}
-
 		// Unlike most checks, this one previously had no exemption at all —
 		// deliberately, since an attack signature is an attack signature
 		// regardless of source. An explicit allowlist entry overrides that:
@@ -153,24 +182,38 @@ wpopsec_register_check(
 			return null;
 		}
 
-		$categories = get_option( 'wpopsec_query_guard_categories', array( 'sqli', 'xss', 'traversal', 'cmdi', 'other' ) );
+		$uri  = (string) ( $_SERVER['REQUEST_URI'] ?? '' );
+		$path = rawurldecode( strtok( $uri, '?' ) );
+		$qs   = isset( $_SERVER['QUERY_STRING'] ) ? (string) $_SERVER['QUERY_STRING'] : '';
 
-		$decoded = rawurldecode( $qs );
-		$hit     = wpopsec_query_guard_scan( $qs, $categories ) ?: wpopsec_query_guard_scan( $decoded, $categories );
+		// Path probes run first and unconditionally — a request with no
+		// query string at all used to skip this whole check, missing
+		// exactly the attacks that live in the path instead (see
+		// wpopsec_query_guard_path_patterns()'s own docblock).
+		$hit      = wpopsec_query_guard_scan_path( $path );
+		$via_path = null !== $hit;
+
+		if ( ! $hit && '' !== $qs ) {
+			$categories = get_option( 'wpopsec_query_guard_categories', array( 'sqli', 'xss', 'traversal', 'cmdi', 'other' ) );
+			$decoded    = rawurldecode( $qs );
+			$hit        = wpopsec_query_guard_scan( $qs, $categories ) ?: wpopsec_query_guard_scan( $decoded, $categories );
+		}
 
 		if ( ! $hit ) {
 			return null;
 		}
 
 		$mode    = get_option( 'wpopsec_query_guard_mode', 'log' );
-		$snippet = substr( str_replace( array( "\r", "\n" ), ' ', $decoded ), 0, 200 );
+		$snippet = $via_path
+			? 'path: ' . substr( $path, 0, 200 )
+			: 'qs: ' . substr( str_replace( array( "\r", "\n" ), ' ', rawurldecode( $qs ) ), 0, 200 );
 
 		if ( 'block' !== $mode ) {
-			wpopsec_log_event( 'query-guard', $hit['id'], 'logged', "qs: {$snippet}" );
+			wpopsec_log_event( 'query-guard', $hit['id'], 'logged', $snippet );
 			return null;
 		}
 
-		wpopsec_log_event( 'query-guard', $hit['id'], 'blocked', "qs: {$snippet}" );
+		wpopsec_log_event( 'query-guard', $hit['id'], 'blocked', $snippet );
 
 		$ip = wpopsec_client_ip();
 		if ( '' !== $ip ) {

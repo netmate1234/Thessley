@@ -836,6 +836,20 @@ class WPOpsec_Module_Loader {
 			wp_mkdir_p( WPMU_PLUGIN_DIR );
 		}
 		copy( WPOPSEC_MU_SOURCE, WPOPSEC_MU_DEST );
+
+		// Every other rewritten data file in this plugin does this; the
+		// mu-loader itself — by far the most consequential one, since it
+		// defines every shared function — never did. Without it, a request
+		// handled by a worker process that already had the old bytecode
+		// opcache-compiled can keep serving stale function definitions
+		// until that cache entry's own revalidation timer fires, which is
+		// a real window for a fatal "undefined function" on a real request
+		// if this file changed (new function added) during it — confirmed
+		// live, not hypothetical: hit a real admin session's own
+		// admin-ajax request during this exact deploy window.
+		if ( function_exists( 'opcache_invalidate' ) ) {
+			opcache_invalidate( WPOPSEC_MU_DEST, true );
+		}
 	}
 
 	private static function remove_mu_loader() {

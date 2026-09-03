@@ -71,6 +71,14 @@ class WPOpsec_Module_IP_Blocklist {
 		$source = __DIR__ . '/check.php';
 		if ( ! file_exists( self::check_dest() ) || md5_file( self::check_dest() ) !== md5_file( $source ) ) {
 			copy( $source, self::check_dest() );
+			// Without this, a worker process that already opcache-compiled the
+			// old bytecode can keep serving stale check logic across multiple
+			// requests until that cache entry's own revalidation timer fires —
+			// a real, confirmed-live gap (hit an actual admin session's request
+			// once via the mu-loader's own version of this same miss).
+			if ( function_exists( 'opcache_invalidate' ) ) {
+				opcache_invalidate( self::check_dest(), true );
+			}
 		}
 	}
 
