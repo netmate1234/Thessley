@@ -83,9 +83,26 @@ if ( ! function_exists( 'wpopsec_query_guard_path_patterns' ) ) {
 	function wpopsec_query_guard_path_patterns() {
 		return array(
 			array( 'id' => 'path_phpunit_evalstdin', 'regex' => '#/eval-stdin\.php(?:$|[/?])#i' ),
-			array( 'id' => 'path_dotenv_exposed', 'regex' => '#(?:^|/)\.env(?:$|[/?])#i' ),
+			// .env.local / .env.production / etc are at least as common in
+			// the wild as bare .env — a real gap in the first version of
+			// this pattern, caught by checking real logged attack traffic
+			// (/.env.development, /.env.local, /.env.production,
+			// /.env.staging all sailed through untouched) rather than
+			// assuming the narrower pattern was enough.
+			array( 'id' => 'path_dotenv_exposed', 'regex' => '#(?:^|/)\.env(?:\.[a-z0-9_-]+)?(?:$|[/?])#i' ),
 			array( 'id' => 'path_git_config_exposed', 'regex' => '#/\.git/config(?:$|[/?])#i' ),
 			array( 'id' => 'path_wpconfig_backup', 'regex' => '#/wp-config\.php(?:\.bak|~|\.save|\.old|\.orig|\.swp)(?:$|[/?])#i' ),
+			// The query-string traversal_dotdot signature above never
+			// covers this: "../" in the *path* itself, not a query param —
+			// seen in real logged traffic (/toolbox-resource/../serverconfig.xml).
+			array( 'id' => 'path_traversal_dotdot', 'regex' => '#\.\.[/\\\\]#' ),
+			// Whole-site backup archive probes — anchored to the root
+			// (never wp-content/uploads/..., where a real uploaded file by
+			// this exact name could legitimately live) since a bare
+			// /backup.zip at the domain root has no legitimate WordPress
+			// origin: uploads always live under a path, never site root.
+			// Seen in real logged traffic hitting all of these stems.
+			array( 'id' => 'path_backup_archive_probe', 'regex' => '#^/(?:backup|backups|www|wwwroot|htdocs|public_html|site|website)\.(?:zip|rar|7z|tar\.gz|tgz|sql|sql\.gz)(?:$|\?)#i' ),
 		);
 	}
 
