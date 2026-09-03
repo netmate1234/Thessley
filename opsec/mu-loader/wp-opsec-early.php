@@ -433,9 +433,19 @@ if ( ! function_exists( 'wpopsec_maybe_unwantedip_report' ) ) {
 		// (which country, how many failed attempts) still goes in the
 		// description below, just not as the headline category.
 		$login_modules = array( 'geo-login', 'login-guard' );
-		$title         = in_array( $module, $login_modules, true )
-			? 'WordPress Login Brute Force Attempt'
-			: sprintf( '%s — %s', $humanize( $module ), $humanize( $event ) );
+		if ( in_array( $module, $login_modules, true ) ) {
+			$title = 'WordPress Login Brute Force Attempt';
+		} elseif ( 'ip-blocklist' === $module && 0 === strpos( $detail, 'matched ' ) ) {
+			// $detail is "matched <source label>" (e.g. "matched Spamhaus
+			// DROP (hijacked/spammer netblocks)", or "matched local
+			// blocklist") — the actual matched source is a far more useful
+			// public-facing category than the generic module/event name,
+			// which would otherwise always just read "Ip Blocklist —
+			// Listed Ip" regardless of which of the 6+ feeds caught it.
+			$title = substr( $detail, strlen( 'matched ' ) );
+		} else {
+			$title = sprintf( '%s — %s', $humanize( $module ), $humanize( $event ) );
+		}
 
 		// Deliberately no blogname/domain here, unlike the Telegram alert —
 		// that's a private message to the site owner; this is data shared
