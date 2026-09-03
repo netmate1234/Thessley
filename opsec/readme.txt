@@ -4,7 +4,7 @@ Tags: security, firewall, malware, geo-blocking, brute-force
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.1.6
+Stable tag: 0.1.7
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -81,6 +81,15 @@ The early-request checks (IP Blocklist, Geo Blocker, Geo Login, Rate Limiter, Qu
 DB-IP's free Country Lite database (CC BY 4.0), refreshed automatically on a schedule.
 
 == Changelog ==
+
+= 0.1.7 =
+* New Bot Log tab (Overview): a separate record of verified good-bot visits, distinct from the Event Log.
+* IP Blocklist Event Log and unwantedip reports now name the actual matched source feed instead of a generic label.
+* unwantedip.eagleeye-intelligence.com added as a sixth IP Blocklist source (WordPress-targeting IPs, requires the same API key as IP Sharing).
+* Trusted-networks canonical source moved to wp-opsec.eagleeye-intelligence.com, with automatic weekly updates from Google, Bing, DuckDuckGo, OpenAI, and Cloudflare's own published IP ranges.
+* Query Guard: new always-on path-probe detection (PHPUnit RCE, exposed .env/.git, wp-config backups, backup-archive probes, path traversal), a signature for CVE-2026-76581 (WPMU DEV Dashboard Hub SSO), and its checks now run early enough to be logged even when another module blocks the same request first.
+* User Enumeration: new setting to hide WordPress's built-in user sitemap, and blocking extended to WooCommerce, LearnDash, Tutor LMS, Ultimate Member, bbPress, MemberPress, and BuddyPress's own user/customer-listing REST routes.
+* Fixed a real opcache-staleness bug across every module's check.php deployment that could serve stale logic to a live request after an update.
 
 = 0.1.6 =
 * New Query Guard signature for the php-cgi %ADd argument-injection technique (CVE-2012-1823 / CVE-2024-4577).
