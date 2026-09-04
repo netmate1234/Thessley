@@ -4,7 +4,7 @@ Tags: security, firewall, malware, geo-blocking, brute-force
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.1.7
+Stable tag: 0.1.8
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -81,6 +81,10 @@ The early-request checks (IP Blocklist, Geo Blocker, Geo Login, Rate Limiter, Qu
 DB-IP's free Country Lite database (CC BY 4.0), refreshed automatically on a schedule.
 
 == Changelog ==
+
+= 0.1.8 =
+* New Query Guard signature for CVE-2026-63030/CVE-2026-60137 ("wp2shell"), the unauthenticated pre-auth RCE chain in WordPress core's REST batch endpoint (CISA KEV, 2026-07-21).
+* Admin menu: "Overview" cluster renamed to "Logs", "Ops" cluster renamed to "Other".
 
 = 0.1.7 =
 * New Bot Log tab (Overview): a separate record of verified good-bot visits, distinct from the Event Log.

@@ -22,7 +22,7 @@ class WPOpsec_Menu_Router {
 	private static function clusters() {
 		return array(
 			'overview' => array(
-				'title' => 'Overview',
+				'title' => 'Logs',
 				'tabs'  => array(
 					'event-log'    => array( 'WPOpsec_Module_Event_Log', 'render_page' ),
 					'geo-map'      => array( 'WPOpsec_Module_Geo_Map', 'render_page' ),
@@ -65,7 +65,7 @@ class WPOpsec_Menu_Router {
 				),
 			),
 			'ops' => array(
-				'title' => 'Ops',
+				'title' => 'Other',
 				'tabs'  => array(
 					'auto-update'     => array( 'WPOpsec_Module_Auto_Update', 'render_settings_page' ),
 					'alerts'          => array( 'WPOpsec_Module_Alerts', 'render_page' ),

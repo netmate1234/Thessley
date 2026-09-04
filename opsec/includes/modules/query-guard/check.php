@@ -60,6 +60,25 @@ if ( ! function_exists( 'wpopsec_query_guard_patterns' ) ) {
 			// plugin's SSO feature has real traffic here — sites that
 			// don't run it lose nothing by blocking it either way.
 			array( 'id' => 'other_wdpsso_hub_sso_cve202676581', 'category' => 'other', 'regex' => '/action=wdpsso_step[12]\b/i' ),
+			// wp2shell (CVE-2026-63030 route confusion + CVE-2026-60137
+			// author__not_in SQLi), unauthenticated pre-auth RCE chain in
+			// WordPress core's REST batch endpoint, added to CISA KEV
+			// 2026-07-21. Core validates and dispatches batch sub-requests
+			// in separate loops; a sub-request path that fails
+			// wp_parse_url() desyncs those arrays so a later sub-request
+			// dispatches under the wrong handler. Real, currently-active
+			// mass-scanning traffic (confirmed in logs): GET requests
+			// using the plain ?rest_route=/batch/v1 form rather than the
+			// pretty-permalink /wp-json/batch/v1 path, which is how a
+			// scanner probes without knowing a site's permalink structure
+			// — legitimate batch use (Gutenberg) is POST with the request
+			// list in the body, not spelled out in the query string.
+			// Query-string category rather than an always-on path
+			// signature so a site with real anonymous need for
+			// /wp-json/batch/v1 (none normally) isn't the deciding case;
+			// decoded-form matching (see the scan call below) already
+			// catches the %2F-encoded variants seen in the same logs.
+			array( 'id' => 'other_wp2shell_batch_route_cve202663030', 'category' => 'other', 'regex' => '#rest_route=/?batch/v1(?:[/?&]|$)#i' ),
 		);
 	}
 
