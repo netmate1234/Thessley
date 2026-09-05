@@ -4,7 +4,7 @@ Tags: security, firewall, malware, geo-blocking, brute-force
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -85,6 +85,9 @@ The early-request checks (IP Blocklist, Geo Blocker, Geo Login, Rate Limiter, Qu
 DB-IP's free Country Lite database (CC BY 4.0), refreshed automatically on a schedule.
 
 == Changelog ==
+
+= 1.0.1 =
+* Verified against the official Plugin Check tool: added missing direct-file-access guards on 6 files, replaced date() with gmdate() at 3 sites, escaped two output sites (Event Map's SVG, paginate_links() calls), and moved 20 file writes/renames/deletes to the WP_Filesystem API.
 
 = 1.0.0 =
 * First release prepared for the WordPress.org plugin directory.
