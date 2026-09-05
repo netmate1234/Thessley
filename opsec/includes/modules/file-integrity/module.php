@@ -231,6 +231,7 @@ class WPOpsec_Module_File_Integrity {
 			return new WP_Error( 'wpopsec_partial_scan', implode( '; ', $scan['errors'] ) );
 		}
 
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- table name only, built from $wpdb->prefix, no user input; identifiers can't be bound via $wpdb->prepare() placeholders anyway.
 		$wpdb->query( "TRUNCATE TABLE {$table}" );
 
 		foreach ( array_chunk( array_keys( $files ), 200 ) as $chunk ) {
@@ -245,7 +246,7 @@ class WPOpsec_Module_File_Integrity {
 					$now
 				);
 			}
-			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- $values is an array of already-prepared '(%s,%s,%s,%d,%s)' fragments (see $wpdb->prepare() calls just above), each independently safe; only the table name (no user input) is otherwise interpolated.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $values is an array of already-prepared '(%s,%s,%s,%d,%s)' fragments (see $wpdb->prepare() calls just above), each independently safe; only the table name (no user input) is otherwise interpolated.
 			$wpdb->query( "INSERT INTO {$table} (path_hash,path,file_hash,size,recorded_at) VALUES " . implode( ',', $values ) );
 		}
 
@@ -313,6 +314,7 @@ class WPOpsec_Module_File_Integrity {
 		global $wpdb;
 
 		$table = self::table();
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- table name only, built from $wpdb->prefix, no user input.
 		$rows  = $wpdb->get_results( "SELECT path, file_hash, size FROM {$table}", ARRAY_A );
 		if ( empty( $rows ) ) {
 			return array( 'added' => array(), 'modified' => array(), 'deleted' => array(), 'no_baseline' => true );
@@ -469,6 +471,7 @@ class WPOpsec_Module_File_Integrity {
 
 		WPOpsec_UI::open( 'file-integrity' );
 
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only result flags set only by this module's own admin-post redirects, which already check_admin_referer() before redirecting.
 		if ( isset( $_GET['saved'] ) ) {
 			WPOpsec_UI::notice( 'success', 'Settings saved.' );
 		}
@@ -480,6 +483,7 @@ class WPOpsec_Module_File_Integrity {
 		} elseif ( isset( $_GET['rebaselined'] ) ) {
 			WPOpsec_UI::notice( 'success', 'Baseline re-taken.' );
 		}
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
 		if ( ! empty( $last['diff']['partial'] ) ) {
 			$msg = '<p><strong>Last scan was incomplete</strong> — results below may under-report:</p><ul>';

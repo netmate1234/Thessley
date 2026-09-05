@@ -65,6 +65,7 @@ class WPOpsec_Module_Geo_Login {
 
 		update_option( 'wpopsec_geo_login_enforce_mode', ( isset( $_POST['enforce'] ) && 'block' === $_POST['enforce'] ) ? 'block' : 'log' );
 
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- already unslashed, and array_intersect() against the real country-code list below discards anything not in it; nothing unvalidated ever reaches update_option().
 		$posted = isset( $_POST['countries'] ) ? (array) wp_unslash( $_POST['countries'] ) : array();
 		$codes  = class_exists( 'WPOpsec_Geo_Country_Codes' )
 			? array_values( array_intersect( $posted, array_keys( WPOpsec_Geo_Country_Codes::all() ) ) )
@@ -93,6 +94,7 @@ class WPOpsec_Module_Geo_Login {
 
 		WPOpsec_UI::open( 'geo-login' );
 
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only result flag set only by this module's own admin-post redirect, which already check_admin_referer()'d before redirecting.
 		if ( isset( $_GET['saved'] ) ) {
 			WPOpsec_UI::notice( 'success', 'Settings saved.' );
 		}

@@ -80,6 +80,7 @@ class WPOpsec_Module_Event_Log {
 
 		$table = wpopsec_events_table();
 
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $table is wpopsec_events_table() (no user input, identifiers can't use $wpdb->prepare() placeholders); $wpdb->update() below already parameterizes its own values via the format arrays.
 		$pairs = $wpdb->get_results(
 			"SELECT DISTINCT module, event, action FROM {$table} WHERE severity = 0",
 			ARRAY_A
@@ -94,6 +95,7 @@ class WPOpsec_Module_Event_Log {
 				array( '%s', '%s', '%s', '%d' )
 			);
 		}
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 	}
 
 	private static function maybe_upgrade_table() {
@@ -108,12 +110,14 @@ class WPOpsec_Module_Event_Log {
 		$days = max( 1, (int) get_option( 'wpopsec_event_log_retain_days', self::DEFAULT_RETAIN ) );
 		$table = wpopsec_events_table();
 
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- table name only, built from $wpdb->prefix, no user input; the actual value ($days) is bound via the %d placeholder above.
 		$wpdb->query(
 			$wpdb->prepare(
 				"DELETE FROM {$table} WHERE created_at < DATE_SUB(NOW(), INTERVAL %d DAY)",
 				$days
 			)
 		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 	}
 
 
@@ -176,12 +180,12 @@ class WPOpsec_Module_Event_Log {
 		$where_sql = implode( ' AND ', $where );
 
 		$count_sql = "SELECT COUNT(*) FROM {$table} WHERE {$where_sql}";
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $count_sql is a query template (table name + %s/%d placeholders only), correctly bound via $wpdb->prepare() right here; the linter can't trace a template built one line above the prepare() call.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $count_sql is a query template (table name + %s/%d placeholders only), correctly bound via $wpdb->prepare() right here; the linter can't trace a template built one line above the prepare() call.
 		$total     = (int) ( $params ? $wpdb->get_var( $wpdb->prepare( $count_sql, $params ) ) : $wpdb->get_var( $count_sql ) );
 
 		$offset   = ( $page - 1 ) * self::PER_PAGE;
 		$rows_sql = "SELECT * FROM {$table} WHERE {$where_sql} ORDER BY {$order_sql} LIMIT %d OFFSET %d";
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- same as $count_sql above: a placeholder-only template, bound via $wpdb->prepare() right here.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- same as $count_sql above: a placeholder-only template, bound via $wpdb->prepare() right here.
 		$rows     = $wpdb->get_results( $wpdb->prepare( $rows_sql, array_merge( $params, array( self::PER_PAGE, $offset ) ) ) );
 
 		return array( 'rows' => $rows ?: array(), 'total' => $total );
@@ -231,6 +235,7 @@ class WPOpsec_Module_Event_Log {
 	public static function render_page() {
 		global $wpdb;
 
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only list filters/pagination, not a state-changing action; already sanitized/cast below.
 		$filters = array(
 			'module'  => isset( $_GET['f_module'] ) ? sanitize_text_field( wp_unslash( $_GET['f_module'] ) ) : '',
 			'action'  => isset( $_GET['f_action'] ) ? sanitize_text_field( wp_unslash( $_GET['f_action'] ) ) : '',
@@ -239,10 +244,12 @@ class WPOpsec_Module_Event_Log {
 			'sort'    => isset( $_GET['sort'] ) && 'severity' === $_GET['sort'] ? 'severity' : 'time',
 		);
 		$page = isset( $_GET['paged'] ) ? max( 1, (int) $_GET['paged'] ) : 1;
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
 		$result = self::query_events( $filters, $page );
 		$table  = wpopsec_events_table();
 
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $table is wpopsec_events_table() (no user input, identifiers can't use $wpdb->prepare() placeholders); these are fixed summary tiles, not worth an object-cache group for.
 		$modules = $wpdb->get_col( "SELECT DISTINCT module FROM {$table} ORDER BY module" ) ?: array();
 		$retain  = (int) get_option( 'wpopsec_event_log_retain_days', self::DEFAULT_RETAIN );
 
@@ -250,15 +257,18 @@ class WPOpsec_Module_Event_Log {
 		$blocked24 = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE action = 'blocked' AND created_at > DATE_SUB(NOW(), INTERVAL 1 DAY)" );
 		$worst24   = (int) $wpdb->get_var( "SELECT MAX(severity) FROM {$table} WHERE created_at > DATE_SUB(NOW(), INTERVAL 1 DAY)" );
 		$high_open = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE severity >= 14 AND created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)" );
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 
 		WPOpsec_UI::open( 'event-log' );
 
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only result flags set only by this module's own admin-post redirects, which already check_admin_referer() before redirecting.
 		if ( isset( $_GET['saved'] ) ) {
 			WPOpsec_UI::notice( 'success', 'Settings saved.' );
 		}
 		if ( isset( $_GET['cleared'] ) ) {
 			WPOpsec_UI::notice( 'success', 'Event log cleared.' );
 		}
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
 		$worst_meta = wpopsec_severity_meta( $worst24 );
 		WPOpsec_UI::tiles(

@@ -164,6 +164,7 @@ wpopsec_register_check(
 		// parse_url() is avoided deliberately: a leading "//" makes it read the
 		// URI as protocol-relative, so "//xmlrpc.php" parses as a *host* with
 		// no path and the check would be skipped entirely.
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- must inspect the raw request path to detect xmlrpc.php; sanitizing it here would risk altering the very string this security check matches against.
 		$uri  = (string) ( $_SERVER['REQUEST_URI'] ?? '' );
 		$path = rawurldecode( strtok( $uri, '?' ) );
 		$path = preg_replace( '#/+#', '/', $path ); // collapse // and ///
@@ -242,9 +243,11 @@ wpopsec_register_check(
 			return null;
 		}
 
+		// phpcs:disable WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- must inspect the raw request path/query string for attack signatures; sanitizing it here would strip the very content this scan exists to detect.
 		$uri  = (string) ( $_SERVER['REQUEST_URI'] ?? '' );
 		$path = rawurldecode( strtok( $uri, '?' ) );
 		$qs   = isset( $_SERVER['QUERY_STRING'] ) ? (string) $_SERVER['QUERY_STRING'] : '';
+		// phpcs:enable WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 
 		// Path probes run first and unconditionally — a request with no
 		// query string at all used to skip this whole check, missing

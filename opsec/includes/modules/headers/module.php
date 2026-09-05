@@ -90,6 +90,7 @@ class WPOpsec_Module_Headers {
 			return false;
 		}
 
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- read-only proxy-header comparison (strcasecmp against 'https'), never stored or output.
 		$proto = $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '';
 		if ( '' !== $proto ) {
 			// May be a comma-separated chain; the first entry is the client.
@@ -97,6 +98,7 @@ class WPOpsec_Module_Headers {
 			return 0 === strcasecmp( 'https', $first );
 		}
 
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- read-only proxy-header comparison, never stored or output.
 		if ( isset( $_SERVER['HTTP_X_FORWARDED_SSL'] ) && 'on' === strtolower( $_SERVER['HTTP_X_FORWARDED_SSL'] ) ) {
 			return true;
 		}
@@ -169,16 +171,19 @@ class WPOpsec_Module_Headers {
 			wp_die( 'Forbidden', 403 );
 		}
 
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- already unslashed, and array_intersect() against self::definitions()'s own keys below discards anything not a real header id; nothing unvalidated ever reaches update_option().
 		$posted  = isset( $_POST['headers'] ) ? (array) wp_unslash( $_POST['headers'] ) : array();
 		$enabled = array_values( array_intersect( $posted, array_keys( self::definitions() ) ) );
 		update_option( 'wpopsec_headers_enabled', $enabled );
 
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- (int) cast is itself the sanitizer; wp_unslash() is a no-op on a value that's about to be cast to int.
 		update_option( 'wpopsec_headers_hsts_max_age', max( 0, (int) ( $_POST['hsts_max_age'] ?? 15552000 ) ) );
 		update_option( 'wpopsec_headers_hsts_subdomains', isset( $_POST['hsts_subdomains'] ) );
 		update_option( 'wpopsec_headers_hsts_preload', isset( $_POST['hsts_preload'] ) );
 		update_option( 'wpopsec_headers_behind_proxy', isset( $_POST['behind_proxy'] ) );
 
 		update_option( 'wpopsec_headers_csp_report_only', isset( $_POST['csp_report_only'] ) );
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- flattened below (CR/LF stripped to prevent header response-splitting) before it's ever stored.
 		$policy = isset( $_POST['csp_policy'] ) ? trim( wp_unslash( $_POST['csp_policy'] ) ) : '';
 		// Header values can't contain newlines — a CR/LF here would be a
 		// response-splitting bug, so flatten before storing.
@@ -194,6 +199,7 @@ class WPOpsec_Module_Headers {
 
 		WPOpsec_UI::open( 'headers' );
 
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only result flag set only by this module's own admin-post redirect, which already check_admin_referer()'d before redirecting.
 		if ( isset( $_GET['saved'] ) ) {
 			WPOpsec_UI::notice( 'success', 'Settings saved.' );
 		}

@@ -144,7 +144,9 @@ class WPOpsec_Menu_Router {
 		}
 
 		$tabs = $cluster['tabs'];
-		$tab  = ( isset( $_GET['tab'] ) && isset( $tabs[ $_GET['tab'] ] ) ) ? $_GET['tab'] : array_key_first( $tabs );
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only tab navigation, not a state-changing action; nonce-gating it would break plain bookmarked/shared tab links for no security benefit.
+		$requested_tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : '';
+		$tab           = isset( $tabs[ $requested_tab ] ) ? $requested_tab : array_key_first( $tabs );
 
 		WPOpsec_UI::styles();
 		?>

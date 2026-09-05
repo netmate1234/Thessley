@@ -18,6 +18,7 @@ if ( ! function_exists( 'wpopsec_geo_login_is_login_request' ) ) {
 	 * and //wp-login.php bypasses that applied to xmlrpc.php apply here.
 	 */
 	function wpopsec_geo_login_is_login_request() {
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- must inspect the raw request path to detect wp-login.php; sanitizing it here would risk altering the very string this security check is matching against.
 		$uri  = (string) ( $_SERVER['REQUEST_URI'] ?? '' );
 		$path = rawurldecode( strtok( $uri, '?' ) );
 		$path = preg_replace( '#/+#', '/', $path );

@@ -97,7 +97,8 @@ class WPOpsec_Module_Query_Guard {
 		}
 
 		$mode   = get_option( 'wpopsec_query_guard_mode', 'log' );
-		$detail = 'anonymous /batch/v1 request (path: ' . substr( (string) ( $_SERVER['REQUEST_URI'] ?? '' ), 0, 200 ) . ')';
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- diagnostic text only (truncated to 200 chars, stored in the event log), not used for any security decision or re-output as HTML.
+		$detail = 'anonymous /batch/v1 request (path: ' . substr( (string) wp_unslash( $_SERVER['REQUEST_URI'] ?? '' ), 0, 200 ) . ')';
 
 		if ( 'block' !== $mode ) {
 			wpopsec_log_event( 'query-guard', 'other_wp2shell_batch_route_cve202663030', 'logged', $detail );
@@ -141,6 +142,7 @@ class WPOpsec_Module_Query_Guard {
 	}
 
 	public static function scan_request_body() {
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- read-only method comparison, never stored or output.
 		if ( 'POST' !== ( $_SERVER['REQUEST_METHOD'] ?? '' ) && 'PUT' !== ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) {
 			return;
 		}
@@ -188,6 +190,7 @@ class WPOpsec_Module_Query_Guard {
 	private static function find_body_hit() {
 		// Uploaded filenames first — an executable extension arriving from an
 		// anonymous visitor is about as unambiguous as a signal gets.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- this is a WAF-style scanner that must inspect every anonymous POST/PUT request site-wide for malicious payloads; a real attacker will never send a valid nonce, so nonce-gating would defeat the check entirely.
 		foreach ( (array) $_FILES as $field => $file ) {
 			foreach ( (array) ( is_array( $file['name'] ?? null ) ? $file['name'] : array( $file['name'] ?? '' ) ) as $name ) {
 				if ( '' !== $name && preg_match( self::dangerous_upload_regex(), (string) $name ) ) {
@@ -201,6 +204,7 @@ class WPOpsec_Module_Query_Guard {
 
 		$patterns = self::body_patterns();
 
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- same reason as the $_FILES loop above: a WAF-style scan of anonymous POST bodies can't require a nonce without defeating its own purpose.
 		foreach ( self::flatten( $_POST ) as $key => $value ) {
 			if ( ! is_string( $value ) || '' === $value ) {
 				continue;
@@ -305,6 +309,7 @@ class WPOpsec_Module_Query_Guard {
 		$mode = ( isset( $_POST['mode'] ) && 'block' === $_POST['mode'] ) ? 'block' : 'log';
 		update_option( 'wpopsec_query_guard_mode', $mode );
 
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- already unslashed, and array_intersect() against self::CATEGORIES below discards anything not a real category id; nothing unvalidated ever reaches update_option().
 		$posted     = isset( $_POST['categories'] ) ? (array) wp_unslash( $_POST['categories'] ) : array();
 		$categories = array_values( array_intersect( $posted, array_keys( self::CATEGORIES ) ) );
 		update_option( 'wpopsec_query_guard_categories', $categories );
@@ -330,12 +335,14 @@ class WPOpsec_Module_Query_Guard {
 
 		WPOpsec_UI::open( 'query-guard' );
 
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only result flags set only by this module's own admin-post redirects, which already check_admin_referer() before redirecting.
 		if ( isset( $_GET['saved'] ) ) {
 			WPOpsec_UI::notice( 'success', 'Settings saved.' );
 		}
 		if ( isset( $_GET['refreshed'] ) ) {
 			WPOpsec_UI::notice( 'success', 'Jetpack IP list refreshed.' );
 		}
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
 		WPOpsec_UI::tiles(
 			array(

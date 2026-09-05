@@ -390,11 +390,13 @@ class WPOpsec_Module_User_Watchdog {
 
 		WPOpsec_UI::open( 'user-watchdog' );
 
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only result flags set only by this module's own admin-post redirects, which already check_admin_referer() before redirecting.
 		foreach ( array( 'saved' => 'Settings saved.', 'scanned' => 'Scan complete.', 'acknowledged' => 'Alerts cleared.' ) as $k => $msg ) {
 			if ( isset( $_GET[ $k ] ) ) {
 				WPOpsec_UI::notice( 'success', $msg );
 			}
 		}
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
 		WPOpsec_UI::tiles(
 			array(

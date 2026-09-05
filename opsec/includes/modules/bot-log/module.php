@@ -85,12 +85,14 @@ class WPOpsec_Module_Bot_Log {
 		$days  = max( 1, (int) get_option( 'wpopsec_bot_log_retain_days', self::DEFAULT_RETAIN ) );
 		$table = wpopsec_bot_log_table();
 
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- table name only, built from $wpdb->prefix, no user input; the actual value ($days) is bound via the %d placeholder above.
 		$wpdb->query(
 			$wpdb->prepare(
 				"DELETE FROM {$table} WHERE created_at < DATE_SUB(NOW(), INTERVAL %d DAY)",
 				$days
 			)
 		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 	}
 
 	public static function handle_save_settings() {
@@ -113,7 +115,7 @@ class WPOpsec_Module_Bot_Log {
 		}
 
 		global $wpdb;
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- table name only, built from $wpdb->prefix, no user input; identifiers can't be bound via $wpdb->prepare() placeholders.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- table name only, built from $wpdb->prefix, no user input; identifiers can't be bound via $wpdb->prepare() placeholders.
 		$wpdb->query( 'TRUNCATE TABLE ' . wpopsec_bot_log_table() );
 
 		wp_safe_redirect( add_query_arg( 'cleared', '1', wp_get_referer() ) );
@@ -140,12 +142,12 @@ class WPOpsec_Module_Bot_Log {
 		$where_sql = implode( ' AND ', $where );
 
 		$count_sql = "SELECT COUNT(*) FROM {$table} WHERE {$where_sql}";
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $count_sql is a query template (table name + %s/%d placeholders only), correctly bound via $wpdb->prepare() right here; the linter can't trace a template built one line above the prepare() call.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $count_sql is a query template (table name + %s/%d placeholders only), correctly bound via $wpdb->prepare() right here; the linter can't trace a template built one line above the prepare() call.
 		$total     = (int) ( $params ? $wpdb->get_var( $wpdb->prepare( $count_sql, $params ) ) : $wpdb->get_var( $count_sql ) );
 
 		$offset   = ( $page - 1 ) * self::PER_PAGE;
 		$rows_sql = "SELECT * FROM {$table} WHERE {$where_sql} ORDER BY id DESC LIMIT %d OFFSET %d";
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- same as $count_sql above: a placeholder-only template, bound via $wpdb->prepare() right here.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- same as $count_sql above: a placeholder-only template, bound via $wpdb->prepare() right here.
 		$rows     = $wpdb->get_results( $wpdb->prepare( $rows_sql, array_merge( $params, array( self::PER_PAGE, $offset ) ) ) );
 
 		return array( 'rows' => $rows ?: array(), 'total' => $total );
@@ -166,46 +168,54 @@ class WPOpsec_Module_Bot_Log {
 		}
 		$ips  = array_unique( $ips );
 		$in   = implode( ',', array_fill( 0, count( $ips ), '%s' ) );
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- table name has no user input; {$in} is a string of bare %s placeholders (one per IP), never actual IP data -- the real values are bound below via $ips, the standard way to build a dynamic IN() clause with $wpdb->prepare().
 		$rows = $wpdb->get_col(
 			$wpdb->prepare(
-				// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- table name has no user input; {$in} is a string of bare %s placeholders (one per IP), never actual IP data -- the real values are bound below via $ips, the standard way to build a dynamic IN() clause with $wpdb->prepare().
 				"SELECT DISTINCT ip FROM " . wpopsec_events_table() . " WHERE action = 'blocked' AND ip IN ({$in})",
 				$ips
 			)
 		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
 		return array_flip( $rows ?: array() );
 	}
 
 	public static function render_page() {
 		global $wpdb;
 
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only list filters/pagination, not a state-changing action; already sanitized/cast below.
 		$filters = array(
 			'bot_name' => isset( $_GET['f_bot'] ) ? sanitize_text_field( wp_unslash( $_GET['f_bot'] ) ) : '',
 			'ip'       => isset( $_GET['f_ip'] ) ? sanitize_text_field( wp_unslash( $_GET['f_ip'] ) ) : '',
 		);
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only pagination, not a state-changing action.
 		$page = isset( $_GET['paged'] ) ? max( 1, (int) $_GET['paged'] ) : 1;
 
 		$result = self::query_sightings( $filters, $page );
 		$table  = wpopsec_bot_log_table();
 
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $table is wpopsec_bot_log_table() (no user input, identifiers can't use $wpdb->prepare() placeholders); these are fixed summary tiles, not worth an object-cache group for.
 		$bot_names = $wpdb->get_col( "SELECT DISTINCT bot_name FROM {$table} ORDER BY bot_name" ) ?: array();
 		$retain    = (int) get_option( 'wpopsec_bot_log_retain_days', self::DEFAULT_RETAIN );
 
 		$last24    = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE created_at > DATE_SUB(NOW(), INTERVAL 1 DAY)" );
 		$distinct24 = (int) $wpdb->get_var( "SELECT COUNT(DISTINCT bot_name) FROM {$table} WHERE created_at > DATE_SUB(NOW(), INTERVAL 1 DAY)" );
 		$top_bot   = $wpdb->get_row( "SELECT bot_name, COUNT(*) c FROM {$table} WHERE created_at > DATE_SUB(NOW(), INTERVAL 1 DAY) GROUP BY bot_name ORDER BY c DESC LIMIT 1" );
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 
 		$row_ips        = wp_list_pluck( $result['rows'], 'ip' );
 		$blocked_ip_set = self::blocked_elsewhere( $row_ips );
 
 		WPOpsec_UI::open( 'bot-log' );
 
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only result flags set only by this module's own admin-post redirects, which already check_admin_referer() before redirecting.
 		if ( isset( $_GET['saved'] ) ) {
 			WPOpsec_UI::notice( 'success', 'Settings saved.' );
 		}
 		if ( isset( $_GET['cleared'] ) ) {
 			WPOpsec_UI::notice( 'success', 'Bot log cleared.' );
 		}
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
 		WPOpsec_UI::tiles(
 			array(

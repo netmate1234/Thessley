@@ -66,8 +66,10 @@ class WPOpsec_Module_User_Enum {
 	 * query-var form (?sitemap=users) sites without rewrite rules use.
 	 */
 	public static function block_user_sitemap_request() {
+		// phpcs:disable WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- must match the raw request path to detect the users sitemap URL; sanitizing it here would risk altering the very string this check matches against.
 		$is_users_sitemap = 'users' === get_query_var( 'sitemap' )
 			|| (bool) preg_match( '#/wp-sitemap-users-\d+\.xml(?:$|[/?])#i', (string) ( $_SERVER['REQUEST_URI'] ?? '' ) );
+		// phpcs:enable WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 
 		if ( ! $is_users_sitemap ) {
 			return;
@@ -94,12 +96,14 @@ class WPOpsec_Module_User_Enum {
 		if ( wpopsec_ip_is_exempt( wpopsec_client_ip() ) ) {
 			return;
 		}
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- read-only probe detection, not a state-changing action; validated below via preg_match( '/^\d+$/', ... ) before use.
 		if ( ! isset( $_GET['author'] ) ) {
 			return;
 		}
 		if ( ! preg_match( '/^\d+$/', (string) wp_unslash( $_GET['author'] ) ) ) {
 			return;
 		}
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 
 		wpopsec_log_event( 'user-enum', 'author_scan', 'blocked', 'numeric ?author= probe' );
 
@@ -239,6 +243,7 @@ class WPOpsec_Module_User_Enum {
 	public static function render_settings_page() {
 		WPOpsec_UI::open( 'user-enum' );
 
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only result flag set only by this module's own admin-post redirect, which already check_admin_referer()'d before redirecting.
 		if ( isset( $_GET['saved'] ) ) {
 			WPOpsec_UI::notice( 'success', 'Settings saved.' );
 		}

@@ -374,12 +374,14 @@ class WPOpsec_Module_Vuln_Scanner {
 
 		WPOpsec_UI::open( 'vuln-scanner' );
 
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only result flags set only by this module's own admin-post redirects, which already check_admin_referer() before redirecting.
 		if ( isset( $_GET['saved'] ) ) {
 			WPOpsec_UI::notice( 'success', 'Settings saved.' );
 		}
 		if ( isset( $_GET['scanned'] ) ) {
 			WPOpsec_UI::notice( 'success', 'Scan complete.' );
 		}
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
 		if ( empty( $last ) ) {
 			WPOpsec_UI::notice( 'info', 'No scan has run yet.' );

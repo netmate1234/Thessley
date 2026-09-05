@@ -60,9 +60,12 @@ class WPOpsec_Module_Rate_Limiter {
 
 		update_option( 'wpopsec_ratelimit_enabled', isset( $_POST['enabled'] ) );
 		update_option( 'wpopsec_ratelimit_mode', ( isset( $_POST['mode'] ) && 'block' === $_POST['mode'] ) ? 'block' : 'log' );
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- (int) cast is itself the sanitizer; wp_unslash() would be a no-op on a value about to be cast to int.
 		update_option( 'wpopsec_ratelimit_per_minute', max( 10, (int) ( $_POST['per_minute'] ?? 300 ) ) );
 		update_option( 'wpopsec_ratelimit_escalate', isset( $_POST['escalate'] ) );
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- same as per_minute above.
 		update_option( 'wpopsec_ratelimit_escalate_after', max( 1, (int) ( $_POST['escalate_after'] ?? 3 ) ) );
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- same as per_minute above.
 		update_option( 'wpopsec_ratelimit_escalate_minutes', max( 1, (int) ( $_POST['escalate_minutes'] ?? 30 ) ) );
 
 		wp_safe_redirect( add_query_arg( 'saved', '1', wp_get_referer() ) );
@@ -79,6 +82,7 @@ class WPOpsec_Module_Rate_Limiter {
 
 		WPOpsec_UI::open( 'rate-limiter' );
 
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only result flag set only by this module's own admin-post redirect, which already check_admin_referer()'d before redirecting.
 		if ( isset( $_GET['saved'] ) ) {
 			WPOpsec_UI::notice( 'success', 'Settings saved.' );
 		}

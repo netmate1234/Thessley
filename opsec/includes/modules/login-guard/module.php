@@ -276,8 +276,11 @@ class WPOpsec_Module_Login_Guard {
 		update_option( 'wpopsec_login_guard_enabled', isset( $_POST['enabled'] ) );
 		update_option( 'wpopsec_login_guard_escalate', isset( $_POST['escalate'] ) );
 		update_option( 'wpopsec_login_guard_generic_errors', isset( $_POST['generic_errors'] ) );
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- (int) cast is itself the sanitizer; wp_unslash() would be a no-op on values about to be cast to int.
 		update_option( 'wpopsec_login_guard_max_fails', max( 1, (int) ( $_POST['max_fails'] ?? self::DEFAULT_MAX_FAILS ) ) );
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- same as max_fails above.
 		update_option( 'wpopsec_login_guard_window_min', max( 1, (int) ( $_POST['window_min'] ?? self::DEFAULT_WINDOW_MIN ) ) );
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- same as max_fails above.
 		update_option( 'wpopsec_login_guard_lockout_min', max( 1, (int) ( $_POST['lockout_min'] ?? self::DEFAULT_LOCKOUT_MIN ) ) );
 
 		if ( isset( $_POST['clear_lockouts'] ) ) {
@@ -301,6 +304,7 @@ class WPOpsec_Module_Login_Guard {
 
 		WPOpsec_UI::open( 'login-guard' );
 
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only result flag set only by this module's own admin-post redirect, which already check_admin_referer()'d before redirecting.
 		if ( isset( $_GET['saved'] ) ) {
 			WPOpsec_UI::notice( 'success', 'Settings saved.' );
 		}

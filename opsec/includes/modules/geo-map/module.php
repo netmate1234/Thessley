@@ -41,6 +41,7 @@ class WPOpsec_Module_Geo_Map {
 		// busy site. The 2000-IP cap is a safety valve, not a real-world
 		// ceiling: that many distinct attacking IPs in one window is already
 		// an extreme outlier worth its own investigation, not a map.
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- table name only, built from $wpdb->prefix, no user input; the actual value ($days) is bound via the %d placeholder below.
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT ip, COUNT(*) c FROM {$table}
@@ -50,6 +51,7 @@ class WPOpsec_Module_Geo_Map {
 			),
 			ARRAY_A
 		) ?: array();
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 
 		$by_country = array();
 		$geo_ready  = function_exists( 'wpopsec_geo_lookup' ) && function_exists( 'wpopsec_geo_country_label' );
@@ -113,6 +115,7 @@ class WPOpsec_Module_Geo_Map {
 	}
 
 	public static function render_page() {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only day-range selector for this map view, not a state-changing action.
 		$days       = isset( $_GET['days'] ) ? max( 1, (int) $_GET['days'] ) : 7;
 		$by_country = self::counts_by_country( $days );
 		$svg_path   = __DIR__ . '/assets/world-map.svg';

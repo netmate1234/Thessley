@@ -55,10 +55,10 @@ class WPOpsec_Module_Alerts {
 
 		update_option( 'wpopsec_telegram_enabled', isset( $_POST['tg_enabled'] ) );
 
-		$token = isset( $_POST['bot_token'] ) ? trim( wp_unslash( $_POST['bot_token'] ) ) : '';
+		$token = isset( $_POST['bot_token'] ) ? sanitize_text_field( wp_unslash( $_POST['bot_token'] ) ) : '';
 		update_option( 'wpopsec_telegram_bot_token', $token );
 
-		$chat_id = isset( $_POST['chat_id'] ) ? trim( wp_unslash( $_POST['chat_id'] ) ) : '';
+		$chat_id = isset( $_POST['chat_id'] ) ? sanitize_text_field( wp_unslash( $_POST['chat_id'] ) ) : '';
 		update_option( 'wpopsec_telegram_chat_id', $chat_id );
 
 		$tg_threshold = isset( $_POST['tg_threshold'] ) ? max( 1, min( 20, (int) $_POST['tg_threshold'] ) ) : 15;
@@ -66,7 +66,7 @@ class WPOpsec_Module_Alerts {
 
 		update_option( 'wpopsec_email_enabled', isset( $_POST['email_enabled'] ) );
 
-		$address = isset( $_POST['email_address'] ) ? trim( wp_unslash( $_POST['email_address'] ) ) : '';
+		$address = isset( $_POST['email_address'] ) ? sanitize_email( wp_unslash( $_POST['email_address'] ) ) : '';
 		update_option( 'wpopsec_email_address', ( '' !== $address && is_email( $address ) ) ? $address : '' );
 
 		$email_threshold = isset( $_POST['email_threshold'] ) ? max( 1, min( 20, (int) $_POST['email_threshold'] ) ) : 15;
@@ -185,31 +185,38 @@ class WPOpsec_Module_Alerts {
 
 		WPOpsec_UI::open( 'alerts' );
 
-		if ( isset( $_GET['saved'] ) ) {
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only result flags set only by this module's own admin-post redirects (handle_save_settings/handle_tg_test/handle_detect_chat/handle_email_test), which already check_admin_referer() before redirecting; there is no state change here to protect.
+		$saved      = isset( $_GET['saved'] );
+		$tg_test    = isset( $_GET['tg_test'] ) ? sanitize_text_field( wp_unslash( $_GET['tg_test'] ) ) : '';
+		$detect     = isset( $_GET['detect'] ) ? sanitize_text_field( wp_unslash( $_GET['detect'] ) ) : '';
+		$email_test = isset( $_GET['email_test'] ) ? sanitize_text_field( wp_unslash( $_GET['email_test'] ) ) : '';
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
+
+		if ( $saved ) {
 			WPOpsec_UI::notice( 'success', 'Settings saved.' );
 		}
-		if ( isset( $_GET['tg_test'] ) ) {
-			if ( 'ok' === $_GET['tg_test'] ) {
+		if ( '' !== $tg_test ) {
+			if ( 'ok' === $tg_test ) {
 				WPOpsec_UI::notice( 'success', 'Test message sent — check Telegram.' );
-			} elseif ( 'missing' === $_GET['tg_test'] ) {
+			} elseif ( 'missing' === $tg_test ) {
 				WPOpsec_UI::notice( 'warning', 'Set a bot token and chat ID first.' );
 			} else {
-				WPOpsec_UI::notice( 'error', 'Telegram rejected the test message: ' . esc_html( sanitize_text_field( wp_unslash( str_replace( 'fail:', '', $_GET['tg_test'] ) ) ) ) );
+				WPOpsec_UI::notice( 'error', 'Telegram rejected the test message: ' . esc_html( str_replace( 'fail:', '', $tg_test ) ) );
 			}
 		}
-		if ( isset( $_GET['detect'] ) ) {
-			if ( 'ok' === $_GET['detect'] ) {
+		if ( '' !== $detect ) {
+			if ( 'ok' === $detect ) {
 				WPOpsec_UI::notice( 'success', 'Chat ID detected and saved.' );
-			} elseif ( 'missing' === $_GET['detect'] ) {
+			} elseif ( 'missing' === $detect ) {
 				WPOpsec_UI::notice( 'warning', 'Set a bot token first.' );
 			} else {
 				WPOpsec_UI::notice( 'warning', 'No messages found. Send anything to your bot on Telegram, then try again.' );
 			}
 		}
-		if ( isset( $_GET['email_test'] ) ) {
-			if ( 'ok' === $_GET['email_test'] ) {
+		if ( '' !== $email_test ) {
+			if ( 'ok' === $email_test ) {
 				WPOpsec_UI::notice( 'success', 'Test email sent — check your inbox.' );
-			} elseif ( 'missing' === $_GET['email_test'] ) {
+			} elseif ( 'missing' === $email_test ) {
 				WPOpsec_UI::notice( 'warning', 'Set a recipient address first (or set a WordPress admin email).' );
 			} else {
 				WPOpsec_UI::notice( 'error', 'WordPress could not send the test email — check the site\'s mail configuration.' );

@@ -103,6 +103,7 @@ class WPOpsec_Module_IP_Blocklist {
 		$mode = ( isset( $_POST['mode'] ) && 'block' === $_POST['mode'] ) ? 'block' : 'log';
 		update_option( 'wpopsec_ip_blocklist_mode', $mode );
 
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- already unslashed, and array_intersect() against the real source-id list below discards anything not in it; nothing unvalidated ever reaches update_option().
 		$posted_sources = isset( $_POST['sources'] ) ? (array) wp_unslash( $_POST['sources'] ) : array();
 		$sources        = array_values( array_intersect( $posted_sources, array_keys( WPOpsec_IP_Blocklist_Fetcher::SOURCES ) ) );
 		update_option( 'wpopsec_ip_blocklist_sources', $sources );
@@ -117,6 +118,7 @@ class WPOpsec_Module_IP_Blocklist {
 			wp_die( 'Forbidden', 403 );
 		}
 
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- validated below via filter_var( ..., FILTER_VALIDATE_IP ) before it's ever used.
 		$ip = isset( $_POST['ip'] ) ? trim( wp_unslash( $_POST['ip'] ) ) : '';
 		if ( false !== filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
 			$reason = isset( $_POST['reason'] ) ? sanitize_text_field( wp_unslash( $_POST['reason'] ) ) : 'manual';
@@ -134,6 +136,7 @@ class WPOpsec_Module_IP_Blocklist {
 			wp_die( 'Forbidden', 403 );
 		}
 
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- only ever used as an array key for unset() below, never output or queried; this handler is already nonce-checked and manage_options-gated above.
 		$ip   = isset( $_POST['ip'] ) ? wp_unslash( $_POST['ip'] ) : '';
 		$list = get_option( 'wpopsec_local_blocklist', array() );
 		unset( $list[ $ip ] );
@@ -152,12 +155,14 @@ class WPOpsec_Module_IP_Blocklist {
 
 		WPOpsec_UI::open( 'ip-blocklist' );
 
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only result flags set only by this module's own admin-post redirects, which already check_admin_referer() before redirecting.
 		if ( isset( $_GET['saved'] ) ) {
 			WPOpsec_UI::notice( 'success', 'Settings saved.' );
 		}
 		if ( isset( $_GET['refreshed'] ) ) {
 			WPOpsec_UI::notice( 'success', 'Blocklist refreshed.' );
 		}
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
 		WPOpsec_UI::tiles(
 			array(
@@ -225,6 +230,7 @@ class WPOpsec_Module_IP_Blocklist {
 			}
 		);
 
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- read-only local-blocklist search/pagination, not a state-changing action; $lb_q is only used for a stripos() comparison and is esc_attr()'d wherever it's echoed back into the search box below, and $_GET['page']/['tab'] are only ever echoed into hidden fields via esc_attr(wp_unslash(...)).
 		$lb_q = isset( $_GET['lb_q'] ) ? trim( wp_unslash( $_GET['lb_q'] ) ) : '';
 
 		$local_filtered = $local;
@@ -258,6 +264,7 @@ class WPOpsec_Module_IP_Blocklist {
 			<?php endif; ?>
 		</form>
 		<?php
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 		if ( empty( $local_page ) ) {
 			echo '<div class="wpopsec-empty"><span class="dashicons dashicons-yes-alt"></span><p>' . ( '' !== $lb_q ? 'No matches.' : 'No local entries.' ) . '</p></div>';
 		} else {

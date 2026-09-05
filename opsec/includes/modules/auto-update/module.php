@@ -194,6 +194,7 @@ class WPOpsec_Module_Auto_Update {
 		$themes = sanitize_text_field( wp_unslash( $_POST['themes'] ?? 'off' ) );
 		update_option( 'wpopsec_auto_update_themes', in_array( $themes, array( 'off', 'all' ), true ) ? $themes : 'off' );
 
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized on the very next line via array_map( 'sanitize_text_field', ... ) before it's ever stored.
 		$exclude = isset( $_POST['exclude'] ) ? (array) wp_unslash( $_POST['exclude'] ) : array();
 		update_option( 'wpopsec_auto_update_exclude', array_map( 'sanitize_text_field', $exclude ) );
 
@@ -227,6 +228,7 @@ class WPOpsec_Module_Auto_Update {
 
 		WPOpsec_UI::open( 'auto-update' );
 
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only "settings saved" notice flag, not a state-changing action.
 		if ( isset( $_GET['saved'] ) ) {
 			WPOpsec_UI::notice( 'success', 'Settings saved.' );
 		}

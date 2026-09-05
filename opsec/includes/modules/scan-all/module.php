@@ -87,7 +87,7 @@ class WPOpsec_Module_Scan_All {
 		}
 
 		if ( function_exists( 'set_time_limit' ) ) {
-			@set_time_limit( 60 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors -- some hosts disable this; failing quietly is correct, not a bug to surface.
+			@set_time_limit( 60 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors, Squiz.PHP.DiscouragedFunctions.Discouraged -- some hosts disable this; failing quietly is correct, not a bug to surface. Explicit, admin-triggered action, not something on the request path for a site visitor.
 		}
 
 		self::run_scan_for( $slug );
@@ -116,7 +116,7 @@ class WPOpsec_Module_Scan_All {
 		// admin-triggered action (not something on the request path for a
 		// site visitor), so a generous ceiling here is the right trade-off.
 		if ( function_exists( 'set_time_limit' ) ) {
-			@set_time_limit( 120 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors -- some hosts disable set_time_limit(); failing quietly is correct here, not a bug to surface.
+			@set_time_limit( 120 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors, Squiz.PHP.DiscouragedFunctions.Discouraged -- some hosts disable set_time_limit(); failing quietly is correct here, not a bug to surface. Explicit, admin-triggered action, not something on the request path for a site visitor.
 		}
 
 		foreach ( array_keys( self::scans() ) as $slug ) {
@@ -166,6 +166,7 @@ class WPOpsec_Module_Scan_All {
 	public static function render_page() {
 		WPOpsec_UI::open( 'scan-all' );
 
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only result flag set only by this module's own admin-post redirect, which already check_admin_referer()'d before redirecting.
 		if ( isset( $_GET['triggered'] ) ) {
 			WPOpsec_UI::notice( 'success', 'All four scans finished — see updated results below.' );
 		}

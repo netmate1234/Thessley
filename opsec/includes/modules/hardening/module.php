@@ -32,6 +32,7 @@ class WPOpsec_Module_Hardening {
 		add_action( self::CRON_HOOK, array( __CLASS__, 'scan_hidden_plugins' ) );
 
 		if ( get_option( 'wpopsec_hardening_disable_file_edit', true ) && ! defined( 'DISALLOW_FILE_EDIT' ) ) {
+			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- this is WordPress core's own recognized constant name (the same one wp-config.php normally defines); prefixing it would make WP core stop recognizing it.
 			define( 'DISALLOW_FILE_EDIT', true );
 		}
 
@@ -98,6 +99,7 @@ class WPOpsec_Module_Hardening {
 	}
 
 	private static function is_apache() {
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- read-only substring check against the server's own software banner, never stored or output.
 		return function_exists( 'apache_get_modules' ) || false !== stripos( (string) ( $_SERVER['SERVER_SOFTWARE'] ?? '' ), 'apache' );
 	}
 
@@ -120,6 +122,7 @@ class WPOpsec_Module_Hardening {
 		}
 
 		$raw      = get_plugins();
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- this is WordPress core's own filter hook (fired by the Plugins screen), not one this plugin defines.
 		$shown    = (array) apply_filters( 'all_plugins', $raw );
 		$reported = array_keys( $shown );
 		$on_disk  = array();
@@ -222,6 +225,7 @@ class WPOpsec_Module_Hardening {
 
 		WPOpsec_UI::open( 'hardening' );
 
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only result flags set only by this module's own admin-post redirects, which already check_admin_referer() before redirecting.
 		if ( isset( $_GET['saved'] ) && '1' === $_GET['saved'] ) {
 			WPOpsec_UI::notice( 'success', 'Settings saved.' );
 		} elseif ( isset( $_GET['saved'] ) && 'guardfail' === $_GET['saved'] ) {
@@ -230,6 +234,7 @@ class WPOpsec_Module_Hardening {
 		if ( isset( $_GET['scanned'] ) ) {
 			WPOpsec_UI::notice( 'success', 'Scan complete.' );
 		}
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
 		WPOpsec_UI::tiles(
 			array(

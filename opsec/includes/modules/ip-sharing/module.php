@@ -87,7 +87,7 @@ class WPOpsec_Module_IP_Sharing {
 
 		update_option( 'wpopsec_unwantedip_enabled', isset( $_POST['enabled'] ) );
 
-		$key = isset( $_POST['api_key'] ) ? trim( wp_unslash( $_POST['api_key'] ) ) : '';
+		$key = isset( $_POST['api_key'] ) ? sanitize_text_field( wp_unslash( $_POST['api_key'] ) ) : '';
 		update_option( 'wpopsec_unwantedip_api_key', $key );
 
 		wp_safe_redirect( add_query_arg( 'saved', '1', wp_get_referer() ) );
@@ -153,28 +153,34 @@ class WPOpsec_Module_IP_Sharing {
 
 		WPOpsec_UI::open( 'ip-sharing' );
 
-		if ( isset( $_GET['saved'] ) ) {
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only result flags set only by this module's own admin-post redirects, which already check_admin_referer() before redirecting.
+		$saved  = isset( $_GET['saved'] );
+		$signup = isset( $_GET['signup'] ) ? sanitize_text_field( wp_unslash( $_GET['signup'] ) ) : '';
+		$test   = isset( $_GET['test'] ) ? sanitize_text_field( wp_unslash( $_GET['test'] ) ) : '';
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
+
+		if ( $saved ) {
 			WPOpsec_UI::notice( 'success', 'Settings saved.' );
 		}
-		if ( isset( $_GET['signup'] ) ) {
-			if ( 'ok' === $_GET['signup'] ) {
+		if ( '' !== $signup ) {
+			if ( 'ok' === $signup ) {
 				WPOpsec_UI::notice( 'success', 'Signed up and saved the API key — sharing is now enabled.' );
-			} elseif ( 'exists' === $_GET['signup'] ) {
+			} elseif ( 'exists' === $signup ) {
 				WPOpsec_UI::notice(
 					'warning',
 					'An account for this server\'s public IP already exists. Keys are shown once at signup and can\'t be retrieved again — if yours was lost, the site owner has to reissue one manually.'
 				);
 			} else {
-				WPOpsec_UI::notice( 'error', 'Sign-up failed: ' . esc_html( sanitize_text_field( wp_unslash( str_replace( 'fail:', '', $_GET['signup'] ) ) ) ) );
+				WPOpsec_UI::notice( 'error', 'Sign-up failed: ' . esc_html( str_replace( 'fail:', '', $signup ) ) );
 			}
 		}
-		if ( isset( $_GET['test'] ) ) {
-			if ( 'ok' === $_GET['test'] ) {
+		if ( '' !== $test ) {
+			if ( 'ok' === $test ) {
 				WPOpsec_UI::notice( 'success', 'Test report accepted.' );
-			} elseif ( 'missing' === $_GET['test'] ) {
+			} elseif ( 'missing' === $test ) {
 				WPOpsec_UI::notice( 'warning', 'Set an API key first.' );
 			} else {
-				WPOpsec_UI::notice( 'error', 'Report rejected: ' . esc_html( sanitize_text_field( wp_unslash( str_replace( 'fail:', '', $_GET['test'] ) ) ) ) );
+				WPOpsec_UI::notice( 'error', 'Report rejected: ' . esc_html( str_replace( 'fail:', '', $test ) ) );
 			}
 		}
 

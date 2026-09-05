@@ -115,16 +115,19 @@ class WPOpsec_Module_Config_IO {
 			wp_die( 'Forbidden', 403 );
 		}
 
-		if ( empty( $_FILES['config_file']['tmp_name'] ) || UPLOAD_ERR_OK !== $_FILES['config_file']['error'] ) {
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotValidated -- the leading isset( $_FILES['config_file'] ) short-circuits (via ||) before ['error'] is ever read, so it can't be undefined here.
+		if ( ! isset( $_FILES['config_file'] ) || empty( $_FILES['config_file']['tmp_name'] ) || UPLOAD_ERR_OK !== $_FILES['config_file']['error'] ) {
 			self::redirect_back( array( 'cio_error' => 'no_file' ) );
 		}
 
 		// 2MB is generous for a JSON options dump — guards against something
 		// large being uploaded through a field with no other size check.
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotValidated -- $_FILES['config_file'] is already confirmed to exist by the isset() check above (this function would have exited via redirect_back() otherwise).
 		if ( $_FILES['config_file']['size'] > 2 * MB_IN_BYTES ) {
 			self::redirect_back( array( 'cio_error' => 'too_large' ) );
 		}
 
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- a server-generated temp file path from PHP's own upload handling, not user-controlled string content.
 		$json = json_decode( (string) file_get_contents( $_FILES['config_file']['tmp_name'] ), true );
 
 		if ( ! is_array( $json ) || 'opsec' !== ( $json['plugin'] ?? '' ) || ! is_array( $json['modules'] ?? null ) ) {
@@ -161,13 +164,15 @@ class WPOpsec_Module_Config_IO {
 	public static function render_page() {
 		WPOpsec_UI::open( 'config-io' );
 
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only result flags set only by this module's own admin-post redirects, which already check_admin_referer() before redirecting.
 		if ( isset( $_GET['cio_error'] ) ) {
 			$messages = array(
 				'no_file'      => 'Choose a file to import.',
 				'too_large'    => 'File is too large (2MB max).',
 				'invalid_file' => "That file doesn't look like an Opsec configuration export.",
 			);
-			WPOpsec_UI::notice( 'error', $messages[ $_GET['cio_error'] ] ?? 'Import failed.' );
+			$cio_error = sanitize_key( wp_unslash( $_GET['cio_error'] ) );
+			WPOpsec_UI::notice( 'error', $messages[ $cio_error ] ?? 'Import failed.' );
 		}
 		if ( isset( $_GET['cio_imported'] ) ) {
 			$n = (int) $_GET['cio_imported'];
@@ -176,6 +181,7 @@ class WPOpsec_Module_Config_IO {
 				$n ? sprintf( '%d setting(s) imported.', $n ) : 'Nothing was imported — no matching modules were selected.'
 			);
 		}
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
 		$registry = self::registry();
 		?>

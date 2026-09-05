@@ -180,6 +180,7 @@ class WPOpsec_Module_Activity_Log {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- already unslashed, and array_intersect() against the fixed $allowed whitelist below discards anything not in that list; nothing unvalidated ever reaches update_option().
 		$posted  = isset( $_POST['categories'] ) ? (array) wp_unslash( $_POST['categories'] ) : array();
 		$allowed = array( 'content', 'plugins_themes', 'settings' );
 		$enabled = array_values( array_intersect( $posted, $allowed ) );
@@ -196,16 +197,19 @@ class WPOpsec_Module_Activity_Log {
 
 		WPOpsec_UI::open( 'activity-log' );
 
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only "settings saved" notice flag, not a state-changing action.
 		if ( isset( $_GET['saved'] ) ) {
 			WPOpsec_UI::notice( 'success', 'Settings saved.' );
 		}
 
 		$recent = array();
 		$total  = 0;
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $table is wpopsec_events_table() (no user input, identifiers can't use $wpdb->prepare() placeholders); the WHERE value itself is properly bound below.
 		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) === $table ) {
 			$total  = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE module = %s", 'activity-log' ) );
 			$recent = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE module = %s ORDER BY id DESC LIMIT 50", 'activity-log' ) ) ?: array();
 		}
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 
 		WPOpsec_UI::tiles(
 			array(

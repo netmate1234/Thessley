@@ -395,6 +395,10 @@ class WPOpsec_Module_Loader {
 	public static function render_dashboard() {
 		global $wpdb;
 
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
+		// $table is always wpopsec_events_table() (built from $wpdb->prefix, no user input) -- identifiers can't be
+		// bound via $wpdb->prepare() placeholders anyway. This is a dashboard summary read over the whole events
+		// table (up to a 7-day window or a flat LIMIT 12), not a per-request lookup worth an object-cache group for.
 		$table     = wpopsec_events_table();
 		$has_table = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) === $table;
 
@@ -455,6 +459,7 @@ class WPOpsec_Module_Loader {
 
 			$recent = $wpdb->get_results( "SELECT * FROM {$table} ORDER BY id DESC LIMIT 12" ) ?: array();
 		}
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 
 		$cards = self::status_cards();
 
