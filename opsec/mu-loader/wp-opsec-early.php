@@ -201,8 +201,6 @@ if ( ! function_exists( 'wpopsec_log_event' ) ) {
 			? wpopsec_event_severity( $module, $event, $action )
 			: max( 1, min( 20, (int) $severity ) );
 
-		error_log( "wp-opsec {$module}: [{$event}] {$action} sev={$severity} ip={$ip} {$detail}" );
-
 		// Never let a logging failure (missing table mid-upgrade, DB hiccup)
 		// take down the request it was only meant to annotate.
 		$table = wpopsec_events_table();
@@ -878,28 +876,34 @@ if ( defined( 'WP_CLI' ) && WP_CLI ) {
 
 $GLOBALS['wpopsec_checks'] = array();
 
-$checks_dir = WPMU_PLUGIN_DIR . '/wp-opsec-checks';
-foreach ( glob( $checks_dir . '/*.php' ) ?: array() as $check_file ) {
-	require $check_file;
-}
-
-usort(
-	$GLOBALS['wpopsec_checks'],
-	function ( $a, $b ) {
-		// usort() isn't guaranteed stable before PHP 8 (this plugin's floor
-		// is 7.4), so 'seq' (registration order) breaks priority ties
-		// explicitly instead of trusting the engine to preserve it.
-		return $a['priority'] <=> $b['priority'] ?: $a['seq'] <=> $b['seq'];
+// Wrapped in an IIFE rather than left as top-level statements: this file is
+// require()'d directly as an mu-plugin (not inside any function), so bare
+// top-level variables here would otherwise leak into the global PHP
+// namespace for the rest of the request.
+( function () {
+	$checks_dir = WPMU_PLUGIN_DIR . '/wp-opsec-checks';
+	foreach ( glob( $checks_dir . '/*.php' ) ?: array() as $check_file ) {
+		require $check_file;
 	}
-);
 
-foreach ( $GLOBALS['wpopsec_checks'] as $entry ) {
-	$result = call_user_func( $entry['check'] );
-	if ( is_array( $result ) ) {
-		wp_die(
-			esc_html( $result['reason'] ?? 'Forbidden' ),
-			'403 Forbidden',
-			array( 'response' => 403 )
-		);
+	usort(
+		$GLOBALS['wpopsec_checks'],
+		function ( $a, $b ) {
+			// usort() isn't guaranteed stable before PHP 8 (this plugin's floor
+			// is 7.4), so 'seq' (registration order) breaks priority ties
+			// explicitly instead of trusting the engine to preserve it.
+			return $a['priority'] <=> $b['priority'] ?: $a['seq'] <=> $b['seq'];
+		}
+	);
+
+	foreach ( $GLOBALS['wpopsec_checks'] as $entry ) {
+		$result = call_user_func( $entry['check'] );
+		if ( is_array( $result ) ) {
+			wp_die(
+				esc_html( $result['reason'] ?? 'Forbidden' ),
+				'403 Forbidden',
+				array( 'response' => 403 )
+			);
+		}
 	}
-}
+} )();
