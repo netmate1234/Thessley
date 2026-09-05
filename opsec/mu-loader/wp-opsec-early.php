@@ -125,7 +125,8 @@ if ( ! function_exists( 'wpopsec_severity_map' ) ) {
 			// --- Reconnaissance ---------------------------------------
 			'ip-blocklist:listed_ip'                => 8,
 			'user-enum:rest_users'                  => 7,
-			'user-enum:author_scan'                 => 7,
+			'user-enum:author_scan'                  => 7,
+			'query-guard:path_plugin_theme_readme_probe' => 7,
 			'login-guard:login_failed'              => 5,
 
 			// --- Informational ----------------------------------------

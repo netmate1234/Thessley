@@ -137,6 +137,17 @@ if ( ! function_exists( 'wpopsec_query_guard_path_patterns' ) ) {
 			// origin: uploads always live under a path, never site root.
 			// Seen in real logged traffic hitting all of these stems.
 			array( 'id' => 'path_backup_archive_probe', 'regex' => '#^/(?:backup|backups|www|wwwroot|htdocs|public_html|site|website)\.(?:zip|rar|7z|tar\.gz|tgz|sql|sql\.gz)(?:$|\?)#i' ),
+			// Version-fingerprinting recon: a plugin/theme's readme.txt (or
+			// changelog) carries a "Stable tag:" line naming the exact
+			// installed version, which is exactly what an attacker needs to
+			// cross-reference against a known CVE for that version before
+			// firing the real exploit. Confirmed live: a scanner requesting
+			// a specific plugin's readme.txt only got blocked by unrelated
+			// luck (a geo-blocker country match), not because query-guard
+			// recognized what it actually was. No legitimate anonymous
+			// visitor ever needs to fetch these directly — WordPress.org's
+			// own parser reads the file server-side, not over HTTP.
+			array( 'id' => 'path_plugin_theme_readme_probe', 'regex' => '#/wp-content/(?:plugins|mu-plugins|themes)/[^/]+/(?:readme|changelog)\.(?:txt|md)(?:$|[/?])#i' ),
 		);
 	}
 
