@@ -147,14 +147,14 @@ if ( ! function_exists( 'wpopsec_query_guard_path_patterns' ) ) {
 			// recognized what it actually was. No legitimate anonymous
 			// visitor ever needs to fetch these directly — WordPress.org's
 			// own parser reads the file server-side, not over HTTP.
-			array( 'id' => 'path_plugin_theme_readme_probe', 'regex' => '#/wp-content/(?:plugins|mu-plugins|themes)/[^/]+/(?:readme|changelog)\.(?:txt|md)(?:$|[/?])#i' ),
+			array( 'id' => 'path_plugin_theme_readme_probe', 'regex' => '#/wp-content/(?<component>plugins|mu-plugins|themes)/(?<slug>[^/]+)/(?:readme|changelog)\.(?:txt|md)(?:$|[/?])#i' ),
 		);
 	}
 
 	function wpopsec_query_guard_scan_path( $path ) {
 		foreach ( wpopsec_query_guard_path_patterns() as $pattern ) {
-			if ( preg_match( $pattern['regex'], $path ) ) {
-				return $pattern;
+			if ( preg_match( $pattern['regex'], $path, $m ) ) {
+				return $pattern + array( 'matches' => $m );
 			}
 		}
 		return null;
@@ -282,12 +282,39 @@ wpopsec_register_check(
 			? 'path: ' . substr( $path, 0, 200 )
 			: 'qs: ' . substr( str_replace( array( "\r", "\n" ), ' ', rawurldecode( $qs ) ), 0, 200 );
 
+		// Distinguishes a blind, internet-wide plugin-slug scan (mostly
+		// noise — the plugin was never here) from a probe that correctly
+		// guessed something actually installed on this site, which is a
+		// real, targeted signal worth an admin's attention rather than
+		// the usual recon-tier severity. Constants only, no theme/plugin
+		// API calls (get_theme_root() etc. aren't guaranteed loaded yet at
+		// this point in the bootstrap), matching how every other early-gate
+		// check in this codebase avoids relying on WordPress not being
+		// fully available.
+		$severity = null;
+		if ( 'path_plugin_theme_readme_probe' === $hit['id'] && isset( $hit['matches']['component'], $hit['matches']['slug'] ) ) {
+			$component = $hit['matches']['component'];
+			$slug      = $hit['matches']['slug'];
+			if ( 'mu-plugins' === $component ) {
+				// mu-plugins are conventionally bare .php files, not
+				// subfolders with their own readme.txt — a hit here is rare
+				// enough, and the shape unusual enough, that confirming
+				// "installed" isn't worth a special case; leave it unscored.
+				$snippet .= ' (installed: unknown)';
+			} else {
+				$base      = 'themes' === $component ? WP_CONTENT_DIR . '/themes' : WP_PLUGIN_DIR;
+				$installed = is_dir( $base . '/' . $slug );
+				$snippet  .= $installed ? ' (installed: yes)' : ' (installed: no)';
+				$severity  = $installed ? 13 : null;
+			}
+		}
+
 		if ( 'block' !== $mode ) {
-			wpopsec_log_event( 'query-guard', $hit['id'], 'logged', $snippet );
+			wpopsec_log_event( 'query-guard', $hit['id'], 'logged', $snippet, $severity );
 			return null;
 		}
 
-		wpopsec_log_event( 'query-guard', $hit['id'], 'blocked', $snippet );
+		wpopsec_log_event( 'query-guard', $hit['id'], 'blocked', $snippet, $severity );
 
 		$ip = wpopsec_client_ip();
 		if ( '' !== $ip ) {
