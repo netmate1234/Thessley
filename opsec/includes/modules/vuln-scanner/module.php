@@ -254,7 +254,7 @@ class WPOpsec_Module_Vuln_Scanner {
 					if ( $ts && $ts < strtotime( '-' . self::STALE_YEARS . ' years' ) ) {
 						$issues[] = array(
 							'kind'   => 'stale',
-							'detail' => sprintf( 'No release since %s — likely unmaintained.', date( 'Y-m-d', $ts ) ),
+							'detail' => sprintf( 'No release since %s — likely unmaintained.', gmdate( 'Y-m-d', $ts ) ),
 						);
 					}
 				}

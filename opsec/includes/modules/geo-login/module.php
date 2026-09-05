@@ -28,7 +28,7 @@ class WPOpsec_Module_Geo_Login {
 
 	public static function deactivate() {
 		if ( file_exists( self::check_dest() ) ) {
-			unlink( self::check_dest() );
+			WPOpsec_Module_Loader::filesystem()->delete( self::check_dest() );
 		}
 	}
 

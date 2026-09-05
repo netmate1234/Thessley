@@ -72,6 +72,26 @@ class WPOpsec_Module_Loader {
 		'config-io'       => 'WPOpsec_Module_Config_IO',
 	);
 
+	/**
+	 * Shared WP_Filesystem instance for the local, plugin-managed file
+	 * writes every module does (compiled datasets, mu-plugin sync, the
+	 * local blocklist cache) — never user uploads or anything reachable
+	 * from a public request. Only for admin-post/cron/activation-context
+	 * callers: it requires wp-admin/includes/file.php and, on the rare
+	 * host without direct filesystem access, can need credentials — both
+	 * fine for those contexts, but wrong for the early-gate check.php
+	 * files, which run pre-bootstrap on every front-end request and stay
+	 * on raw fopen()/fread() for that reason (documented at each site).
+	 */
+	public static function filesystem() {
+		global $wp_filesystem;
+		if ( ! $wp_filesystem ) {
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+			WP_Filesystem();
+		}
+		return $wp_filesystem;
+	}
+
 	public static function init() {
 		self::ensure_mu_loader_current();
 
@@ -429,7 +449,7 @@ class WPOpsec_Module_Loader {
 				$seen[ $r['d'] ] = (int) $r['c'];
 			}
 			for ( $i = 6; $i >= 0; $i-- ) {
-				$day             = date( 'Y-m-d', strtotime( "-{$i} days" ) );
+				$day             = gmdate( 'Y-m-d', strtotime( "-{$i} days" ) );
 				$daily[ $day ]   = $seen[ $day ] ?? 0;
 			}
 
@@ -855,7 +875,7 @@ class WPOpsec_Module_Loader {
 
 	private static function remove_mu_loader() {
 		if ( file_exists( WPOPSEC_MU_DEST ) ) {
-			unlink( WPOPSEC_MU_DEST );
+			self::filesystem()->delete( WPOPSEC_MU_DEST );
 		}
 	}
 

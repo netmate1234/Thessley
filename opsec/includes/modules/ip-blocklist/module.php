@@ -30,7 +30,7 @@ class WPOpsec_Module_IP_Blocklist {
 		wp_clear_scheduled_hook( self::CRON_HOOK );
 
 		if ( file_exists( self::check_dest() ) ) {
-			unlink( self::check_dest() );
+			WPOpsec_Module_Loader::filesystem()->delete( self::check_dest() );
 		}
 	}
 

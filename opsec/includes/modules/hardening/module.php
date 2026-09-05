@@ -86,7 +86,7 @@ class WPOpsec_Module_Hardening {
 		);
 
 		if ( '' === trim( (string) $cleaned ) ) {
-			unlink( $path );
+			WPOpsec_Module_Loader::filesystem()->delete( $path );
 		} elseif ( $cleaned !== $content ) {
 			file_put_contents( $path, $cleaned, LOCK_EX );
 		}

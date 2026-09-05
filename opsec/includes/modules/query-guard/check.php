@@ -1,4 +1,8 @@
 <?php
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 // Copied verbatim into wp-content/mu-plugins/wp-opsec-checks/ by the
 // query-guard module on activation. Runs inside wp-opsec-early.php.
 //

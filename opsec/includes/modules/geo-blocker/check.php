@@ -1,10 +1,24 @@
 <?php
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 // Copied verbatim into wp-content/mu-plugins/wp-opsec-checks/ by the
 // geo-blocker module on activation. Runs inside wp-opsec-early.php.
 //
 // Binary search over a flat file of fixed 9-byte records (4-byte start,
 // 4-byte end, 1-byte country index) rather than loading ~358,000 ranges
 // into a PHP array — see the module.php header comment for why.
+//
+// Deliberately raw fopen()/fseek()/fread(), not WP_Filesystem: this runs
+// pre-bootstrap, on every single front-end request, and does a seekable
+// partial read at an arbitrary byte offset per binary-search step —
+// WP_Filesystem's API only exposes whole-file get_contents()/put_contents(),
+// which would mean reading this entire multi-megabyte index into memory on
+// every request, exactly what the binary-search design exists to avoid.
+// WP_Filesystem() also needs wp-admin/includes/file.php and can prompt for
+// credentials on some hosts, neither appropriate for a per-request hot path
+// that must stay usable before WordPress finishes loading at all.
 
 if ( ! function_exists( 'wpopsec_geo_lookup' ) ) {
 	/** @return int|null country index, or null if the file is missing/IP not found */
@@ -16,9 +30,9 @@ if ( ! function_exists( 'wpopsec_geo_lookup' ) ) {
 
 		if ( $opened_path !== $file ) {
 			if ( is_resource( $fh ) ) {
-				fclose( $fh );
+				fclose( $fh ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- see file header
 			}
-			$fh = @fopen( $file, 'rb' );
+			$fh = @fopen( $file, 'rb' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- see file header
 			$opened_path = $file;
 			$count = $fh ? (int) ( filesize( $file ) / $record_size ) : 0;
 		}
@@ -33,7 +47,7 @@ if ( ! function_exists( 'wpopsec_geo_lookup' ) ) {
 		while ( $lo <= $hi ) {
 			$mid = (int) ( ( $lo + $hi ) / 2 );
 			fseek( $fh, $mid * $record_size );
-			$data = fread( $fh, $record_size );
+			$data = fread( $fh, $record_size ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fread -- see file header
 			if ( false === $data || strlen( $data ) < $record_size ) {
 				return null;
 			}

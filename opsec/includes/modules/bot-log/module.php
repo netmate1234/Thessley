@@ -273,12 +273,14 @@ class WPOpsec_Module_Bot_Log {
 		$total_pages = (int) ceil( $result['total'] / self::PER_PAGE );
 		if ( $total_pages > 1 ) {
 			echo '<div class="tablenav" style="margin-top:12px"><div class="tablenav-pages">';
-			echo paginate_links(
-				array(
-					'base'    => add_query_arg( 'paged', '%#%' ),
-					'format'  => '',
-					'current' => $page,
-					'total'   => $total_pages,
+			echo wp_kses_post(
+				paginate_links(
+					array(
+						'base'    => add_query_arg( 'paged', '%#%' ),
+						'format'  => '',
+						'current' => $page,
+						'total'   => $total_pages,
+					)
 				)
 			);
 			echo '</div></div>';

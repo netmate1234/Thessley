@@ -95,7 +95,7 @@ class WPOpsec_Module_Geo_Map {
 
 			$replacement = sprintf(
 				'id="%s" class="wpopsec-geo-hit wpopsec-geo-b%d" data-country="%s" data-count="%d"',
-				$id,
+				esc_attr( $id ),
 				$bucket,
 				esc_attr( $name ),
 				$count
@@ -150,7 +150,10 @@ class WPOpsec_Module_Geo_Map {
 			<?php if ( empty( $by_country ) ) : ?>
 				<div class="wpopsec-empty"><span class="dashicons dashicons-info-outline"></span><p>No blocked or logged events with a resolvable country in this window.</p></div>
 			<?php else : ?>
-				<div class="wpopsec-geo-map-wrap"><?php echo $svg; /* server-generated, country codes and counts only */ ?></div>
+				<div class="wpopsec-geo-map-wrap"><?php
+				// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $svg is this plugin's own bundled, static asset file (assets/world-map.svg); the only dynamic pieces spliced in (tint_svg() above) are esc_attr()'d, and the country codes/counts driving them come from the compiled GeoIP dataset, never from request input.
+				echo $svg;
+				?></div>
 				<div id="wpopsec-geo-tip" class="wpopsec-geo-tip"></div>
 			<?php endif; ?>
 		<?php WPOpsec_UI::section_end(); ?>
