@@ -41,6 +41,11 @@ class WPOpsec_IP_Blocklist_Fetcher {
 			'url'   => 'https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level2.netset', // phpcs:ignore PluginCheck.CodeAnalysis.Offloading.OffloadedContent -- same as firehol_level1 above.
 			'type'  => 'cidr_list',
 		),
+		'et_tor'         => array(
+			'label' => 'ET Tor (Emerging Threats Tor exit nodes)',
+			'url'   => 'https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/et_tor.ipset', // phpcs:ignore PluginCheck.CodeAnalysis.Offloading.OffloadedContent -- same as firehol_level1 above.
+			'type'  => 'ip_list',
+		),
 		'unwantedip_wp'  => array(
 			'label' => 'unwantedip.eagleeye-intelligence.com (WordPress-targeting IPs, 90d)',
 			'url'   => 'https://unwantedip.eagleeye-intelligence.com/api/v1/feed/wordpress',
