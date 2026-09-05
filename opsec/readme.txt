@@ -4,7 +4,7 @@ Tags: security, firewall, malware, geo-blocking, brute-force
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.1.8
+Stable tag: 0.1.9
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -81,6 +81,11 @@ The early-request checks (IP Blocklist, Geo Blocker, Geo Login, Rate Limiter, Qu
 DB-IP's free Country Lite database (CC BY 4.0), refreshed automatically on a schedule.
 
 == Changelog ==
+
+= 0.1.9 =
+* New Import/Export tab (Other): back up or restore every module's settings as a single JSON file, with each module optionally left out on either side. API keys/tokens are included by default, with an option to leave them out.
+* Query Guard's CVE-2026-63030/CVE-2026-60137 ("wp2shell") signature now also catches the pretty-permalink form of the REST batch endpoint, not just the query-string form — closes a gap confirmed live on a client site.
+* User Enumeration's per-plugin REST route list replaced with a general pattern, after real traffic showed a scanner fuzzing dozens of plugin namespaces the list didn't cover.
 
 = 0.1.8 =
 * New Query Guard signature for CVE-2026-63030/CVE-2026-60137 ("wp2shell"), the unauthenticated pre-auth RCE chain in WordPress core's REST batch endpoint (CISA KEV, 2026-07-21).

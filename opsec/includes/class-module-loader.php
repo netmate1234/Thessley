@@ -69,6 +69,7 @@ class WPOpsec_Module_Loader {
 		'alerts'          => 'WPOpsec_Module_Alerts',
 		'ip-sharing'      => 'WPOpsec_Module_IP_Sharing',
 		'scan-all'        => 'WPOpsec_Module_Scan_All',
+		'config-io'       => 'WPOpsec_Module_Config_IO',
 	);
 
 	public static function init() {

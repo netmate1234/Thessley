@@ -71,6 +71,7 @@ class WPOpsec_Menu_Router {
 					'alerts'          => array( 'WPOpsec_Module_Alerts', 'render_page' ),
 				'ip-sharing'      => array( 'WPOpsec_Module_IP_Sharing', 'render_page' ),
 				'scan-all'        => array( 'WPOpsec_Module_Scan_All', 'render_page' ),
+				'config-io'       => array( 'WPOpsec_Module_Config_IO', 'render_page' ),
 				),
 			),
 		);

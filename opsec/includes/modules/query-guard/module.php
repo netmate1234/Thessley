@@ -55,7 +55,66 @@ class WPOpsec_Module_Query_Guard {
 			add_action( 'init', array( __CLASS__, 'scan_request_body' ), 0 );
 		}
 
+		add_filter( 'rest_pre_dispatch', array( __CLASS__, 'block_batch_route' ), 5, 3 );
+
 		return __CLASS__;
+	}
+
+	/**
+	 * CVE-2026-63030/CVE-2026-60137 ("wp2shell"): core's REST batch endpoint
+	 * short-circuits inside WP_REST_Server::dispatch() itself, matched on
+	 * $request->get_route() === '/batch/v1' before normal route callbacks
+	 * ever run — the check.php early-gate signature only sees the raw
+	 * request line, so it catches ?rest_route=/batch/v1 but never the
+	 * pretty-permalink /wp-json/batch/v1 form, since that only resolves to
+	 * the same route string after WP finishes bootstrapping. Confirmed live
+	 * on a client site: the pretty-permalink form got through untouched and
+	 * was only blocked as a side effect of the attacker's IP already being
+	 * escalated to the local blocklist from an earlier query-string-form
+	 * hit — a request that used only the path form first would have gone
+	 * straight through. rest_pre_dispatch fires after WP has normalized
+	 * both URL forms to the same route, so this closes the gap regardless
+	 * of which one an attacker uses. Gutenberg's own batch calls are always
+	 * authenticated, so requiring a logged-in user costs nothing real.
+	 */
+	public static function block_batch_route( $result, $server, $request ) {
+		if ( null !== $result || '/batch/v1' !== $request->get_route() ) {
+			return $result;
+		}
+
+		$categories = get_option( 'wpopsec_query_guard_categories', array( 'sqli', 'xss', 'traversal', 'cmdi', 'other' ) );
+		if ( ! in_array( 'other', $categories, true ) ) {
+			return $result;
+		}
+
+		if ( is_user_logged_in() ) {
+			return $result;
+		}
+
+		$ip = wpopsec_client_ip();
+		if ( '' !== $ip && wpopsec_ip_is_exempt( $ip ) ) {
+			return $result;
+		}
+
+		$mode   = get_option( 'wpopsec_query_guard_mode', 'log' );
+		$detail = 'anonymous /batch/v1 request (path: ' . substr( (string) ( $_SERVER['REQUEST_URI'] ?? '' ), 0, 200 ) . ')';
+
+		if ( 'block' !== $mode ) {
+			wpopsec_log_event( 'query-guard', 'other_wp2shell_batch_route_cve202663030', 'logged', $detail );
+			return $result;
+		}
+
+		wpopsec_log_event( 'query-guard', 'other_wp2shell_batch_route_cve202663030', 'blocked', $detail );
+
+		if ( '' !== $ip ) {
+			wpopsec_local_blocklist_add( $ip, 'query-guard: other_wp2shell_batch_route_cve202663030' );
+		}
+
+		return new WP_Error(
+			'wpopsec_batch_forbidden',
+			__( 'Authentication required.', 'wp-opsec' ),
+			array( 'status' => 401 )
+		);
 	}
 
 	/**

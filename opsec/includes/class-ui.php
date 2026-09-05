@@ -41,6 +41,7 @@ class WPOpsec_UI {
 			'rate-limiter'    => array( 'clock', 'Rate Limiter', 'Throttles requests per IP site-wide, and escalates sustained floods to the local IP blocklist.' ),
 			'geo-map'         => array( 'admin-site-alt3', 'Event Map', 'Blocked and logged events tinted on a world map by country, reusing Geo Blocker\'s dataset. Read-only — nothing here affects enforcement.' ),
 			'geo-login'       => array( 'lock', 'Geo Login', 'Restricts wp-login.php to an allow-list of countries. Your LAN, reserved space, and the trusted-networks file are always exempt, so this can\'t lock out your own network.' ),
+			'config-io'       => array( 'download', 'Import/Export', 'Back up every module\'s settings to a file, or restore them on another install — with each module optionally left out on either side.' ),
 		);
 
 		return $map[ $key ] ?? array( 'shield', 'Opsec', '' );

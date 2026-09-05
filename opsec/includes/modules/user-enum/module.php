@@ -127,17 +127,27 @@ class WPOpsec_Module_User_Enum {
 	 * telling "cherry-picking only author fields" apart from "a normal
 	 * request that happens to include one" needs more careful heuristic
 	 * design than a route allowlist, not a quick addition here.
+	 *
+	 * Was a hardcoded per-plugin list (WooCommerce, LearnDash, Tutor LMS,
+	 * Ultimate Member, bbPress, MemberPress, BuddyPress...) until real
+	 * logged traffic across multiple sites showed a single scanner blindly
+	 * fuzzing dozens more: BuddyBoss, Contact Form 7, Yoast, Google Site
+	 * Kit, Popup Maker, wp-abilities, wp-block-editor, TrustIndex — a list
+	 * can never keep up with that. Every real plugin route it actually hit
+	 * shared the same two-segment shape (namespace/vN/word), so matching
+	 * the shape generalizes to plugins not yet seen instead of waiting to
+	 * add each by name. Safe to broaden this way specifically because this
+	 * filter only ever runs for a route WP has already resolved to a real
+	 * registered callback (rest_request_before_callbacks) — the scanner's
+	 * many malformed guesses for routes nobody registered (a duplicated
+	 * ".../v1/v1/users" segment, plugins not installed on this site) 404
+	 * before ever reaching this code, so widening the shape doesn't widen
+	 * what can actually match.
 	 */
 	private static function enum_route_patterns() {
 		return array(
 			'#^/wp/v2/users(/|$)#',
-			'#^/wc/v[1-3]/customers(/|$)#',          // WooCommerce
-			'#^/ldlms/v[12]/users(/|$)#',             // LearnDash
-			'#^/tutor/v1/students(/|$)#',             // Tutor LMS
-			'#^/ultimate-member/v[12]/users(/|$)#',   // Ultimate Member
-			'#^/bbp-api/v1/users(/|$)#',               // bbPress API
-			'#^/mepr/v1/members(/|$)#',                // MemberPress
-			'#^/buddypress/v1/members(/|$)#',          // BuddyPress
+			'#^/[a-z0-9][a-z0-9_-]*/v\d+/(?:users|members|customers|students)(/|$)#i',
 		);
 	}
 
