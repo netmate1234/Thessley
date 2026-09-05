@@ -227,7 +227,7 @@ class WPOpsec_Module_Login_Guard {
 				'wpopsec_locked_out',
 				sprintf(
 					/* translators: %d: minutes remaining */
-					__( '<strong>Too many failed login attempts.</strong> Try again in %d minutes.', 'wp-opsec' ),
+					__( '<strong>Too many failed login attempts.</strong> Try again in %d minutes.', 'opsec' ),
 					$minutes
 				)
 			);
@@ -246,7 +246,7 @@ class WPOpsec_Module_Login_Guard {
 		if ( is_string( $error ) && false !== strpos( $error, 'Too many failed login attempts' ) ) {
 			return $error;
 		}
-		return __( '<strong>Error:</strong> Invalid username, email address or password.', 'wp-opsec' );
+		return __( '<strong>Error:</strong> Invalid username, email address or password.', 'opsec' );
 	}
 
 	/**

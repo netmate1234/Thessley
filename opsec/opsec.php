@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Opsec
  * Description: General security hardening plugin. Modular — each feature lives under includes/modules.
- * Version: 0.1.9
+ * Version: 1.0.0
  * Author: Martin Lundstrom
  * Text Domain: opsec
  * License: GPLv2 or later

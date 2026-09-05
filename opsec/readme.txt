@@ -4,7 +4,7 @@ Tags: security, firewall, malware, geo-blocking, brute-force
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.1.9
+Stable tag: 1.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -60,6 +60,10 @@ Each of these is either a standard security data feed or something you explicitl
 * Jetpack's published IP list (xmlrpc.php allowlist — Query Guard module)
 * Telegram Bot API — only if you enable and configure Telegram alerts yourself
 
+= Bundled third-party assets =
+
+* World map outline used by the Event Map module: [flekschas/simple-world-map](https://github.com/flekschas/simple-world-map), CC BY-SA 3.0.
+
 == Installation ==
 
 1. Upload the plugin files to `/wp-content/plugins/opsec`, or install directly through the WordPress plugins screen.
@@ -81,6 +85,11 @@ The early-request checks (IP Blocklist, Geo Blocker, Geo Login, Rate Limiter, Qu
 DB-IP's free Country Lite database (CC BY 4.0), refreshed automatically on a schedule.
 
 == Changelog ==
+
+= 1.0.0 =
+* First release prepared for the WordPress.org plugin directory.
+* Fixed a text-domain mismatch (translation strings used 'wp-opsec', the plugin header declares 'opsec').
+* Documented the bundled world-map graphic's license (CC BY-SA 3.0) alongside the existing external-services disclosures.
 
 = 0.1.9 =
 * New Import/Export tab (Other): back up or restore every module's settings as a single JSON file, with each module optionally left out on either side. API keys/tokens are included by default, with an option to leave them out.
