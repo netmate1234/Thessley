@@ -113,6 +113,7 @@ class WPOpsec_Module_Bot_Log {
 		}
 
 		global $wpdb;
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- table name only, built from $wpdb->prefix, no user input; identifiers can't be bound via $wpdb->prepare() placeholders.
 		$wpdb->query( 'TRUNCATE TABLE ' . wpopsec_bot_log_table() );
 
 		wp_safe_redirect( add_query_arg( 'cleared', '1', wp_get_referer() ) );
@@ -139,10 +140,12 @@ class WPOpsec_Module_Bot_Log {
 		$where_sql = implode( ' AND ', $where );
 
 		$count_sql = "SELECT COUNT(*) FROM {$table} WHERE {$where_sql}";
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $count_sql is a query template (table name + %s/%d placeholders only), correctly bound via $wpdb->prepare() right here; the linter can't trace a template built one line above the prepare() call.
 		$total     = (int) ( $params ? $wpdb->get_var( $wpdb->prepare( $count_sql, $params ) ) : $wpdb->get_var( $count_sql ) );
 
 		$offset   = ( $page - 1 ) * self::PER_PAGE;
 		$rows_sql = "SELECT * FROM {$table} WHERE {$where_sql} ORDER BY id DESC LIMIT %d OFFSET %d";
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- same as $count_sql above: a placeholder-only template, bound via $wpdb->prepare() right here.
 		$rows     = $wpdb->get_results( $wpdb->prepare( $rows_sql, array_merge( $params, array( self::PER_PAGE, $offset ) ) ) );
 
 		return array( 'rows' => $rows ?: array(), 'total' => $total );
@@ -165,6 +168,7 @@ class WPOpsec_Module_Bot_Log {
 		$in   = implode( ',', array_fill( 0, count( $ips ), '%s' ) );
 		$rows = $wpdb->get_col(
 			$wpdb->prepare(
+				// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- table name has no user input; {$in} is a string of bare %s placeholders (one per IP), never actual IP data -- the real values are bound below via $ips, the standard way to build a dynamic IN() clause with $wpdb->prepare().
 				"SELECT DISTINCT ip FROM " . wpopsec_events_table() . " WHERE action = 'blocked' AND ip IN ({$in})",
 				$ips
 			)

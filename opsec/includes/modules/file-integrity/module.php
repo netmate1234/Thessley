@@ -245,6 +245,7 @@ class WPOpsec_Module_File_Integrity {
 					$now
 				);
 			}
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- $values is an array of already-prepared '(%s,%s,%s,%d,%s)' fragments (see $wpdb->prepare() calls just above), each independently safe; only the table name (no user input) is otherwise interpolated.
 			$wpdb->query( "INSERT INTO {$table} (path_hash,path,file_hash,size,recorded_at) VALUES " . implode( ',', $values ) );
 		}
 

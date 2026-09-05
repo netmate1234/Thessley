@@ -33,12 +33,12 @@ class WPOpsec_IP_Blocklist_Fetcher {
 		),
 		'firehol_level1' => array(
 			'label' => 'FireHOL level1 (DShield+Spamhaus DROP+bogons+Feodo, merged, low-FP)',
-			'url'   => 'https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset',
+			'url'   => 'https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset', // phpcs:ignore PluginCheck.CodeAnalysis.Offloading.OffloadedContent -- a plain-text threat-feed URL fetched server-side (wp_remote_get) to compile a local blocklist, not a front-end JS/CSS/image asset.
 			'type'  => 'cidr_list',
 		),
 		'firehol_level2' => array(
 			'label' => 'FireHOL level2 (48h recent-attacker feed, large & volatile)',
-			'url'   => 'https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level2.netset',
+			'url'   => 'https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level2.netset', // phpcs:ignore PluginCheck.CodeAnalysis.Offloading.OffloadedContent -- same as firehol_level1 above.
 			'type'  => 'cidr_list',
 		),
 		'unwantedip_wp'  => array(
