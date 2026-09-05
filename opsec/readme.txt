@@ -4,7 +4,7 @@ Tags: security, firewall, malware, geo-blocking, brute-force
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.3
+Stable tag: 1.0.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -85,6 +85,9 @@ The early-request checks (IP Blocklist, Geo Blocker, Geo Login, Rate Limiter, Qu
 DB-IP's free Country Lite database (CC BY 4.0), refreshed automatically on a schedule.
 
 == Changelog ==
+
+= 1.0.4 =
+* Cleared Plugin Check's remaining warnings (286 -> 1, the last being an informational-only notice): settings fields now go through proper sanitizers instead of a bare trim(), a missing file-upload existence check was added, and every other finding was verified safe and documented inline.
 
 = 1.0.3 =
 * Silenced Plugin Check's remaining 19 false-positive errors (verified safe table-name/query-template SQL patterns, and server-side threat-feed URLs misidentified as front-end assets) with justified inline annotations, rather than rewriting already-safe code.
