@@ -23,18 +23,36 @@ if ( ! function_exists( 'wpopsec_query_guard_patterns' ) ) {
 			array( 'id' => 'sqli_information_schema', 'category' => 'sqli', 'regex' => '/\binformation_schema\b/i' ),
 			array( 'id' => 'sqli_extractvalue', 'category' => 'sqli', 'regex' => '/\b(extractvalue|updatexml)\s*\(/i' ),
 			array( 'id' => 'sqli_comment_injection', 'category' => 'sqli', 'regex' => '/\'\s*(--|#|\/\*)/' ),
+			// Numeric-context injection: no quote to close, just a closing
+			// paren before the boolean/comment (e.g. author_exclude's scalar
+			// bypass in CVE-2026-60137: "0) OR 1=1-- -"). sqli_comment_injection
+			// above requires a preceding quote and misses this entirely.
+			array( 'id' => 'sqli_trailing_comment_bypass', 'category' => 'sqli', 'regex' => '/\)\s*(?:--|#)/' ),
+			// Stacked query: a statement terminator followed by a second,
+			// destructive DML/DDL keyword. Legitimate query strings never
+			// contain a literal ";" followed by a SQL verb.
+			array( 'id' => 'sqli_stacked_query', 'category' => 'sqli', 'regex' => '/;\s*(?:insert|update|delete|drop|alter|create|truncate)\b/i' ),
+			array( 'id' => 'sqli_mssql_probe', 'category' => 'sqli', 'regex' => '/\b(?:waitfor\s+delay|xp_cmdshell)\b/i' ),
 
 			// Cross-site scripting
 			array( 'id' => 'xss_script_tag', 'category' => 'xss', 'regex' => '/<script[\s>\/]/i' ),
 			array( 'id' => 'xss_js_protocol', 'category' => 'xss', 'regex' => '/javascript\s*:/i' ),
 			array( 'id' => 'xss_event_handler', 'category' => 'xss', 'regex' => '/\bon(error|load|mouseover|focus|click)\s*=/i' ),
 			array( 'id' => 'xss_svg_onload', 'category' => 'xss', 'regex' => '/<svg[^>]*onload/i' ),
+			// data: URI carrying an HTML/JS payload — no "//" after the
+			// scheme, so it never matches traversal_remote_wrapper below.
+			array( 'id' => 'xss_data_uri_html', 'category' => 'xss', 'regex' => '#data:text/html#i' ),
 
 			// Path traversal / local & remote file inclusion
 			array( 'id' => 'traversal_dotdot', 'category' => 'traversal', 'regex' => '#\.\.[/\\\\]#' ),
 			array( 'id' => 'traversal_etc_passwd', 'category' => 'traversal', 'regex' => '#etc/passwd#i' ),
 			array( 'id' => 'traversal_php_wrapper', 'category' => 'traversal', 'regex' => '#php://(filter|input|memory)#i' ),
-			array( 'id' => 'traversal_remote_wrapper', 'category' => 'traversal', 'regex' => '#\b(expect|data)://#i' ),
+			// Covers expect:// and data:// (RCE / SSRF-to-code-exec wrappers),
+			// plus phar:// (PHP object-injection-via-deserialization gadget
+			// chains), zip:// and glob:// (local-file-read wrappers), and
+			// file:// (explicit scheme forcing local disk reads through a
+			// param that otherwise expects a URL).
+			array( 'id' => 'traversal_remote_wrapper', 'category' => 'traversal', 'regex' => '#\b(?:expect|data|phar|zip|glob|file)://#i' ),
 
 			// Command injection / webshell probes
 			array( 'id' => 'cmdi_shell_functions', 'category' => 'cmdi', 'regex' => '/\b(system|exec|passthru|shell_exec|proc_open|popen)\s*\(/i' ),
@@ -53,6 +71,21 @@ if ( ! function_exists( 'wpopsec_query_guard_patterns' ) ) {
 
 			// Misc
 			array( 'id' => 'other_null_byte', 'category' => 'other', 'regex' => '/%00|\x00/' ),
+			// HTTP response splitting / header injection: a raw or
+			// percent-encoded CRLF pair let an attacker smuggle extra
+			// headers or a second response into a param that gets echoed
+			// into a redirect/header. No legitimate query string needs one.
+			array( 'id' => 'other_crlf_injection', 'category' => 'other', 'regex' => '/%0d%0a|\r\n/i' ),
+			// PHP object injection: a serialized-object string handed to an
+			// unserialize() call somewhere downstream. O:/C: is the class
+			// form (gadget-chain deserialization RCE); a:/s: alone are too
+			// common in legitimate serialized data to use as signals here.
+			array( 'id' => 'other_php_object_injection', 'category' => 'other', 'regex' => '/[oOcC]:\d+:"[^"]*":\d+:\{/' ),
+			// Cloud-metadata SSRF: a param whose value is fed to
+			// wp_remote_get()/similar pointed at the cloud instance-metadata
+			// endpoint, the standard way to steal IAM credentials from a
+			// server-side request forgery bug.
+			array( 'id' => 'other_ssrf_cloud_metadata', 'category' => 'other', 'regex' => '#169\.254\.169\.254|metadata\.google\.internal#i' ),
 			// CVE-2026-76581 (CVSS 9.8): unauthenticated admin takeover in
 			// WPMU DEV Dashboard's Hub SSO. wdpsso_step1 signs an
 			// unseparated token+state+redirect+domain blob; wdpsso_step2

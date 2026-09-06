@@ -4,7 +4,7 @@ Tags: security, firewall, malware, geo-blocking, brute-force
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.4
+Stable tag: 1.0.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -85,6 +85,9 @@ The early-request checks (IP Blocklist, Geo Blocker, Geo Login, Rate Limiter, Qu
 DB-IP's free Country Lite database (CC BY 4.0), refreshed automatically on a schedule.
 
 == Changelog ==
+
+= 1.0.5 =
+* Query Guard: added signatures for SQLi numeric-context comment bypass, stacked destructive queries, MSSQL/xp_cmdshell probes, PHP object-injection payloads, CRLF/header-splitting injection, cloud-metadata SSRF probes, and data:text/html XSS; expanded the remote-wrapper signature to cover phar://, zip://, glob:// and file:// alongside expect:// and data://.
 
 = 1.0.4 =
 * Cleared Plugin Check's remaining warnings (286 -> 1, the last being an informational-only notice): settings fields now go through proper sanitizers instead of a bare trim(), a missing file-upload existence check was added, and every other finding was verified safe and documented inline.
