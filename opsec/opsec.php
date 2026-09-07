@@ -1,10 +1,10 @@
 <?php
 /**
- * Plugin Name: Opsec
+ * Plugin Name: EagleEye Opsec
  * Description: General security hardening plugin. Modular — each feature lives under includes/modules.
  * Version: 1.0.5
  * Author: Martin Lundstrom
- * Text Domain: opsec
+ * Text Domain: eagleeye-opsec
  * License: GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  */

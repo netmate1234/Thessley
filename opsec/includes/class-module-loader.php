@@ -149,8 +149,8 @@ class WPOpsec_Module_Loader {
 
 	public static function admin_menu() {
 		add_menu_page(
-			'Opsec',
-			'Opsec',
+			'EagleEye Opsec',
+			'EagleEye Opsec',
 			'manage_options',
 			'wp-opsec',
 			array( __CLASS__, 'render_dashboard' ),

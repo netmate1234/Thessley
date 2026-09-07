@@ -1,5 +1,5 @@
-=== Opsec ===
-Contributors: martinlundstrom
+=== EagleEye Opsec ===
+Contributors: martinlundstrom, opseceagleeye
 Tags: security, firewall, malware, geo-blocking, brute-force
 Requires at least: 6.0
 Tested up to: 7.1

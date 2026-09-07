@@ -203,7 +203,7 @@ class WPOpsec_Module_User_Enum {
 
 		return new WP_Error(
 			'wpopsec_rest_users_forbidden',
-			__( 'Authentication required.', 'opsec' ),
+			__( 'Authentication required.', 'eagleeye-opsec' ),
 			array( 'status' => 401 )
 		);
 	}

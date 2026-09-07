@@ -113,7 +113,7 @@ class WPOpsec_Module_Query_Guard {
 
 		return new WP_Error(
 			'wpopsec_batch_forbidden',
-			__( 'Authentication required.', 'opsec' ),
+			__( 'Authentication required.', 'eagleeye-opsec' ),
 			array( 'status' => 401 )
 		);
 	}
