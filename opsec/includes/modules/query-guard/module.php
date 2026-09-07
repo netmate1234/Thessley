@@ -192,8 +192,13 @@ class WPOpsec_Module_Query_Guard {
 		// anonymous visitor is about as unambiguous as a signal gets.
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- this is a WAF-style scanner that must inspect every anonymous POST/PUT request site-wide for malicious payloads; a real attacker will never send a valid nonce, so nonce-gating would defeat the check entirely.
 		foreach ( (array) $_FILES as $field => $file ) {
-			foreach ( (array) ( is_array( $file['name'] ?? null ) ? $file['name'] : array( $file['name'] ?? '' ) ) as $name ) {
-				if ( '' !== $name && preg_match( self::dangerous_upload_regex(), (string) $name ) ) {
+			// A multi-dimensional field name (e.g. upload[file][]) nests
+			// 'name' more than one level deep — flatten() (already used for
+			// $_POST below) handles arbitrary nesting instead of the single
+			// is_array() check this used to do, which only unwrapped one
+			// level and passed a leftover array into preg_match() otherwise.
+			foreach ( self::flatten( $file['name'] ?? '' ) as $name ) {
+				if ( '' !== $name && is_string( $name ) && preg_match( self::dangerous_upload_regex(), $name ) ) {
 					return array(
 						'id'     => 'upload_executable_ext',
 						'detail' => sprintf( 'field "%s" filename "%s"', $field, substr( (string) $name, 0, 100 ) ),

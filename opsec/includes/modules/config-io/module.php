@@ -147,13 +147,52 @@ class WPOpsec_Module_Config_IO {
 			// or mismatched module name to reach an option outside it.
 			foreach ( $registry[ $slug ] as $key ) {
 				if ( array_key_exists( $key, $values ) ) {
-					update_option( $key, $values[ $key ] );
+					update_option( $key, self::sanitize_import_value( $values[ $key ] ) );
 					$applied++;
 				}
 			}
 		}
 
 		self::redirect_back( array( 'cio_imported' => $applied ) );
+	}
+
+	/**
+	 * A JSON import file is untrusted input, same as any other request body —
+	 * the old code passed each value straight to update_option() with no
+	 * validation, so a crafted file could store an arbitrary type against a
+	 * boolean/int toggle, or unsafe markup into a string option (e.g. the
+	 * CSP policy text, which headers/module.php later echoes into a real
+	 * response header). This doesn't re-derive each module's own business
+	 * rules (valid country codes, known category slugs, etc. — those still
+	 * get re-validated the next time that module's own settings form is
+	 * saved) — it only guarantees every value reaching update_option() here
+	 * is one of the plain scalar/array shapes these options ever actually
+	 * use, with string content run through the same tag-stripping every
+	 * other text input in this plugin gets.
+	 */
+	private static function sanitize_import_value( $value, $depth = 0 ) {
+		if ( $depth > 6 ) {
+			return null;
+		}
+		if ( is_bool( $value ) ) {
+			return $value;
+		}
+		if ( is_int( $value ) || is_float( $value ) ) {
+			return $value;
+		}
+		if ( is_string( $value ) ) {
+			return sanitize_text_field( $value );
+		}
+		if ( is_array( $value ) ) {
+			$out = array();
+			foreach ( $value as $k => $v ) {
+				$out[ is_string( $k ) ? sanitize_text_field( $k ) : (int) $k ] = self::sanitize_import_value( $v, $depth + 1 );
+			}
+			return $out;
+		}
+		// null, or anything else JSON can't actually produce via json_decode()
+		// with assoc=true (no objects survive that) — nothing left to keep.
+		return null;
 	}
 
 	private static function redirect_back( array $args ) {

@@ -332,23 +332,28 @@ class WPOpsec_Module_Event_Log {
 				<input type="checkbox" id="wpopsec-el-autorefresh"> Auto-refresh every 30s
 			</label>
 		</div>
-		<script>
-		(function () {
-			var cb  = document.getElementById( 'wpopsec-el-autorefresh' );
-			var key = 'wpopsec_el_autorefresh';
-			var timer = null;
-			function schedule() {
-				if ( timer ) { clearTimeout( timer ); }
-				timer = setTimeout( function () { location.reload(); }, 30000 );
-			}
-			try { cb.checked = localStorage.getItem( key ) === '1'; } catch ( e ) {}
-			if ( cb.checked ) { schedule(); }
-			cb.addEventListener( 'change', function () {
-				try { localStorage.setItem( key, cb.checked ? '1' : '0' ); } catch ( e ) {}
-				if ( cb.checked ) { schedule(); } else if ( timer ) { clearTimeout( timer ); }
-			} );
-		})();
-		</script>
+		<?php
+		wp_register_script( 'wpopsec-event-log', false, array(), WPOPSEC_VERSION, true );
+		wp_enqueue_script( 'wpopsec-event-log' );
+		wp_add_inline_script(
+			'wpopsec-event-log',
+			"(function () {
+				var cb  = document.getElementById( 'wpopsec-el-autorefresh' );
+				var key = 'wpopsec_el_autorefresh';
+				var timer = null;
+				function schedule() {
+					if ( timer ) { clearTimeout( timer ); }
+					timer = setTimeout( function () { location.reload(); }, 30000 );
+				}
+				try { cb.checked = localStorage.getItem( key ) === '1'; } catch ( e ) {}
+				if ( cb.checked ) { schedule(); }
+				cb.addEventListener( 'change', function () {
+					try { localStorage.setItem( key, cb.checked ? '1' : '0' ); } catch ( e ) {}
+					if ( cb.checked ) { schedule(); } else if ( timer ) { clearTimeout( timer ); }
+				} );
+			})();"
+		);
+		?>
 
 		<table class="wpopsec-table">
 			<thead>

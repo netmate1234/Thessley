@@ -106,6 +106,7 @@ class WPOpsec_Module_Loader {
 		}
 
 		add_action( 'admin_menu', array( __CLASS__, 'admin_menu' ), 5 );
+		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_assets' ) );
 		WPOpsec_Menu_Router::register();
 
 		foreach ( self::$modules as $module => $class ) {
@@ -156,6 +157,28 @@ class WPOpsec_Module_Loader {
 			array( __CLASS__, 'render_dashboard' ),
 			'dashicons-shield'
 		);
+	}
+
+	/**
+	 * Every Opsec admin page's hook suffix contains "wp-opsec" — the
+	 * top-level page is "toplevel_page_wp-opsec", every cluster submenu
+	 * (registered by WPOpsec_Menu_Router against the "wp-opsec" parent) is
+	 * "wp-opsec_page_wp-opsec-<cluster>". Enqueued unconditionally across
+	 * all of them, one bundle covering every module's admin UI, rather than
+	 * detecting which of the tabs within a cluster page is active: none of
+	 * this CSS varies by request, and the combined size is trivial.
+	 *
+	 * Must run at admin_enqueue_scripts — by the time a page's own render
+	 * callback runs, wp-admin has already printed admin_print_styles() into
+	 * <head>, so a style enqueued any later would silently never appear.
+	 */
+	public static function enqueue_assets( $hook ) {
+		if ( false === strpos( (string) $hook, 'wp-opsec' ) ) {
+			return;
+		}
+		wp_enqueue_style( 'wpopsec-admin', WPOPSEC_PLUGIN_URL . 'assets/admin.css', array(), WPOPSEC_VERSION );
+		wp_enqueue_style( 'wpopsec-dashboard', WPOPSEC_PLUGIN_URL . 'assets/dashboard.css', array( 'wpopsec-admin' ), WPOPSEC_VERSION );
+		wp_enqueue_style( 'wpopsec-geo-map', WPOPSEC_PLUGIN_URL . 'assets/geo-map.css', array(), WPOPSEC_VERSION );
 	}
 
 	/**
@@ -513,14 +536,14 @@ class WPOpsec_Module_Loader {
 			)
 		);
 
-		// Shared tokens/components first, then the dashboard-only additions.
-		WPOpsec_UI::styles();
-		self::dashboard_styles();
+		// CSS is enqueued externally via enqueue_assets() (admin_enqueue_scripts),
+		// not printed here — by the time this callback runs, wp-admin's <head>
+		// has already been sent.
 		?>
 		<div class="wrap wpopsec wpopsec-dash">
 			<h1 class="wpopsec-title">
 				<img src="<?php echo esc_attr( self::logo_data_uri() ); ?>" alt="" width="30" height="30">
-				Opsec
+				EagleEye Opsec
 			</h1>
 
 			<div class="wpopsec-hero">
@@ -718,134 +741,6 @@ class WPOpsec_Module_Loader {
 				</table>
 			<?php endif; ?>
 		</div>
-		<?php
-	}
-
-	/**
-	 * Inline so the dashboard has no external asset dependency — it stays
-	 * readable even if the site enforces a strict CSP or blocks outside
-	 * requests. Dashicons ship with WordPress admin, so no icon font is
-	 * fetched either.
-	 */
-	private static function dashboard_styles() {
-		?>
-		<style>
-		/* Tokens come from WPOpsec_UI::styles(); only dashboard-specific bits below. */
-		.wpopsec-dash .wpopsec-title { display:flex; align-items:center; gap:10px; font-size:23px; margin-bottom:18px; }
-		.wpopsec-dash .wpopsec-title .dashicons { font-size:30px; width:30px; height:30px; color:#2271b1; }
-
-		.wpopsec-hero { display:flex; flex-wrap:wrap; gap:26px; align-items:center;
-			background:var(--card); border:1px solid var(--line); border-radius:10px;
-			padding:20px 24px; margin-bottom:16px; }
-
-		.wpopsec-score { display:flex; flex-direction:column; align-items:center; gap:6px; }
-		.wpopsec-score__ring { --pct:0; width:104px; height:104px; border-radius:50%;
-			display:grid; place-items:center;
-			background:conic-gradient(var(--ring) calc(var(--pct)*1%), #e9eaec 0); }
-		.wpopsec-score--good .wpopsec-score__ring { --ring:var(--ok); }
-		.wpopsec-score--warn .wpopsec-score__ring { --ring:var(--warn); }
-		.wpopsec-score--bad  .wpopsec-score__ring { --ring:var(--bad); }
-		.wpopsec-score__num { width:82px; height:82px; border-radius:50%; background:var(--card);
-			display:grid; place-items:center; font-size:25px; font-weight:600; color:var(--ink); }
-		.wpopsec-score__num span { font-size:13px; font-weight:400; color:var(--muted); }
-		.wpopsec-score__label { font-size:12px; font-weight:600; text-transform:uppercase;
-			letter-spacing:.6px; color:var(--muted); }
-
-		.wpopsec-hero__stats { display:flex; flex-wrap:wrap; gap:22px; align-items:center; flex:1; }
-		.wpopsec-stat { display:flex; align-items:center; gap:10px; }
-		.wpopsec-stat .dashicons { font-size:22px; width:22px; height:22px; color:var(--muted); }
-		.wpopsec-stat--bad .dashicons { color:var(--bad); }
-		.wpopsec-stat--warn .dashicons { color:var(--warn); }
-		.wpopsec-stat strong { display:block; font-size:21px; line-height:1.15; color:var(--ink); }
-		.wpopsec-stat span:last-child { font-size:12px; color:var(--muted); }
-
-		.wpopsec-spark { display:flex; align-items:flex-end; gap:4px; height:50px;
-			margin-left:auto; padding-left:16px; border-left:1px solid var(--line); }
-		.wpopsec-spark__bar { width:11px; background:#c3c4c7; border-radius:2px 2px 0 0; cursor:default; }
-		.wpopsec-spark__bar:hover { background:#2271b1; }
-
-		.wpopsec-attention { display:flex; gap:10px; align-items:flex-start;
-			background:#f0f6fc; border:1px solid #c5d9ed; border-left:4px solid var(--blue);
-			border-radius:6px; padding:12px 14px; margin-bottom:20px; }
-		.wpopsec-attention .dashicons { color:var(--blue); }
-		.wpopsec-attention a { text-decoration:none; }
-		.wpopsec-attention em { color:var(--muted); font-style:normal; font-size:12px; }
-
-		.wpopsec-protect { border-radius:8px; padding:16px 18px; margin-bottom:16px; }
-		.wpopsec-protect--bad { background:#fdeaf1; border:1px solid #f3c2d2; border-left:4px solid var(--bad); }
-		.wpopsec-protect--good { background:#edf7f2; border:1px solid #b6e0cb; border-left:4px solid var(--ok); }
-		.wpopsec-protect__head { display:flex; gap:12px; align-items:flex-start; }
-		.wpopsec-protect__head .dashicons { font-size:24px; width:24px; height:24px; margin-top:1px; }
-		.wpopsec-protect--bad .wpopsec-protect__head .dashicons { color:var(--bad); }
-		.wpopsec-protect--good .wpopsec-protect__head .dashicons { color:var(--ok); }
-		.wpopsec-protect__head strong { display:block; font-size:15px; color:var(--ink); }
-		.wpopsec-protect__head span { font-size:13px; color:var(--muted); }
-		.wpopsec-protect__list { list-style:none; margin:12px 0 0; padding:0;
-			display:grid; gap:6px; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); }
-		.wpopsec-protect__list a { display:flex; align-items:center; gap:6px; text-decoration:none;
-			background:var(--card); border:1px solid var(--line); border-radius:6px;
-			padding:8px 10px; font-size:13px; color:var(--ink); }
-		.wpopsec-protect__list a:hover { border-color:var(--bad); }
-		.wpopsec-protect__list .dashicons { font-size:15px; width:15px; height:15px; color:var(--bad); flex:none; }
-		.wpopsec-protect__list em { margin-left:auto; font-style:normal; font-size:11px; color:var(--muted); white-space:nowrap; }
-
-		.wpopsec-h2 { display:flex; align-items:baseline; gap:12px; font-size:15px;
-			text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin:24px 0 12px; }
-		.wpopsec-h2__link { margin-left:auto; font-size:13px; text-transform:none;
-			letter-spacing:0; text-decoration:none; }
-
-		.wpopsec-grid { display:grid; gap:14px;
-			grid-template-columns:repeat(auto-fill, minmax(232px, 1fr)); }
-		.wpopsec-card { display:block; background:var(--card); border:1px solid var(--line);
-			border-top:3px solid var(--accent, #c3c4c7); border-radius:8px; padding:14px 16px;
-			text-decoration:none; color:inherit; transition:box-shadow .15s, transform .15s; }
-		.wpopsec-card:hover { box-shadow:0 3px 12px rgba(0,0,0,.09); transform:translateY(-1px); }
-		.wpopsec-card--good { --accent:var(--ok); }
-		.wpopsec-card--warn { --accent:var(--warn); }
-		.wpopsec-card--bad  { --accent:var(--bad); }
-		.wpopsec-card__top { display:flex; align-items:center; gap:8px; margin-bottom:9px; }
-		.wpopsec-card__icon { font-size:19px; width:19px; height:19px; color:var(--accent, #646970); }
-		.wpopsec-card__title { font-weight:600; font-size:14px; color:var(--ink); }
-		.wpopsec-card__note { font-size:12px; color:var(--muted); margin-top:7px; }
-		.wpopsec-sevdot { margin-left:auto; display:inline-grid; place-items:center; min-width:22px;
-			height:20px; padding:0 5px; border-radius:4px; color:#fff; font-size:11px;
-			font-weight:700; font-variant-numeric:tabular-nums; }
-		.wpopsec-card__foot { margin-top:11px; display:flex; gap:6px; flex-wrap:wrap; }
-
-		.wpopsec-pill { display:inline-block; font-size:12px; font-weight:600; padding:3px 9px;
-			border-radius:11px; background:#f0f0f1; color:var(--ink); }
-		.wpopsec-card--good .wpopsec-pill { background:#e5f5ee; color:var(--ok); }
-		.wpopsec-card--warn .wpopsec-pill { background:#fcf3e3; color:var(--warn); }
-		.wpopsec-card--bad  .wpopsec-pill { background:#fdeaf1; color:var(--bad); }
-
-		.wpopsec-chip { display:inline-block; font-size:11px; padding:2px 7px; border-radius:9px;
-			background:#f0f0f1; color:var(--muted); }
-		.wpopsec-chip--bad { background:#fdeaf1; color:var(--bad); font-weight:600; }
-		.wpopsec-chip--warn { background:#fcf3e3; color:var(--warn); font-weight:600; }
-		.wpopsec-chip--quiet { background:transparent; color:#8c8f94; padding-left:0; }
-
-		.wpopsec-table { width:100%; border-collapse:separate; border-spacing:0;
-			background:var(--card); border:1px solid var(--line); border-radius:8px; overflow:hidden; }
-		.wpopsec-table th { text-align:left; font-size:11px; text-transform:uppercase;
-			letter-spacing:.5px; color:var(--muted); padding:9px 12px;
-			background:var(--bg); border-bottom:1px solid var(--line); }
-		.wpopsec-table td { padding:9px 12px; border-bottom:1px solid #f0f0f1; font-size:13px;
-			vertical-align:middle; }
-		.wpopsec-table tr:last-child td { border-bottom:0; }
-		.wpopsec-table tbody tr:hover { background:#fafafa; }
-		.wpopsec-table code { font-size:12px; background:#f6f7f7; padding:1px 5px; border-radius:3px; }
-		.wpopsec-nowrap { white-space:nowrap; }
-		.wpopsec-detail { color:var(--muted); font-size:12px; word-break:break-word; }
-		.wpopsec-mod { font-size:12px; font-weight:600; color:#2271b1; }
-
-		.wpopsec-empty { text-align:center; padding:34px; background:var(--card);
-			border:1px dashed var(--line); border-radius:8px; color:var(--muted); }
-		.wpopsec-empty .dashicons { font-size:30px; width:30px; height:30px; color:var(--ok); }
-
-		@media screen and (max-width:782px) {
-			.wpopsec-spark { margin-left:0; border-left:0; padding-left:0; }
-		}
-		</style>
 		<?php
 	}
 

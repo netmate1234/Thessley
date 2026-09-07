@@ -227,7 +227,8 @@ class WPOpsec_Module_Scan_All {
 			</table>
 		<?php WPOpsec_UI::section_end(); ?>
 
-		<script>
+		<?php
+		$wpopsec_sa_js = <<<'JS'
 		(function () {
 			var form = document.getElementById( 'wpopsec-sa-form' );
 			var btn  = document.getElementById( 'wpopsec-sa-button' );
@@ -236,9 +237,9 @@ class WPOpsec_Module_Scan_All {
 				return; // no JS / no fetch: form still submits normally, admin_post handles it
 			}
 
-			var slugs = <?php echo wp_json_encode( array_keys( self::scans() ) ); ?>;
+			var slugs = __WPOPSEC_SA_SLUGS__;
 			var nonce = form.querySelector( 'input[name="_wpnonce"]' ).value;
-			var ajaxUrl = '<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>';
+			var ajaxUrl = '__WPOPSEC_SA_AJAX_URL__';
 
 			function setRowRunning( slug ) {
 				var row = document.querySelector( '[data-wpopsec-sa-slug="' + slug + '"]' );
@@ -301,8 +302,18 @@ class WPOpsec_Module_Scan_All {
 				} );
 			} );
 		})();
-		</script>
-		<?php
+		JS;
+
+		$wpopsec_sa_js = str_replace(
+			array( '__WPOPSEC_SA_SLUGS__', '__WPOPSEC_SA_AJAX_URL__' ),
+			array( wp_json_encode( array_keys( self::scans() ) ), esc_url( admin_url( 'admin-ajax.php' ) ) ),
+			$wpopsec_sa_js
+		);
+
+		wp_register_script( 'wpopsec-scan-all', false, array(), WPOPSEC_VERSION, true );
+		wp_enqueue_script( 'wpopsec-scan-all' );
+		wp_add_inline_script( 'wpopsec-scan-all', $wpopsec_sa_js );
+
 		WPOpsec_UI::close();
 	}
 }

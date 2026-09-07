@@ -186,41 +186,29 @@ class WPOpsec_Module_Geo_Map {
 
 		<p class="wpopsec-help">Country resolution reuses the Geo Blocker module's dataset (DB-IP Country Lite, CC BY 4.0) — enable that module at least once for this map to have data. Map graphic: <a href="https://github.com/flekschas/simple-world-map" target="_blank" rel="noopener">flekschas/simple-world-map</a>, CC BY-SA 3.0.</p>
 
-		<style>
-		.wpopsec-geo-map-wrap { max-width:100%; overflow-x:auto; }
-		.wpopsec-geo-map-wrap svg { width:100%; height:auto; max-height:520px; }
-		.wpopsec-geo-map-wrap svg path { fill:#e2e4e8; stroke:#fff; stroke-width:0.4; }
-		<?php foreach ( self::BUCKET_COLORS as $i => $color ) : ?>
-		<?php /* Some countries (US, CA, AU, JP, GB, ...) are a <g id="xx"> wrapping several
-		unlabelled <path> children rather than a single <path id="xx">, so the class lands on
-		the <g> — the descendant selector is what actually reaches those child shapes; the
-		plain "path.wpopsec-geo-bN" selector alone only covers the single-shape countries. */ ?>
-		.wpopsec-geo-map-wrap svg path.wpopsec-geo-b<?php echo (int) $i; ?>,
-		.wpopsec-geo-map-wrap svg g.wpopsec-geo-b<?php echo (int) $i; ?> path { fill:<?php echo esc_html( $color ); ?>; cursor:pointer; }
-		<?php endforeach; ?>
-		.wpopsec-geo-map-wrap svg path.wpopsec-geo-hit:hover,
-		.wpopsec-geo-map-wrap svg g.wpopsec-geo-hit:hover path { stroke:#1d2327; stroke-width:1.2; }
-		.wpopsec-geo-tip { position:fixed; display:none; pointer-events:none; z-index:9999;
-			background:#1d2327; color:#fff; font-size:12px; padding:5px 9px; border-radius:5px;
-			box-shadow:0 2px 8px rgba(0,0,0,.25); white-space:nowrap; }
-		</style>
-		<script>
-		(function () {
-			var wrap = document.querySelector( '.wpopsec-geo-map-wrap' );
-			var tip  = document.getElementById( 'wpopsec-geo-tip' );
-			if ( ! wrap || ! tip ) { return; }
-			wrap.addEventListener( 'mousemove', function ( e ) {
-				var el = e.target.closest ? e.target.closest( '.wpopsec-geo-hit' ) : null;
-				if ( ! el ) { tip.style.display = 'none'; return; }
-				tip.textContent = el.getAttribute( 'data-country' ) + ': ' + el.getAttribute( 'data-count' ) + ' event(s)';
-				tip.style.left = ( e.clientX + 14 ) + 'px';
-				tip.style.top  = ( e.clientY + 14 ) + 'px';
-				tip.style.display = 'block';
-			} );
-			wrap.addEventListener( 'mouseleave', function () { tip.style.display = 'none'; } );
-		})();
-		</script>
 		<?php
+		// Styling (assets/geo-map.css, enqueued by WPOpsec_Module_Loader::
+		// enqueue_assets()) hardcodes BUCKET_COLORS' 5 values directly —
+		// keep the two in sync if BUCKET_COLORS above is ever changed.
+		wp_register_script( 'wpopsec-geo-map', false, array(), WPOPSEC_VERSION, true );
+		wp_enqueue_script( 'wpopsec-geo-map' );
+		wp_add_inline_script(
+			'wpopsec-geo-map',
+			"(function () {
+				var wrap = document.querySelector( '.wpopsec-geo-map-wrap' );
+				var tip  = document.getElementById( 'wpopsec-geo-tip' );
+				if ( ! wrap || ! tip ) { return; }
+				wrap.addEventListener( 'mousemove', function ( e ) {
+					var el = e.target.closest ? e.target.closest( '.wpopsec-geo-hit' ) : null;
+					if ( ! el ) { tip.style.display = 'none'; return; }
+					tip.textContent = el.getAttribute( 'data-country' ) + ': ' + el.getAttribute( 'data-count' ) + ' event(s)';
+					tip.style.left = ( e.clientX + 14 ) + 'px';
+					tip.style.top  = ( e.clientY + 14 ) + 'px';
+					tip.style.display = 'block';
+				} );
+				wrap.addEventListener( 'mouseleave', function () { tip.style.display = 'none'; } );
+			})();"
+		);
 		WPOpsec_UI::close();
 	}
 }

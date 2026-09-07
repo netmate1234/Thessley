@@ -198,9 +198,14 @@ class WPOpsec_Module_File_Integrity {
 		return 0 === strpos( $absolute, $abs ) ? substr( $absolute, strlen( $abs ) ) : $absolute;
 	}
 
-	/** Roots may be relative to ABSPATH or absolute (wp-content moved out). */
+	/**
+	 * Roots may be relative to ABSPATH or absolute (wp-content moved out).
+	 * path_is_absolute() (WP core) recognizes Windows drive-letter and UNC
+	 * paths too — a leading-"/" check alone misses "C:\content" and treats
+	 * it as ABSPATH-relative.
+	 */
 	private static function root_to_dir( $root ) {
-		return ( '/' === substr( $root, 0, 1 ) ) ? $root : trailingslashit( ABSPATH ) . $root;
+		return path_is_absolute( $root ) ? $root : trailingslashit( ABSPATH ) . $root;
 	}
 
 	private static function file_info( $path ) {

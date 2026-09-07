@@ -50,16 +50,6 @@ Opsec is a modular security plugin. Each feature is a self-contained module you 
 * **Auto Updates** — per-plugin auto-update control, including a "flagged only" mode driven by the Vulnerability Scan's findings.
 * **Alerts** — a real-time Telegram message and/or email when an event crosses a severity threshold you set, independently per channel.
 
-= External services this plugin can connect to =
-
-Each of these is either a standard security data feed or something you explicitly opt into — nothing is contacted without the relevant module being active:
-
-* CINS Army, DShield, Spamhaus DROP, FireHOL (IP reputation feeds — IP Blocklist module)
-* DB-IP.com Country Lite dataset, CC BY 4.0 (Geo Blocker / Geo Login modules)
-* api.wordpress.org (core checksum verification — File Integrity module)
-* Jetpack's published IP list (xmlrpc.php allowlist — Query Guard module)
-* Telegram Bot API — only if you enable and configure Telegram alerts yourself
-
 = Bundled third-party assets =
 
 * World map outline used by the Event Map module: [flekschas/simple-world-map](https://github.com/flekschas/simple-world-map), CC BY-SA 3.0.
@@ -83,6 +73,29 @@ The early-request checks (IP Blocklist, Geo Blocker, Geo Login, Rate Limiter, Qu
 = Where does the geo data come from? =
 
 DB-IP's free Country Lite database (CC BY 4.0), refreshed automatically on a schedule.
+
+== External services ==
+
+This plugin can connect to several third-party services to power its blocking, geolocation, vulnerability-lookup, and alerting features. Each one is only ever contacted while the module that owns it is active; CINS Army and SANS DShield are the only two enabled by default (IP Blocklist's starting feed selection) — everything else requires the site admin to explicitly enable a toggle or enter credentials first.
+
+**IP-reputation feeds (IP Blocklist module)** — plain-text lists of malicious IPs/ranges, fetched periodically and compiled into a local blocklist. Nothing about this site or its visitors is sent to any of these; each is a single anonymous HTTP GET for a public text file.
+
+* CINS Army list (enabled by default): `https://cinsscore.com/list/ci-badguys.txt`. This is a static public feed with no dedicated Terms/Privacy page; project info: https://cinsscore.com/
+* SANS DShield block list (enabled by default): `https://feeds.dshield.org/block.txt`, operated by the SANS Internet Storm Center. About: https://www.dshield.org/about.html — Privacy: https://www.dshield.org/privacy.html
+* Spamhaus DROP (opt-in): `https://www.spamhaus.org/drop/drop.txt`. Fair Use Policy: https://www.spamhaus.org/blocklists/drop-fair-use-policy/ — Terms: https://www.spamhaus.org/terms-conditions/ — Privacy: https://www.spamhaus.org/privacy-notice/
+* FireHOL blocklist-ipsets levels 1 & 2, and the ET Tor exit-node list (opt-in): hosted on GitHub at `raw.githubusercontent.com/firehol/blocklist-ipsets`. GitHub Terms: https://docs.github.com/en/site-policy/github-terms/github-terms-of-service — GitHub Privacy Statement: https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement
+
+**DB-IP Country Lite (Geo Blocker / Geo Login modules)** — a compiled IP-to-country dataset, downloaded on a weekly schedule and looked up locally; no per-visitor data is ever sent to DB-IP. Used whenever Geo Blocker or Geo Login is enabled. Source: https://db-ip.com — Privacy: https://db-ip.com/privacy.php. Dataset licensed CC BY 4.0: https://creativecommons.org/licenses/by/4.0/
+
+**api.wordpress.org (File Integrity module)** — fetches WordPress core's official published checksums to compare against this site's core files. No data about this site is sent. Privacy: https://wordpress.org/about/privacy/
+
+**Jetpack IP list (Query Guard module, opt-in)** — fetches Automattic's published Jetpack IP range list (`https://jetpack.com/ips-v4.txt`) so xmlrpc.php requests genuinely originating from Jetpack's own servers can be exempted from blocking. No data is sent beyond the request for the list itself. Automattic Terms: https://automattic.com/tos/ — Privacy: https://automattic.com/privacy/
+
+**WPScan API (Vulnerability Scan module, opt-in — requires a free WPScan API token you provide)** — looks up known CVEs for the plugins/themes installed on this site. Sends: the slug of each installed plugin/theme being checked, and your WPScan API token, once per plugin/theme per 24 hours (results are cached). WPScan Terms: https://wpscan.com/terms/ — Automattic Privacy: https://automattic.com/privacy/
+
+**Telegram Bot API (Alerts module, opt-in — requires a bot token and chat ID you provide)** — sends a message to a Telegram chat you control when a security event crosses the severity threshold you configure. Sends: the alert text (module, event type, severity, source IP) to api.telegram.org, only at the moment a qualifying alert fires. Telegram Terms: https://telegram.org/tos — Privacy: https://telegram.org/privacy
+
+**unwantedip.eagleeye-intelligence.com (IP Sharing module, opt-in — requires an API key you request)** — a self-hosted IP-reputation tracker run by this plugin's author, shared across sites that opt in. Sends: the blocked IP address, an event category, and a severity label, only when this site actually blocks a request (rate-limited to at most once per IP per hour). The same service can optionally be read back as an additional IP-reputation feed in IP Blocklist (`https://unwantedip.eagleeye-intelligence.com/api/v1/feed/wordpress`), which sends nothing — it's a read-only fetch. A dedicated Terms/Privacy page for this service is in progress.
 
 == Changelog ==
 
