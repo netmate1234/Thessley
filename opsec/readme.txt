@@ -12,7 +12,7 @@ Modular WordPress security hardening — IP/country blocking, request inspection
 
 == Description ==
 
-Opsec is a modular security plugin. Each feature is a self-contained module you can enable, configure, and put into log-only or enforcing mode independently — nothing is all-or-nothing.
+ShieldCore Security is a modular security plugin. Each feature is a self-contained module you can enable, configure, and put into log-only or enforcing mode independently — nothing is all-or-nothing.
 
 **Perimeter**
 
@@ -56,7 +56,7 @@ Opsec is a modular security plugin. Each feature is a self-contained module you 
 
 == Installation ==
 
-1. Upload the plugin files to `/wp-content/plugins/opsec`, or install directly through the WordPress plugins screen.
+1. Upload the plugin files to `/wp-content/plugins/shieldcore-security`, or install directly through the WordPress plugins screen.
 2. Activate the plugin.
 3. Each module starts in log-only mode where applicable — review the Event Log for a few days before switching any module to Block.
 

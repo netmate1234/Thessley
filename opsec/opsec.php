@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SHIELDCORE_VERSION', '0.1.1' );
+define( 'SHIELDCORE_VERSION', '1.0.7' );
 define( 'SHIELDCORE_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SHIELDCORE_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'SHIELDCORE_MU_SOURCE', SHIELDCORE_PLUGIN_DIR . 'mu-loader/wp-shieldcore-early.php' );
