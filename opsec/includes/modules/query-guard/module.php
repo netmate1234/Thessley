@@ -3,7 +3,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class WPOpsec_Module_Query_Guard {
+class ShieldCore_Module_Query_Guard {
 
 	const CATEGORIES = array(
 		'sqli'      => 'SQL injection',
@@ -14,10 +14,10 @@ class WPOpsec_Module_Query_Guard {
 	);
 
 	const JETPACK_IP_SOURCE = 'https://jetpack.com/ips-v4.txt';
-	const XMLRPC_CRON_HOOK  = 'wpopsec_qg_xmlrpc_allow_refresh';
+	const XMLRPC_CRON_HOOK  = 'shieldcore_qg_xmlrpc_allow_refresh';
 
 	public static function check_dest() {
-		return WPOPSEC_CHECKS_DIR . '/query-guard.php';
+		return SHIELDCORE_CHECKS_DIR . '/query-guard.php';
 	}
 
 	public static function activate() {
@@ -33,15 +33,15 @@ class WPOpsec_Module_Query_Guard {
 		wp_clear_scheduled_hook( self::XMLRPC_CRON_HOOK );
 
 		if ( file_exists( self::check_dest() ) ) {
-			WPOpsec_Module_Loader::filesystem()->delete( self::check_dest() );
+			ShieldCore_Module_Loader::filesystem()->delete( self::check_dest() );
 		}
 	}
 
 	public static function register() {
 		self::deploy_check_file();
 
-		add_action( 'admin_post_wpopsec_qg_save_settings', array( __CLASS__, 'handle_save_settings' ) );
-		add_action( 'admin_post_wpopsec_qg_refresh_xmlrpc_allow', array( __CLASS__, 'handle_refresh_xmlrpc_allow' ) );
+		add_action( 'admin_post_shieldcore_qg_save_settings', array( __CLASS__, 'handle_save_settings' ) );
+		add_action( 'admin_post_shieldcore_qg_refresh_xmlrpc_allow', array( __CLASS__, 'handle_refresh_xmlrpc_allow' ) );
 		add_action( self::XMLRPC_CRON_HOOK, array( __CLASS__, 'refresh_xmlrpc_allowlist' ) );
 
 		// POST scanning can't run in the early gate: it needs
@@ -51,7 +51,7 @@ class WPOpsec_Module_Query_Guard {
 		// callback added there would be scheduled at a priority that has
 		// already passed and would silently never run. `init` still fires
 		// before request routing, admin-ajax handlers and REST dispatch.
-		if ( get_option( 'wpopsec_query_guard_scan_post', true ) ) {
+		if ( get_option( 'shieldcore_query_guard_scan_post', true ) ) {
 			add_action( 'init', array( __CLASS__, 'scan_request_body' ), 0 );
 		}
 
@@ -82,7 +82,7 @@ class WPOpsec_Module_Query_Guard {
 			return $result;
 		}
 
-		$categories = get_option( 'wpopsec_query_guard_categories', array( 'sqli', 'xss', 'traversal', 'cmdi', 'other' ) );
+		$categories = get_option( 'shieldcore_query_guard_categories', array( 'sqli', 'xss', 'traversal', 'cmdi', 'other' ) );
 		if ( ! in_array( 'other', $categories, true ) ) {
 			return $result;
 		}
@@ -91,28 +91,28 @@ class WPOpsec_Module_Query_Guard {
 			return $result;
 		}
 
-		$ip = wpopsec_client_ip();
-		if ( '' !== $ip && wpopsec_ip_is_exempt( $ip ) ) {
+		$ip = shieldcore_client_ip();
+		if ( '' !== $ip && shieldcore_ip_is_exempt( $ip ) ) {
 			return $result;
 		}
 
-		$mode   = get_option( 'wpopsec_query_guard_mode', 'log' );
+		$mode   = get_option( 'shieldcore_query_guard_mode', 'log' );
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- diagnostic text only (truncated to 200 chars, stored in the event log), not used for any security decision or re-output as HTML.
 		$detail = 'anonymous /batch/v1 request (path: ' . substr( (string) wp_unslash( $_SERVER['REQUEST_URI'] ?? '' ), 0, 200 ) . ')';
 
 		if ( 'block' !== $mode ) {
-			wpopsec_log_event( 'query-guard', 'other_wp2shell_batch_route_cve202663030', 'logged', $detail );
+			shieldcore_log_event( 'query-guard', 'other_wp2shell_batch_route_cve202663030', 'logged', $detail );
 			return $result;
 		}
 
-		wpopsec_log_event( 'query-guard', 'other_wp2shell_batch_route_cve202663030', 'blocked', $detail );
+		shieldcore_log_event( 'query-guard', 'other_wp2shell_batch_route_cve202663030', 'blocked', $detail );
 
 		if ( '' !== $ip ) {
-			wpopsec_local_blocklist_add( $ip, 'query-guard: other_wp2shell_batch_route_cve202663030' );
+			shieldcore_local_blocklist_add( $ip, 'query-guard: other_wp2shell_batch_route_cve202663030' );
 		}
 
 		return new WP_Error(
-			'wpopsec_batch_forbidden',
+			'shieldcore_batch_forbidden',
 			__( 'Authentication required.', 'shieldcore-security' ),
 			array( 'status' => 401 )
 		);
@@ -147,8 +147,8 @@ class WPOpsec_Module_Query_Guard {
 			return;
 		}
 
-		$ip = wpopsec_client_ip();
-		if ( '' !== $ip && wpopsec_ip_is_exempt( $ip ) ) {
+		$ip = shieldcore_client_ip();
+		if ( '' !== $ip && shieldcore_ip_is_exempt( $ip ) ) {
 			return;
 		}
 
@@ -157,7 +157,7 @@ class WPOpsec_Module_Query_Guard {
 		// where the bulk of exploitable plugin bugs are actually reached, so
 		// that's the default scope. Checked with a real cookie validation,
 		// not just cookie presence, so a forged cookie can't opt out of it.
-		if ( 'all' !== get_option( 'wpopsec_query_guard_post_scope', 'anon' ) ) {
+		if ( 'all' !== get_option( 'shieldcore_query_guard_post_scope', 'anon' ) ) {
 			if ( is_user_logged_in() ) {
 				return;
 			}
@@ -168,17 +168,17 @@ class WPOpsec_Module_Query_Guard {
 			return;
 		}
 
-		$mode = get_option( 'wpopsec_query_guard_mode', 'log' );
+		$mode = get_option( 'shieldcore_query_guard_mode', 'log' );
 
 		if ( 'block' !== $mode ) {
-			wpopsec_log_event( 'query-guard', $hit['id'], 'logged', $hit['detail'] );
+			shieldcore_log_event( 'query-guard', $hit['id'], 'logged', $hit['detail'] );
 			return;
 		}
 
-		wpopsec_log_event( 'query-guard', $hit['id'], 'blocked', $hit['detail'] );
+		shieldcore_log_event( 'query-guard', $hit['id'], 'blocked', $hit['detail'] );
 
 		if ( '' !== $ip ) {
-			wpopsec_local_blocklist_add( $ip, "query-guard: {$hit['id']}" );
+			shieldcore_local_blocklist_add( $ip, "query-guard: {$hit['id']}" );
 		}
 
 		status_header( 403 );
@@ -253,7 +253,7 @@ class WPOpsec_Module_Query_Guard {
 	 * file instead of us guessing at more hardcoded IP data.
 	 */
 	public static function refresh_xmlrpc_allowlist() {
-		$response = wp_remote_get( self::JETPACK_IP_SOURCE, array( 'timeout' => 15, 'user-agent' => 'wp-opsec/' . WPOPSEC_VERSION ) );
+		$response = wp_remote_get( self::JETPACK_IP_SOURCE, array( 'timeout' => 15, 'user-agent' => 'wp-shieldcore/' . SHIELDCORE_VERSION ) );
 		if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
 			return false;
 		}
@@ -264,17 +264,17 @@ class WPOpsec_Module_Query_Guard {
 			if ( '' === $line || false === strpos( $line, '/' ) ) {
 				continue;
 			}
-			$ranges[] = wpopsec_cidr_to_range( $line );
+			$ranges[] = shieldcore_cidr_to_range( $line );
 		}
 
-		update_option( 'wpopsec_qg_xmlrpc_allow_ranges', $ranges, false );
-		update_option( 'wpopsec_qg_xmlrpc_allow_updated_at', time(), false );
+		update_option( 'shieldcore_qg_xmlrpc_allow_ranges', $ranges, false );
+		update_option( 'shieldcore_qg_xmlrpc_allow_updated_at', time(), false );
 
 		return count( $ranges );
 	}
 
 	public static function handle_refresh_xmlrpc_allow() {
-		check_admin_referer( 'wpopsec_qg_refresh_xmlrpc_allow' );
+		check_admin_referer( 'shieldcore_qg_refresh_xmlrpc_allow' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
@@ -306,50 +306,50 @@ class WPOpsec_Module_Query_Guard {
 
 
 	public static function handle_save_settings() {
-		check_admin_referer( 'wpopsec_qg_save_settings' );
+		check_admin_referer( 'shieldcore_qg_save_settings' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
 
 		$mode = ( isset( $_POST['mode'] ) && 'block' === $_POST['mode'] ) ? 'block' : 'log';
-		update_option( 'wpopsec_query_guard_mode', $mode );
+		update_option( 'shieldcore_query_guard_mode', $mode );
 
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- already unslashed, and array_intersect() against self::CATEGORIES below discards anything not a real category id; nothing unvalidated ever reaches update_option().
 		$posted     = isset( $_POST['categories'] ) ? (array) wp_unslash( $_POST['categories'] ) : array();
 		$categories = array_values( array_intersect( $posted, array_keys( self::CATEGORIES ) ) );
-		update_option( 'wpopsec_query_guard_categories', $categories );
+		update_option( 'shieldcore_query_guard_categories', $categories );
 
-		update_option( 'wpopsec_query_guard_block_xmlrpc', isset( $_POST['block_xmlrpc'] ) );
-		update_option( 'wpopsec_qg_allow_jetpack', isset( $_POST['allow_jetpack'] ) );
+		update_option( 'shieldcore_query_guard_block_xmlrpc', isset( $_POST['block_xmlrpc'] ) );
+		update_option( 'shieldcore_qg_allow_jetpack', isset( $_POST['allow_jetpack'] ) );
 
-		update_option( 'wpopsec_query_guard_scan_post', isset( $_POST['scan_post'] ) );
+		update_option( 'shieldcore_query_guard_scan_post', isset( $_POST['scan_post'] ) );
 		$scope = sanitize_text_field( wp_unslash( $_POST['post_scope'] ?? 'anon' ) );
-		update_option( 'wpopsec_query_guard_post_scope', in_array( $scope, array( 'anon', 'all' ), true ) ? $scope : 'anon' );
+		update_option( 'shieldcore_query_guard_post_scope', in_array( $scope, array( 'anon', 'all' ), true ) ? $scope : 'anon' );
 
 		wp_safe_redirect( add_query_arg( 'saved', '1', wp_get_referer() ) );
 		exit;
 	}
 
 	public static function render_settings_page() {
-		$mode          = get_option( 'wpopsec_query_guard_mode', 'log' );
-		$categories    = get_option( 'wpopsec_query_guard_categories', array_keys( self::CATEGORIES ) );
-		$block_xmlrpc  = get_option( 'wpopsec_query_guard_block_xmlrpc', false );
-		$allow_jetpack = get_option( 'wpopsec_qg_allow_jetpack', true );
-		$jp_ranges     = get_option( 'wpopsec_qg_xmlrpc_allow_ranges', array() );
-		$jp_updated_at = get_option( 'wpopsec_qg_xmlrpc_allow_updated_at', 0 );
+		$mode          = get_option( 'shieldcore_query_guard_mode', 'log' );
+		$categories    = get_option( 'shieldcore_query_guard_categories', array_keys( self::CATEGORIES ) );
+		$block_xmlrpc  = get_option( 'shieldcore_query_guard_block_xmlrpc', false );
+		$allow_jetpack = get_option( 'shieldcore_qg_allow_jetpack', true );
+		$jp_ranges     = get_option( 'shieldcore_qg_xmlrpc_allow_ranges', array() );
+		$jp_updated_at = get_option( 'shieldcore_qg_xmlrpc_allow_updated_at', 0 );
 
-		WPOpsec_UI::open( 'query-guard' );
+		ShieldCore_UI::open( 'query-guard' );
 
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only result flags set only by this module's own admin-post redirects, which already check_admin_referer() before redirecting.
 		if ( isset( $_GET['saved'] ) ) {
-			WPOpsec_UI::notice( 'success', 'Settings saved.' );
+			ShieldCore_UI::notice( 'success', 'Settings saved.' );
 		}
 		if ( isset( $_GET['refreshed'] ) ) {
-			WPOpsec_UI::notice( 'success', 'Jetpack IP list refreshed.' );
+			ShieldCore_UI::notice( 'success', 'Jetpack IP list refreshed.' );
 		}
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
-		WPOpsec_UI::tiles(
+		ShieldCore_UI::tiles(
 			array(
 				array(
 					'icon'  => 'block' === $mode ? 'shield-alt' : 'visibility',
@@ -364,9 +364,9 @@ class WPOpsec_Module_Query_Guard {
 					'label' => 'signature categories on',
 				),
 				array(
-					'icon'  => get_option( 'wpopsec_query_guard_scan_post', true ) ? 'yes-alt' : 'minus',
-					'tone'  => get_option( 'wpopsec_query_guard_scan_post', true ) ? 'good' : 'warn',
-					'value' => get_option( 'wpopsec_query_guard_scan_post', true ) ? 'GET + POST' : 'GET only',
+					'icon'  => get_option( 'shieldcore_query_guard_scan_post', true ) ? 'yes-alt' : 'minus',
+					'tone'  => get_option( 'shieldcore_query_guard_scan_post', true ) ? 'good' : 'warn',
+					'value' => get_option( 'shieldcore_query_guard_scan_post', true ) ? 'GET + POST' : 'GET only',
 					'label' => 'request scanning',
 				),
 			)
@@ -374,12 +374,12 @@ class WPOpsec_Module_Query_Guard {
 		?>
 
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-			<?php wp_nonce_field( 'wpopsec_qg_save_settings' ); ?>
-			<input type="hidden" name="action" value="wpopsec_qg_save_settings">
+			<?php wp_nonce_field( 'shieldcore_qg_save_settings' ); ?>
+			<input type="hidden" name="action" value="shieldcore_qg_save_settings">
 
-			<?php WPOpsec_UI::section( 'Query string signatures', 'filter' ); ?>
+			<?php ShieldCore_UI::section( 'Query string signatures', 'filter' ); ?>
 				<?php
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Categories',
 					function () use ( $categories ) {
 						foreach ( self::CATEGORIES as $id => $label ) {
@@ -394,37 +394,37 @@ class WPOpsec_Module_Query_Guard {
 					'Applies to the GET query string. POST bodies are scanned separately with a much narrower set — real content legitimately contains XSS and SQL-looking strings.'
 				);
 				?>
-			<?php WPOpsec_UI::section_end(); ?>
+			<?php ShieldCore_UI::section_end(); ?>
 
-			<?php WPOpsec_UI::section( 'Request bodies', 'upload' ); ?>
+			<?php ShieldCore_UI::section( 'Request bodies', 'upload' ); ?>
 				<?php
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'POST scanning',
 					function () {
 						?>
-						<label><input type="checkbox" name="scan_post" <?php checked( get_option( 'wpopsec_query_guard_scan_post', true ) ); ?>> Scan POST data and file uploads</label>
+						<label><input type="checkbox" name="scan_post" <?php checked( get_option( 'shieldcore_query_guard_scan_post', true ) ); ?>> Scan POST data and file uploads</label>
 						<?php
 					},
 					'Code execution, file wrappers, traversal and executable file uploads only — no XSS/SQLi patterns.'
 				);
 
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Who to scan',
 					function () {
-						$scope = get_option( 'wpopsec_query_guard_post_scope', 'anon' );
+						$scope = get_option( 'shieldcore_query_guard_post_scope', 'anon' );
 						?>
-						<label><input type="radio" name="post_scope" value="anon" <?php checked( $scope, 'anon' ); ?>> Logged-out visitors only <?php WPOpsec_UI::badge( 'recommended', 'good' ); ?></label>
+						<label><input type="radio" name="post_scope" value="anon" <?php checked( $scope, 'anon' ); ?>> Logged-out visitors only <?php ShieldCore_UI::badge( 'recommended', 'good' ); ?></label>
 						<label><input type="radio" name="post_scope" value="all" <?php checked( $scope, 'all' ); ?>> Everyone, including logged-in users</label>
 						<?php
 					},
 					'43% of plugin vulnerabilities are exploitable without logging in, which is what the first option covers. Scanning logged-in POSTs as well will flag the block editor and any code-snippet plugin.'
 				);
 				?>
-			<?php WPOpsec_UI::section_end(); ?>
+			<?php ShieldCore_UI::section_end(); ?>
 
-			<?php WPOpsec_UI::section( 'xmlrpc.php', 'rest-api' ); ?>
+			<?php ShieldCore_UI::section( 'xmlrpc.php', 'rest-api' ); ?>
 				<?php
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Block access',
 					function () use ( $block_xmlrpc ) {
 						?>
@@ -434,26 +434,26 @@ class WPOpsec_Module_Query_Guard {
 					'Off by default — xmlrpc.php is needed by Jetpack, the WordPress mobile app, desktop blog clients and pingbacks. Enable only if you know this site uses none of them. Pingback-based DDoS amplification and password guessing via multicall are the common abuses.'
 				);
 
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Jetpack exemption',
 					function () use ( $allow_jetpack, $jp_ranges, $jp_updated_at ) {
 						?>
 						<label><input type="checkbox" name="allow_jetpack" <?php checked( $allow_jetpack ); ?>> Still allow Jetpack (Automattic) IPs through</label>
 						<?php
 						if ( $jp_updated_at ) {
-							WPOpsec_UI::badge( count( $jp_ranges ) . ' ranges · ' . date_i18n( 'M j', $jp_updated_at ), 'good', 'yes-alt' );
+							ShieldCore_UI::badge( count( $jp_ranges ) . ' ranges · ' . date_i18n( 'M j', $jp_updated_at ), 'good', 'yes-alt' );
 						} else {
-							WPOpsec_UI::badge( 'not fetched yet', 'warn' );
+							ShieldCore_UI::badge( 'not fetched yet', 'warn' );
 						}
 					},
-					'Fetched from Automattic&#39;s own published list, refreshed daily. For other providers, add their IPs to the trusted networks file on the <a href="' . esc_url( WPOpsec_Menu_Router::url( 'ip-blocklist' ) ) . '">IP Blocklist</a> page — that list is exempt here too.'
+					'Fetched from Automattic&#39;s own published list, refreshed daily. For other providers, add their IPs to the trusted networks file on the <a href="' . esc_url( ShieldCore_Menu_Router::url( 'ip-blocklist' ) ) . '">IP Blocklist</a> page — that list is exempt here too.'
 				);
 				?>
-			<?php WPOpsec_UI::section_end(); ?>
+			<?php ShieldCore_UI::section_end(); ?>
 
-			<?php WPOpsec_UI::section( 'Mode', 'admin-generic' ); ?>
+			<?php ShieldCore_UI::section( 'Mode', 'admin-generic' ); ?>
 				<?php
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Enforcement',
 					function () use ( $mode ) {
 						?>
@@ -464,19 +464,19 @@ class WPOpsec_Module_Query_Guard {
 					'Start in log-only mode, confirm the Event Log shows no false positives, then switch to block.'
 				);
 				?>
-			<?php WPOpsec_UI::section_end(); ?>
+			<?php ShieldCore_UI::section_end(); ?>
 
 			<?php submit_button( 'Save settings' ); ?>
 		</form>
 
-		<div class="wpopsec-actions" style="margin-top:14px">
+		<div class="shieldcore-actions" style="margin-top:14px">
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( 'wpopsec_qg_refresh_xmlrpc_allow' ); ?>
-				<input type="hidden" name="action" value="wpopsec_qg_refresh_xmlrpc_allow">
+				<?php wp_nonce_field( 'shieldcore_qg_refresh_xmlrpc_allow' ); ?>
+				<input type="hidden" name="action" value="shieldcore_qg_refresh_xmlrpc_allow">
 				<?php submit_button( 'Refresh Jetpack IP list now', 'secondary', 'submit', false ); ?>
 			</form>
 		</div>
 		<?php
-		WPOpsec_UI::close();
+		ShieldCore_UI::close();
 	}
 }

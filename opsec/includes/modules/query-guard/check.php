@@ -3,8 +3,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-// Copied verbatim into wp-content/mu-plugins/wp-opsec-checks/ by the
-// query-guard module on activation. Runs inside wp-opsec-early.php.
+// Copied verbatim into wp-content/mu-plugins/wp-shieldcore-checks/ by the
+// query-guard module on activation. Runs inside wp-shieldcore-early.php.
 //
 // Scoped to the GET query string only, never POST bodies — POST carries
 // legitimate rich content (block editor HTML, REST payloads) that would
@@ -13,8 +13,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 // needs, which is also how opportunistic scanner/bot traffic actually
 // probes sites (known exploit query strings blasted at random hosts).
 
-if ( ! function_exists( 'wpopsec_query_guard_patterns' ) ) {
-	function wpopsec_query_guard_patterns() {
+if ( ! function_exists( 'shieldcore_query_guard_patterns' ) ) {
+	function shieldcore_query_guard_patterns() {
 		return array(
 			// SQL injection
 			array( 'id' => 'sqli_union_select', 'category' => 'sqli', 'regex' => '/\bunion\b(\s+all)?\s+select\b/i' ),
@@ -119,8 +119,8 @@ if ( ! function_exists( 'wpopsec_query_guard_patterns' ) ) {
 		);
 	}
 
-	function wpopsec_query_guard_scan( $haystack, array $enabled_categories ) {
-		foreach ( wpopsec_query_guard_patterns() as $pattern ) {
+	function shieldcore_query_guard_scan( $haystack, array $enabled_categories ) {
+		foreach ( shieldcore_query_guard_patterns() as $pattern ) {
 			if ( ! in_array( $pattern['category'], $enabled_categories, true ) ) {
 				continue;
 			}
@@ -132,7 +132,7 @@ if ( ! function_exists( 'wpopsec_query_guard_patterns' ) ) {
 	}
 }
 
-if ( ! function_exists( 'wpopsec_query_guard_path_patterns' ) ) {
+if ( ! function_exists( 'shieldcore_query_guard_path_patterns' ) ) {
 	/**
 	 * Matched against the URL path, not the query string — and always
 	 * checked regardless of the category toggles above, unlike everything
@@ -147,7 +147,7 @@ if ( ! function_exists( 'wpopsec_query_guard_path_patterns' ) ) {
 	 * PHPUnit's eval-stdin.php RCE probe (CVE-2017-9841) is a bare path
 	 * with no query string, so it never reached any pattern here before.
 	 */
-	function wpopsec_query_guard_path_patterns() {
+	function shieldcore_query_guard_path_patterns() {
 		return array(
 			array( 'id' => 'path_phpunit_evalstdin', 'regex' => '#/eval-stdin\.php(?:$|[/?])#i' ),
 			// .env.local / .env.production / etc are at least as common in
@@ -184,8 +184,8 @@ if ( ! function_exists( 'wpopsec_query_guard_path_patterns' ) ) {
 		);
 	}
 
-	function wpopsec_query_guard_scan_path( $path ) {
-		foreach ( wpopsec_query_guard_path_patterns() as $pattern ) {
+	function shieldcore_query_guard_scan_path( $path ) {
+		foreach ( shieldcore_query_guard_path_patterns() as $pattern ) {
 			if ( preg_match( $pattern['regex'], $path, $m ) ) {
 				return $pattern + array( 'matches' => $m );
 			}
@@ -194,9 +194,9 @@ if ( ! function_exists( 'wpopsec_query_guard_path_patterns' ) ) {
 	}
 }
 
-wpopsec_register_check(
+shieldcore_register_check(
 	function () {
-		if ( ! get_option( 'wpopsec_query_guard_block_xmlrpc', false ) ) {
+		if ( ! get_option( 'shieldcore_query_guard_block_xmlrpc', false ) ) {
 			return null;
 		}
 
@@ -216,21 +216,21 @@ wpopsec_register_check(
 			return null;
 		}
 
-		$ip_long = ip2long( wpopsec_client_ip() );
+		$ip_long = ip2long( shieldcore_client_ip() );
 
 		// Jetpack is the one common legitimate xmlrpc.php consumer — allow
 		// its published IPs through by default. Any other provider (backup
 		// tools, remote publishers, etc.) goes through the general trusted-
 		// networks file rather than us guessing at more hardcoded IP data.
 		if ( false !== $ip_long ) {
-			// wpopsec_ip_is_exempt() covers trusted-CIDR (what this checked
+			// shieldcore_ip_is_exempt() covers trusted-CIDR (what this checked
 			// before), plus reserved space and the explicit allowlist —
 			// strictly wider, never narrower, than the previous check.
-			if ( wpopsec_ip_is_exempt( $ip_long ) ) {
+			if ( shieldcore_ip_is_exempt( $ip_long ) ) {
 				return null;
 			}
-			if ( get_option( 'wpopsec_qg_allow_jetpack', true ) ) {
-				foreach ( get_option( 'wpopsec_qg_xmlrpc_allow_ranges', array() ) as $r ) {
+			if ( get_option( 'shieldcore_qg_allow_jetpack', true ) ) {
+				foreach ( get_option( 'shieldcore_qg_xmlrpc_allow_ranges', array() ) as $r ) {
 					if ( $ip_long >= $r[0] && $ip_long <= $r[1] ) {
 						return null;
 					}
@@ -238,20 +238,20 @@ wpopsec_register_check(
 			}
 		}
 
-		$mode = get_option( 'wpopsec_query_guard_mode', 'log' );
+		$mode = get_option( 'shieldcore_query_guard_mode', 'log' );
 
 		if ( 'block' !== $mode ) {
-			wpopsec_log_event( 'query-guard', 'xmlrpc_access', 'logged', 'log-only mode' );
+			shieldcore_log_event( 'query-guard', 'xmlrpc_access', 'logged', 'log-only mode' );
 			return null;
 		}
 
-		wpopsec_log_event( 'query-guard', 'xmlrpc_access', 'blocked' );
+		shieldcore_log_event( 'query-guard', 'xmlrpc_access', 'blocked' );
 
-		$ip = wpopsec_client_ip();
+		$ip = shieldcore_client_ip();
 		if ( '' !== $ip ) {
 			// If the admin turned this on at all, they've said the site never
 			// legitimately uses xmlrpc.php — any hit is worth escalating.
-			wpopsec_local_blocklist_add( $ip, 'query-guard: xmlrpc_access' );
+			shieldcore_local_blocklist_add( $ip, 'query-guard: xmlrpc_access' );
 		}
 
 		// Not wp_die() here deliberately: xmlrpc.php defines XMLRPC_REQUEST
@@ -275,7 +275,7 @@ wpopsec_register_check(
 	5
 );
 
-wpopsec_register_check(
+shieldcore_register_check(
 	function () {
 		// Unlike most checks, this one previously had no exemption at all —
 		// deliberately, since an attack signature is an attack signature
@@ -283,7 +283,7 @@ wpopsec_register_check(
 		// an admin who's said "never block this IP" means it, even here.
 		// LAN/reserved/trusted-CIDR IPs remain covered too, just as a
 		// side effect of using the same shared check every other module does.
-		if ( wpopsec_ip_is_exempt( wpopsec_client_ip() ) ) {
+		if ( shieldcore_ip_is_exempt( shieldcore_client_ip() ) ) {
 			return null;
 		}
 
@@ -296,21 +296,21 @@ wpopsec_register_check(
 		// Path probes run first and unconditionally — a request with no
 		// query string at all used to skip this whole check, missing
 		// exactly the attacks that live in the path instead (see
-		// wpopsec_query_guard_path_patterns()'s own docblock).
-		$hit      = wpopsec_query_guard_scan_path( $path );
+		// shieldcore_query_guard_path_patterns()'s own docblock).
+		$hit      = shieldcore_query_guard_scan_path( $path );
 		$via_path = null !== $hit;
 
 		if ( ! $hit && '' !== $qs ) {
-			$categories = get_option( 'wpopsec_query_guard_categories', array( 'sqli', 'xss', 'traversal', 'cmdi', 'other' ) );
+			$categories = get_option( 'shieldcore_query_guard_categories', array( 'sqli', 'xss', 'traversal', 'cmdi', 'other' ) );
 			$decoded    = rawurldecode( $qs );
-			$hit        = wpopsec_query_guard_scan( $qs, $categories ) ?: wpopsec_query_guard_scan( $decoded, $categories );
+			$hit        = shieldcore_query_guard_scan( $qs, $categories ) ?: shieldcore_query_guard_scan( $decoded, $categories );
 		}
 
 		if ( ! $hit ) {
 			return null;
 		}
 
-		$mode    = get_option( 'wpopsec_query_guard_mode', 'log' );
+		$mode    = get_option( 'shieldcore_query_guard_mode', 'log' );
 		$snippet = $via_path
 			? 'path: ' . substr( $path, 0, 200 )
 			: 'qs: ' . substr( str_replace( array( "\r", "\n" ), ' ', rawurldecode( $qs ) ), 0, 200 );
@@ -343,20 +343,20 @@ wpopsec_register_check(
 		}
 
 		if ( 'block' !== $mode ) {
-			wpopsec_log_event( 'query-guard', $hit['id'], 'logged', $snippet, $severity );
+			shieldcore_log_event( 'query-guard', $hit['id'], 'logged', $snippet, $severity );
 			return null;
 		}
 
-		wpopsec_log_event( 'query-guard', $hit['id'], 'blocked', $snippet, $severity );
+		shieldcore_log_event( 'query-guard', $hit['id'], 'blocked', $snippet, $severity );
 
-		$ip = wpopsec_client_ip();
+		$ip = shieldcore_client_ip();
 		if ( '' !== $ip ) {
 			// Escalate to the shared local blocklist so ip-blocklist catches
 			// this IP on future requests too, not just this one. Gated on
 			// query-guard's own mode being "block" (not just detecting a hit)
 			// so an unverified/tuning-stage signature can't cause real blocks
 			// via a side channel while its own module is still in log-only mode.
-			wpopsec_local_blocklist_add( $ip, "query-guard: {$hit['id']}" );
+			shieldcore_local_blocklist_add( $ip, "query-guard: {$hit['id']}" );
 		}
 
 		return array( 'reason' => 'Access denied.' );

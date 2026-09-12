@@ -3,10 +3,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-// Copied verbatim into wp-content/mu-plugins/wp-opsec-checks/ by the
-// ip-blocklist module on activation. Runs inside wp-opsec-early.php.
+// Copied verbatim into wp-content/mu-plugins/wp-shieldcore-checks/ by the
+// ip-blocklist module on activation. Runs inside wp-shieldcore-early.php.
 
-wpopsec_register_check(
+shieldcore_register_check(
 	function () {
 		static $ranges = null;
 		static $local  = null;
@@ -16,19 +16,19 @@ wpopsec_register_check(
 			$ranges    = file_exists( $data_file ) ? require $data_file : array();
 		}
 		if ( null === $local ) {
-			$local = file_exists( wpopsec_local_blocklist_file() ) ? require wpopsec_local_blocklist_file() : array();
+			$local = file_exists( shieldcore_local_blocklist_file() ) ? require shieldcore_local_blocklist_file() : array();
 		}
 
 		if ( empty( $ranges ) && empty( $local ) ) {
 			return null;
 		}
 
-		$ip = wpopsec_client_ip();
+		$ip = shieldcore_client_ip();
 		if ( '' === $ip || false === strpos( $ip, '.' ) ) {
 			return null; // no IPv4 to check (IPv6 not covered by these sources)
 		}
 
-		if ( wpopsec_ip_is_exempt( $ip ) ) {
+		if ( shieldcore_ip_is_exempt( $ip ) ) {
 			return null; // LAN/reserved/trusted/allowlisted — same shared rule every other module follows
 		}
 
@@ -39,12 +39,12 @@ wpopsec_register_check(
 
 		$source = null;
 		$label  = '';
-		if ( wpopsec_ip_in_ranges( $needle, $local ) ) {
+		if ( shieldcore_ip_in_ranges( $needle, $local ) ) {
 			$source = 'local';
 			$label  = 'local blocklist';
-		} elseif ( wpopsec_ip_in_ranges( $needle, $ranges ) ) {
+		} elseif ( shieldcore_ip_in_ranges( $needle, $ranges ) ) {
 			$source     = 'reputation list';
-			$src_labels = wpopsec_ip_reputation_sources( $needle );
+			$src_labels = shieldcore_ip_reputation_sources( $needle );
 			$label      = $src_labels ? implode( ', ', $src_labels ) : 'reputation list';
 		}
 
@@ -52,20 +52,20 @@ wpopsec_register_check(
 			return null;
 		}
 
-		$mode = get_option( 'wpopsec_ip_blocklist_mode', 'log' );
+		$mode = get_option( 'shieldcore_ip_blocklist_mode', 'log' );
 
 		if ( 'block' !== $mode ) {
-			wpopsec_log_event( 'ip-blocklist', 'listed_ip', 'logged', "matched {$label} (log-only mode)" );
+			shieldcore_log_event( 'ip-blocklist', 'listed_ip', 'logged', "matched {$label} (log-only mode)" );
 			return null;
 		}
 
-		wpopsec_log_event( 'ip-blocklist', 'listed_ip', 'blocked', "matched {$label}" );
+		shieldcore_log_event( 'ip-blocklist', 'listed_ip', 'blocked', "matched {$label}" );
 
 		return array( 'reason' => 'Access denied.' );
 	}
 );
 
-if ( ! function_exists( 'wpopsec_ip_reputation_sources' ) ) {
+if ( ! function_exists( 'shieldcore_ip_reputation_sources' ) ) {
 	/**
 	 * Only called after a reputation-list hit is already decided — never
 	 * on the hot path for the vast majority of requests that don't match
@@ -77,7 +77,7 @@ if ( ! function_exists( 'wpopsec_ip_reputation_sources' ) ) {
 	 *
 	 * @return string[] human labels of every source whose range covers $needle
 	 */
-	function wpopsec_ip_reputation_sources( $needle ) {
+	function shieldcore_ip_reputation_sources( $needle ) {
 		static $by_source = null;
 		if ( null === $by_source ) {
 			$file      = __DIR__ . '/data/ip-blocklist-by-source.php';
@@ -86,7 +86,7 @@ if ( ! function_exists( 'wpopsec_ip_reputation_sources' ) ) {
 
 		$labels = array();
 		foreach ( $by_source as $label => $source_ranges ) {
-			if ( wpopsec_ip_in_ranges( $needle, $source_ranges ) ) {
+			if ( shieldcore_ip_in_ranges( $needle, $source_ranges ) ) {
 				$labels[] = $label;
 			}
 		}
@@ -94,9 +94,9 @@ if ( ! function_exists( 'wpopsec_ip_reputation_sources' ) ) {
 	}
 }
 
-if ( ! function_exists( 'wpopsec_ip_in_ranges' ) ) {
+if ( ! function_exists( 'shieldcore_ip_in_ranges' ) ) {
 	/** @param array<int, array{0:int,1:int}> $ranges sorted, non-overlapping */
-	function wpopsec_ip_in_ranges( $needle, array $ranges ) {
+	function shieldcore_ip_in_ranges( $needle, array $ranges ) {
 		$lo = 0;
 		$hi = count( $ranges ) - 1;
 

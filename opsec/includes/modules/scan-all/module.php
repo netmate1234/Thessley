@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * this install for problems — a different kind of action than the four
  * this page covers.
  */
-class WPOpsec_Module_Scan_All {
+class ShieldCore_Module_Scan_All {
 
 	/** module slug => title, for the summary table. */
 	private static function scans() {
@@ -39,35 +39,35 @@ class WPOpsec_Module_Scan_All {
 	public static function deactivate() {}
 
 	public static function register() {
-		add_action( 'admin_post_wpopsec_sa_run', array( __CLASS__, 'handle_run' ) );
+		add_action( 'admin_post_shieldcore_sa_run', array( __CLASS__, 'handle_run' ) );
 		// JS runs each scan one at a time via this and updates the page as
 		// each finishes; the admin_post handler above is the no-JS fallback,
 		// still fully functional (one request, all four, then a redirect)
 		// if JS is disabled or the fetch calls fail for some reason.
-		add_action( 'wp_ajax_wpopsec_sa_run_one', array( __CLASS__, 'handle_run_one' ) );
+		add_action( 'wp_ajax_shieldcore_sa_run_one', array( __CLASS__, 'handle_run_one' ) );
 		return __CLASS__;
 	}
 
 	private static function run_scan_for( $slug ) {
 		switch ( $slug ) {
 			case 'file-integrity':
-				if ( class_exists( 'WPOpsec_Module_File_Integrity' ) ) {
-					WPOpsec_Module_File_Integrity::run_scan();
+				if ( class_exists( 'ShieldCore_Module_File_Integrity' ) ) {
+					ShieldCore_Module_File_Integrity::run_scan();
 				}
 				break;
 			case 'malware-scanner':
-				if ( class_exists( 'WPOpsec_Module_Malware_Scanner' ) ) {
-					WPOpsec_Module_Malware_Scanner::run_scan();
+				if ( class_exists( 'ShieldCore_Module_Malware_Scanner' ) ) {
+					ShieldCore_Module_Malware_Scanner::run_scan();
 				}
 				break;
 			case 'vuln-scanner':
-				if ( class_exists( 'WPOpsec_Module_Vuln_Scanner' ) ) {
-					WPOpsec_Module_Vuln_Scanner::run_scan();
+				if ( class_exists( 'ShieldCore_Module_Vuln_Scanner' ) ) {
+					ShieldCore_Module_Vuln_Scanner::run_scan();
 				}
 				break;
 			case 'user-watchdog':
-				if ( class_exists( 'WPOpsec_Module_User_Watchdog' ) ) {
-					WPOpsec_Module_User_Watchdog::scan();
+				if ( class_exists( 'ShieldCore_Module_User_Watchdog' ) ) {
+					ShieldCore_Module_User_Watchdog::scan();
 				}
 				break;
 		}
@@ -75,7 +75,7 @@ class WPOpsec_Module_Scan_All {
 
 	/** Runs exactly one scan and returns its result — called once per scan by the JS, in sequence. */
 	public static function handle_run_one() {
-		check_ajax_referer( 'wpopsec_sa_run' );
+		check_ajax_referer( 'shieldcore_sa_run' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( array( 'message' => 'Forbidden' ), 403 );
 		}
@@ -91,7 +91,7 @@ class WPOpsec_Module_Scan_All {
 		}
 
 		self::run_scan_for( $slug );
-		update_option( 'wpopsec_scan_all_last_triggered', time(), false );
+		update_option( 'shieldcore_scan_all_last_triggered', time(), false );
 
 		list( $at, $count, $count_label ) = self::summary_row( $slug );
 
@@ -106,7 +106,7 @@ class WPOpsec_Module_Scan_All {
 	}
 
 	public static function handle_run() {
-		check_admin_referer( 'wpopsec_sa_run' );
+		check_admin_referer( 'shieldcore_sa_run' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
@@ -123,7 +123,7 @@ class WPOpsec_Module_Scan_All {
 			self::run_scan_for( $slug );
 		}
 
-		update_option( 'wpopsec_scan_all_last_triggered', time(), false );
+		update_option( 'shieldcore_scan_all_last_triggered', time(), false );
 
 		wp_safe_redirect( add_query_arg( 'triggered', '1', wp_get_referer() ) );
 		exit;
@@ -135,7 +135,7 @@ class WPOpsec_Module_Scan_All {
 				// baseline_at is when a baseline was last (re)taken, not when
 				// this routine check last ran — last_result.at is the one
 				// that updates on every scan, same as the other three below.
-				$last   = get_option( 'wpopsec_integrity_last_result', array() );
+				$last   = get_option( 'shieldcore_integrity_last_result', array() );
 				$at     = (int) ( $last['at'] ?? 0 );
 				$issues = count( (array) ( $last['core']['modified'] ?? array() ) )
 					+ count( (array) ( $last['core']['missing'] ?? array() ) )
@@ -144,12 +144,12 @@ class WPOpsec_Module_Scan_All {
 				return array( $at, $issues, 'change(s)' );
 
 			case 'malware-scanner':
-				$last = get_option( 'wpopsec_malware_last_result', array() );
+				$last = get_option( 'shieldcore_malware_last_result', array() );
 				$at   = (int) ( $last['at'] ?? 0 );
 				return array( $at, count( (array) ( $last['findings'] ?? array() ) ), 'finding(s)' );
 
 			case 'vuln-scanner':
-				$last = get_option( 'wpopsec_vuln_last_result', array() );
+				$last = get_option( 'shieldcore_vuln_last_result', array() );
 				$at   = (int) ( $last['at'] ?? 0 );
 				return array( $at, count( (array) ( $last['findings'] ?? array() ) ), 'finding(s)' );
 
@@ -157,23 +157,23 @@ class WPOpsec_Module_Scan_All {
 				// snapshot() runs unconditionally at the end of every scan()
 				// call (not just the first), so this timestamp does track
 				// "last routine scan", unlike file-integrity's baseline_at.
-				$at = (int) get_option( 'wpopsec_user_watchdog_snapshot_at', 0 );
-				return array( $at, count( (array) get_option( 'wpopsec_user_watchdog_alerts', array() ) ), 'alert(s)' );
+				$at = (int) get_option( 'shieldcore_user_watchdog_snapshot_at', 0 );
+				return array( $at, count( (array) get_option( 'shieldcore_user_watchdog_alerts', array() ) ), 'alert(s)' );
 		}
 		return array( 0, 0, '' );
 	}
 
 	public static function render_page() {
-		WPOpsec_UI::open( 'scan-all' );
+		ShieldCore_UI::open( 'scan-all' );
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only result flag set only by this module's own admin-post redirect, which already check_admin_referer()'d before redirecting.
 		if ( isset( $_GET['triggered'] ) ) {
-			WPOpsec_UI::notice( 'success', 'All four scans finished — see updated results below.' );
+			ShieldCore_UI::notice( 'success', 'All four scans finished — see updated results below.' );
 		}
 
-		$last_triggered = (int) get_option( 'wpopsec_scan_all_last_triggered', 0 );
+		$last_triggered = (int) get_option( 'shieldcore_scan_all_last_triggered', 0 );
 
-		WPOpsec_UI::tiles(
+		ShieldCore_UI::tiles(
 			array(
 				array(
 					'icon'  => 'search',
@@ -191,86 +191,86 @@ class WPOpsec_Module_Scan_All {
 		);
 
 		?>
-		<div class="wpopsec-actions" style="margin-bottom:14px">
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" id="wpopsec-sa-form">
-				<?php wp_nonce_field( 'wpopsec_sa_run' ); ?>
-				<input type="hidden" name="action" value="wpopsec_sa_run">
-				<?php submit_button( 'Scan everything now', 'primary', 'submit', false, array( 'id' => 'wpopsec-sa-button' ) ); ?>
+		<div class="shieldcore-actions" style="margin-bottom:14px">
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" id="shieldcore-sa-form">
+				<?php wp_nonce_field( 'shieldcore_sa_run' ); ?>
+				<input type="hidden" name="action" value="shieldcore_sa_run">
+				<?php submit_button( 'Scan everything now', 'primary', 'submit', false, array( 'id' => 'shieldcore-sa-button' ) ); ?>
 			</form>
-			<p class="wpopsec-help" style="margin-top:6px" id="wpopsec-sa-help">
+			<p class="shieldcore-help" style="margin-top:6px" id="shieldcore-sa-help">
 				Runs File Integrity, Malware Scanner, Vulnerability Scan, and User Watchdog one at a time, updating the table below as each finishes.
 			</p>
 		</div>
 
-		<?php WPOpsec_UI::section( 'Included scans', 'list-view' ); ?>
-			<table class="wpopsec-table">
+		<?php ShieldCore_UI::section( 'Included scans', 'list-view' ); ?>
+			<table class="shieldcore-table">
 				<thead><tr><th>Scan</th><th style="width:130px">Last ran</th><th style="width:150px">Result</th><th style="width:110px"></th></tr></thead>
 				<tbody>
 				<?php foreach ( self::scans() as $slug => $title ) : ?>
 					<?php list( $at, $count, $count_label ) = self::summary_row( $slug ); ?>
-					<tr data-wpopsec-sa-slug="<?php echo esc_attr( $slug ); ?>">
+					<tr data-shieldcore-sa-slug="<?php echo esc_attr( $slug ); ?>">
 						<td><?php echo esc_html( $title ); ?></td>
-						<td class="wpopsec-nowrap wpopsec-sa-at"><?php echo $at ? esc_html( date_i18n( 'M j, H:i', $at ) ) : 'never'; ?></td>
-						<td class="wpopsec-sa-result">
+						<td class="shieldcore-nowrap shieldcore-sa-at"><?php echo $at ? esc_html( date_i18n( 'M j, H:i', $at ) ) : 'never'; ?></td>
+						<td class="shieldcore-sa-result">
 							<?php if ( ! $at ) : ?>
-								<span class="wpopsec-muted">—</span>
+								<span class="shieldcore-muted">—</span>
 							<?php elseif ( $count > 0 ) : ?>
-								<?php WPOpsec_UI::badge( $count . ' ' . $count_label, 'bad', 'warning' ); ?>
+								<?php ShieldCore_UI::badge( $count . ' ' . $count_label, 'bad', 'warning' ); ?>
 							<?php else : ?>
-								<?php WPOpsec_UI::badge( 'clean', 'good', 'yes-alt' ); ?>
+								<?php ShieldCore_UI::badge( 'clean', 'good', 'yes-alt' ); ?>
 							<?php endif; ?>
 						</td>
-						<td><a href="<?php echo esc_url( WPOpsec_Menu_Router::url( $slug ) ); ?>">View →</a></td>
+						<td><a href="<?php echo esc_url( ShieldCore_Menu_Router::url( $slug ) ); ?>">View →</a></td>
 					</tr>
 				<?php endforeach; ?>
 				</tbody>
 			</table>
-		<?php WPOpsec_UI::section_end(); ?>
+		<?php ShieldCore_UI::section_end(); ?>
 
 		<?php
-		$wpopsec_sa_js = <<<'JS'
+		$shieldcore_sa_js = <<<'JS'
 		(function () {
-			var form = document.getElementById( 'wpopsec-sa-form' );
-			var btn  = document.getElementById( 'wpopsec-sa-button' );
-			var help = document.getElementById( 'wpopsec-sa-help' );
+			var form = document.getElementById( 'shieldcore-sa-form' );
+			var btn  = document.getElementById( 'shieldcore-sa-button' );
+			var help = document.getElementById( 'shieldcore-sa-help' );
 			if ( ! form || ! btn || ! window.fetch ) {
 				return; // no JS / no fetch: form still submits normally, admin_post handles it
 			}
 
-			var slugs = __WPOPSEC_SA_SLUGS__;
+			var slugs = __SHIELDCORE_SA_SLUGS__;
 			var nonce = form.querySelector( 'input[name="_wpnonce"]' ).value;
-			var ajaxUrl = '__WPOPSEC_SA_AJAX_URL__';
+			var ajaxUrl = '__SHIELDCORE_SA_AJAX_URL__';
 
 			function setRowRunning( slug ) {
-				var row = document.querySelector( '[data-wpopsec-sa-slug="' + slug + '"]' );
+				var row = document.querySelector( '[data-shieldcore-sa-slug="' + slug + '"]' );
 				if ( row ) {
-					row.querySelector( '.wpopsec-sa-result' ).innerHTML = '<span class="wpopsec-muted">Running…</span>';
+					row.querySelector( '.shieldcore-sa-result' ).innerHTML = '<span class="shieldcore-muted">Running…</span>';
 				}
 			}
 
 			function setRowDone( slug, data ) {
-				var row = document.querySelector( '[data-wpopsec-sa-slug="' + slug + '"]' );
+				var row = document.querySelector( '[data-shieldcore-sa-slug="' + slug + '"]' );
 				if ( ! row ) { return; }
 				if ( data.at ) {
-					row.querySelector( '.wpopsec-sa-at' ).textContent = data.at;
+					row.querySelector( '.shieldcore-sa-at' ).textContent = data.at;
 				}
 				var badge = ( data.count > 0 )
-					? '<span class="wpopsec-badge wpopsec-badge--warn"><span class="dashicons dashicons-warning"></span>' + data.count + ' ' + data.count_label + '</span>'
-					: '<span class="wpopsec-badge wpopsec-badge--good"><span class="dashicons dashicons-yes-alt"></span>clean</span>';
-				row.querySelector( '.wpopsec-sa-result' ).innerHTML = badge;
+					? '<span class="shieldcore-badge shieldcore-badge--warn"><span class="dashicons dashicons-warning"></span>' + data.count + ' ' + data.count_label + '</span>'
+					: '<span class="shieldcore-badge shieldcore-badge--good"><span class="dashicons dashicons-yes-alt"></span>clean</span>';
+				row.querySelector( '.shieldcore-sa-result' ).innerHTML = badge;
 			}
 
 			function setRowFailed( slug ) {
-				var row = document.querySelector( '[data-wpopsec-sa-slug="' + slug + '"]' );
+				var row = document.querySelector( '[data-shieldcore-sa-slug="' + slug + '"]' );
 				if ( row ) {
-					row.querySelector( '.wpopsec-sa-result' ).innerHTML = '<span class="wpopsec-badge wpopsec-badge--bad">failed</span>';
+					row.querySelector( '.shieldcore-sa-result' ).innerHTML = '<span class="shieldcore-badge shieldcore-badge--bad">failed</span>';
 				}
 			}
 
 			function runOne( slug ) {
 				setRowRunning( slug );
 				var body = new URLSearchParams();
-				body.set( 'action', 'wpopsec_sa_run_one' );
+				body.set( 'action', 'shieldcore_sa_run_one' );
 				body.set( 'which', slug );
 				body.set( '_wpnonce', nonce );
 				return fetch( ajaxUrl, { method: 'POST', credentials: 'same-origin', body: body } )
@@ -304,16 +304,16 @@ class WPOpsec_Module_Scan_All {
 		})();
 		JS;
 
-		$wpopsec_sa_js = str_replace(
-			array( '__WPOPSEC_SA_SLUGS__', '__WPOPSEC_SA_AJAX_URL__' ),
+		$shieldcore_sa_js = str_replace(
+			array( '__SHIELDCORE_SA_SLUGS__', '__SHIELDCORE_SA_AJAX_URL__' ),
 			array( wp_json_encode( array_keys( self::scans() ) ), esc_url( admin_url( 'admin-ajax.php' ) ) ),
-			$wpopsec_sa_js
+			$shieldcore_sa_js
 		);
 
-		wp_register_script( 'wpopsec-scan-all', false, array(), WPOPSEC_VERSION, true );
-		wp_enqueue_script( 'wpopsec-scan-all' );
-		wp_add_inline_script( 'wpopsec-scan-all', $wpopsec_sa_js );
+		wp_register_script( 'shieldcore-scan-all', false, array(), SHIELDCORE_VERSION, true );
+		wp_enqueue_script( 'shieldcore-scan-all' );
+		wp_add_inline_script( 'shieldcore-scan-all', $shieldcore_sa_js );
 
-		WPOpsec_UI::close();
+		ShieldCore_UI::close();
 	}
 }

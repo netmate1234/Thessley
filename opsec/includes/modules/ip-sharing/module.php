@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Shares blocked IPs with unwantedip.eagleeye-intelligence.com — a
  * self-hosted, cross-host reputation tracker (not a third-party service).
- * The actual send call (wpopsec_maybe_unwantedip_report()) lives in the
+ * The actual send call (shieldcore_maybe_unwantedip_report()) lives in the
  * mu-loader, not here, for the same reason Alerts works that
  * way: a real block calls wp_die() at mu-plugin time, before regular
  * plugins have loaded, so nothing hooked here would ever see those
@@ -15,24 +15,24 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Only ever reports actual blocks (never log-only detections) for an IP
  * that isn't LAN/reserved/trusted, and at most once per IP per hour.
  */
-class WPOpsec_Module_IP_Sharing {
+class ShieldCore_Module_IP_Sharing {
 
 	const API = 'https://unwantedip.eagleeye-intelligence.com/api/v1';
 
 	public static function activate() {
 		// Pre-arms the toggle so reporting goes live the moment a key exists
-		// — but doesn't do anything by itself: wpopsec_maybe_unwantedip_report()
+		// — but doesn't do anything by itself: shieldcore_maybe_unwantedip_report()
 		// (mu-loader) requires both this AND a saved API key, and getting a
 		// key means calling out to unwantedip's signup endpoint, which is a
 		// real account creation and needs a human to actually click it.
-		add_option( 'wpopsec_unwantedip_enabled', true );
+		add_option( 'shieldcore_unwantedip_enabled', true );
 	}
 	public static function deactivate() {}
 
 	public static function register() {
-		add_action( 'admin_post_wpopsec_uip_save_settings', array( __CLASS__, 'handle_save_settings' ) );
-		add_action( 'admin_post_wpopsec_uip_test', array( __CLASS__, 'handle_test' ) );
-		add_action( 'admin_post_wpopsec_uip_signup', array( __CLASS__, 'handle_signup' ) );
+		add_action( 'admin_post_shieldcore_uip_save_settings', array( __CLASS__, 'handle_save_settings' ) );
+		add_action( 'admin_post_shieldcore_uip_test', array( __CLASS__, 'handle_test' ) );
+		add_action( 'admin_post_shieldcore_uip_signup', array( __CLASS__, 'handle_signup' ) );
 
 		return __CLASS__;
 	}
@@ -47,7 +47,7 @@ class WPOpsec_Module_IP_Sharing {
 	 * exactly once and saved immediately — there's no recovery endpoint.
 	 */
 	public static function handle_signup() {
-		check_admin_referer( 'wpopsec_uip_signup' );
+		check_admin_referer( 'shieldcore_uip_signup' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
@@ -63,8 +63,8 @@ class WPOpsec_Module_IP_Sharing {
 		$body = json_decode( wp_remote_retrieve_body( $response ), true );
 
 		if ( 201 === $code && ! empty( $body['api_key'] ) ) {
-			update_option( 'wpopsec_unwantedip_api_key', $body['api_key'] );
-			update_option( 'wpopsec_unwantedip_enabled', true );
+			update_option( 'shieldcore_unwantedip_api_key', $body['api_key'] );
+			update_option( 'shieldcore_unwantedip_enabled', true );
 			wp_safe_redirect( add_query_arg( 'signup', 'ok', wp_get_referer() ) );
 			exit;
 		}
@@ -80,15 +80,15 @@ class WPOpsec_Module_IP_Sharing {
 	}
 
 	public static function handle_save_settings() {
-		check_admin_referer( 'wpopsec_uip_save_settings' );
+		check_admin_referer( 'shieldcore_uip_save_settings' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
 
-		update_option( 'wpopsec_unwantedip_enabled', isset( $_POST['enabled'] ) );
+		update_option( 'shieldcore_unwantedip_enabled', isset( $_POST['enabled'] ) );
 
 		$key = isset( $_POST['api_key'] ) ? sanitize_text_field( wp_unslash( $_POST['api_key'] ) ) : '';
-		update_option( 'wpopsec_unwantedip_api_key', $key );
+		update_option( 'shieldcore_unwantedip_api_key', $key );
 
 		wp_safe_redirect( add_query_arg( 'saved', '1', wp_get_referer() ) );
 		exit;
@@ -96,12 +96,12 @@ class WPOpsec_Module_IP_Sharing {
 
 	/** Reports a harmless, obviously-synthetic test IP so a real address never appears in your own test history. */
 	public static function handle_test() {
-		check_admin_referer( 'wpopsec_uip_test' );
+		check_admin_referer( 'shieldcore_uip_test' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
 
-		$key = trim( (string) get_option( 'wpopsec_unwantedip_api_key', '' ) );
+		$key = trim( (string) get_option( 'shieldcore_unwantedip_api_key', '' ) );
 		if ( '' === $key ) {
 			wp_safe_redirect( add_query_arg( 'test', 'missing', wp_get_referer() ) );
 			exit;
@@ -148,10 +148,10 @@ class WPOpsec_Module_IP_Sharing {
 	}
 
 	public static function render_page() {
-		$enabled = get_option( 'wpopsec_unwantedip_enabled', false );
-		$key     = (string) get_option( 'wpopsec_unwantedip_api_key', '' );
+		$enabled = get_option( 'shieldcore_unwantedip_enabled', false );
+		$key     = (string) get_option( 'shieldcore_unwantedip_api_key', '' );
 
-		WPOpsec_UI::open( 'ip-sharing' );
+		ShieldCore_UI::open( 'ip-sharing' );
 
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only result flags set only by this module's own admin-post redirects, which already check_admin_referer() before redirecting.
 		$saved  = isset( $_GET['saved'] );
@@ -160,31 +160,31 @@ class WPOpsec_Module_IP_Sharing {
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
 		if ( $saved ) {
-			WPOpsec_UI::notice( 'success', 'Settings saved.' );
+			ShieldCore_UI::notice( 'success', 'Settings saved.' );
 		}
 		if ( '' !== $signup ) {
 			if ( 'ok' === $signup ) {
-				WPOpsec_UI::notice( 'success', 'Signed up and saved the API key — sharing is now enabled.' );
+				ShieldCore_UI::notice( 'success', 'Signed up and saved the API key — sharing is now enabled.' );
 			} elseif ( 'exists' === $signup ) {
-				WPOpsec_UI::notice(
+				ShieldCore_UI::notice(
 					'warning',
 					'An account for this server\'s public IP already exists. Keys are shown once at signup and can\'t be retrieved again — if yours was lost, the site owner has to reissue one manually.'
 				);
 			} else {
-				WPOpsec_UI::notice( 'error', 'Sign-up failed: ' . esc_html( str_replace( 'fail:', '', $signup ) ) );
+				ShieldCore_UI::notice( 'error', 'Sign-up failed: ' . esc_html( str_replace( 'fail:', '', $signup ) ) );
 			}
 		}
 		if ( '' !== $test ) {
 			if ( 'ok' === $test ) {
-				WPOpsec_UI::notice( 'success', 'Test report accepted.' );
+				ShieldCore_UI::notice( 'success', 'Test report accepted.' );
 			} elseif ( 'missing' === $test ) {
-				WPOpsec_UI::notice( 'warning', 'Set an API key first.' );
+				ShieldCore_UI::notice( 'warning', 'Set an API key first.' );
 			} else {
-				WPOpsec_UI::notice( 'error', 'Report rejected: ' . esc_html( str_replace( 'fail:', '', $test ) ) );
+				ShieldCore_UI::notice( 'error', 'Report rejected: ' . esc_html( str_replace( 'fail:', '', $test ) ) );
 			}
 		}
 
-		WPOpsec_UI::tiles(
+		ShieldCore_UI::tiles(
 			array(
 				array(
 					'icon'  => $enabled ? 'yes-alt' : 'warning',
@@ -203,13 +203,13 @@ class WPOpsec_Module_IP_Sharing {
 
 		if ( ! $key ) {
 			?>
-			<div class="wpopsec-actions" style="margin-bottom:14px">
+			<div class="shieldcore-actions" style="margin-bottom:14px">
 				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-					<?php wp_nonce_field( 'wpopsec_uip_signup' ); ?>
-					<input type="hidden" name="action" value="wpopsec_uip_signup">
+					<?php wp_nonce_field( 'shieldcore_uip_signup' ); ?>
+					<input type="hidden" name="action" value="shieldcore_uip_signup">
 					<?php submit_button( 'Sign up for an API key', 'primary', 'submit', false ); ?>
 				</form>
-				<p class="wpopsec-help" style="margin-top:6px">
+				<p class="shieldcore-help" style="margin-top:6px">
 					Sends one request, from this server, to <code>/api/v1/signup</code>. Your account identity is this server's own public IP — there's nothing to fill in first.
 				</p>
 			</div>
@@ -218,12 +218,12 @@ class WPOpsec_Module_IP_Sharing {
 
 		?>
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-			<?php wp_nonce_field( 'wpopsec_uip_save_settings' ); ?>
-			<input type="hidden" name="action" value="wpopsec_uip_save_settings">
+			<?php wp_nonce_field( 'shieldcore_uip_save_settings' ); ?>
+			<input type="hidden" name="action" value="shieldcore_uip_save_settings">
 
-			<?php WPOpsec_UI::section( 'unwantedip.eagleeye-intelligence.com', 'shield-alt' ); ?>
+			<?php ShieldCore_UI::section( 'unwantedip.eagleeye-intelligence.com', 'shield-alt' ); ?>
 				<?php
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Enabled',
 					function () use ( $enabled ) {
 						?>
@@ -233,7 +233,7 @@ class WPOpsec_Module_IP_Sharing {
 					'Only actual blocks are reported — never log-only detections — and at most once per IP per hour, so a sustained flood from one address files one report, not hundreds. LAN, reserved, and trusted-network IPs are never reported.'
 				);
 
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'API key',
 					function () use ( $key ) {
 						?>
@@ -243,19 +243,19 @@ class WPOpsec_Module_IP_Sharing {
 					'Filled in automatically by "Sign up" below — there\'s no signup form on the site itself, since your account identity is this server\'s own public IP. Paste one in by hand only if you already have a key from elsewhere (e.g. reissued by the site owner).'
 				);
 				?>
-			<?php WPOpsec_UI::section_end(); ?>
+			<?php ShieldCore_UI::section_end(); ?>
 
 			<?php submit_button( 'Save settings' ); ?>
 		</form>
 
-		<div class="wpopsec-actions" style="margin-top:14px">
+		<div class="shieldcore-actions" style="margin-top:14px">
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( 'wpopsec_uip_test' ); ?>
-				<input type="hidden" name="action" value="wpopsec_uip_test">
+				<?php wp_nonce_field( 'shieldcore_uip_test' ); ?>
+				<input type="hidden" name="action" value="shieldcore_uip_test">
 				<?php submit_button( 'Send test report', 'secondary', 'submit', false ); ?>
 			</form>
 		</div>
 		<?php
-		WPOpsec_UI::close();
+		ShieldCore_UI::close();
 	}
 }

@@ -7,12 +7,12 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Opsec — early request gate.
  *
  * Deployed as a must-use plugin so it runs before the rest of WordPress
- * bootstraps. Self-contained: does not depend on the main wp-opsec plugin
+ * bootstraps. Self-contained: does not depend on the main wp-shieldcore plugin
  * being loaded (mu-plugins load first). Modules drop individual check
- * files into wp-content/mu-plugins/wp-opsec-checks/*.php; each such file
- * calls wpopsec_register_check() to add itself.
+ * files into wp-content/mu-plugins/wp-shieldcore-checks/*.php; each such file
+ * calls shieldcore_register_check() to add itself.
  *
- * Kill switch: define('WPOPSEC_DISABLE', true) in wp-config.php to bypass
+ * Kill switch: define('SHIELDCORE_DISABLE', true) in wp-config.php to bypass
  * the gate below if a check ever misfires.
  *
  * The helper functions below are always defined, even under WP_CLI or the
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * file can't distinguish from a gated HTTP request at define-time.
  */
 
-if ( ! function_exists( 'wpopsec_register_check' ) ) {
+if ( ! function_exists( 'shieldcore_register_check' ) ) {
 	/**
 	 * @param callable $check    Receives no args, returns null/false to
 	 *                           allow, or array{reason:string} to block.
@@ -38,28 +38,28 @@ if ( ! function_exists( 'wpopsec_register_check' ) ) {
 	 *                           it) should set this explicitly rather than
 	 *                           relying on its filename sorting right.
 	 */
-	function wpopsec_register_check( callable $check, $priority = 10 ) {
-		global $wpopsec_checks;
+	function shieldcore_register_check( callable $check, $priority = 10 ) {
+		global $shieldcore_checks;
 		static $seq = 0;
-		$wpopsec_checks[] = array( 'priority' => $priority, 'seq' => $seq++, 'check' => $check );
+		$shieldcore_checks[] = array( 'priority' => $priority, 'seq' => $seq++, 'check' => $check );
 	}
 }
 
-if ( ! function_exists( 'wpopsec_client_ip' ) ) {
-	function wpopsec_client_ip() {
+if ( ! function_exists( 'shieldcore_client_ip' ) ) {
+	function shieldcore_client_ip() {
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- must return the raw IP string; every caller validates it itself (ip2long()/filter_var()) as appropriate to its own use.
 		return isset( $_SERVER['REMOTE_ADDR'] ) ? $_SERVER['REMOTE_ADDR'] : '';
 	}
 }
 
-if ( ! function_exists( 'wpopsec_events_table' ) ) {
-	function wpopsec_events_table() {
+if ( ! function_exists( 'shieldcore_events_table' ) ) {
+	function shieldcore_events_table() {
 		global $wpdb;
-		return $wpdb->prefix . 'wpopsec_events';
+		return $wpdb->prefix . 'shieldcore_events';
 	}
 }
 
-if ( ! function_exists( 'wpopsec_severity_map' ) ) {
+if ( ! function_exists( 'shieldcore_severity_map' ) ) {
 	/**
 	 * Event severity, 1 (noise) to 20 (treat the site as compromised).
 	 *
@@ -77,7 +77,7 @@ if ( ! function_exists( 'wpopsec_severity_map' ) ) {
 	 *
 	 * @return array<string,int> "module:event" or "event" => severity
 	 */
-	function wpopsec_severity_map() {
+	function shieldcore_severity_map() {
 		return array(
 			// --- Evidence something already happened -------------------
 			'file-integrity:core_mismatch'          => 20,
@@ -151,8 +151,8 @@ if ( ! function_exists( 'wpopsec_severity_map' ) ) {
 	 * Severity for one event, falling back to a mid-scale default so an
 	 * unmapped event from a new module is never silently treated as noise.
 	 */
-	function wpopsec_event_severity( $module, $event, $action = 'noted' ) {
-		$map = wpopsec_severity_map();
+	function shieldcore_event_severity( $module, $event, $action = 'noted' ) {
+		$map = shieldcore_severity_map();
 		$key = $module . ':' . $event;
 
 		if ( isset( $map[ $key ] ) ) {
@@ -169,7 +169,7 @@ if ( ! function_exists( 'wpopsec_severity_map' ) ) {
 	}
 
 	/** @return array{0:string,1:string} label and colour for a severity. */
-	function wpopsec_severity_meta( $severity ) {
+	function shieldcore_severity_meta( $severity ) {
 		$severity = (int) $severity;
 		if ( $severity >= 18 ) {
 			return array( 'Critical', '#8b0a3e' );
@@ -187,7 +187,7 @@ if ( ! function_exists( 'wpopsec_severity_map' ) ) {
 	}
 }
 
-if ( ! function_exists( 'wpopsec_log_event' ) ) {
+if ( ! function_exists( 'shieldcore_log_event' ) ) {
 	/**
 	 * Central event log every module writes to, so the admin has one place
 	 * to see what fired instead of grepping error_log on the server. Also
@@ -200,19 +200,19 @@ if ( ! function_exists( 'wpopsec_log_event' ) ) {
 	 * @param string   $detail   free-text context (truncated)
 	 * @param int|null $severity 1-20; omit to take it from the severity map
 	 */
-	function wpopsec_log_event( $module, $event, $action = 'noted', $detail = '', $severity = null ) {
+	function shieldcore_log_event( $module, $event, $action = 'noted', $detail = '', $severity = null ) {
 		global $wpdb;
 
-		$ip     = wpopsec_client_ip();
+		$ip     = shieldcore_client_ip();
 		$detail = substr( str_replace( array( "\r", "\n" ), ' ', (string) $detail ), 0, 500 );
 
 		$severity = ( null === $severity )
-			? wpopsec_event_severity( $module, $event, $action )
+			? shieldcore_event_severity( $module, $event, $action )
 			: max( 1, min( 20, (int) $severity ) );
 
 		// Never let a logging failure (missing table mid-upgrade, DB hiccup)
 		// take down the request it was only meant to annotate.
-		$table = wpopsec_events_table();
+		$table = shieldcore_events_table();
 		$wpdb->suppress_errors( true );
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- $wpdb->insert() already parameterizes every value (the %s/%d format array); the raw REQUEST_URI is intentional here, since this IS the audit log and stripping "suspicious" characters would defeat its purpose.
 		$wpdb->insert(
@@ -232,15 +232,15 @@ if ( ! function_exists( 'wpopsec_log_event' ) ) {
 		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 		$wpdb->suppress_errors( false );
 
-		wpopsec_maybe_telegram_alert( $module, $event, $action, $detail, $severity, $ip );
-		wpopsec_maybe_email_alert( $module, $event, $action, $detail, $severity, $ip );
-		wpopsec_maybe_unwantedip_report( $module, $event, $action, $detail, $severity, $ip );
+		shieldcore_maybe_telegram_alert( $module, $event, $action, $detail, $severity, $ip );
+		shieldcore_maybe_email_alert( $module, $event, $action, $detail, $severity, $ip );
+		shieldcore_maybe_unwantedip_report( $module, $event, $action, $detail, $severity, $ip );
 	}
 }
 
-if ( ! function_exists( 'wpopsec_maybe_telegram_alert' ) ) {
+if ( ! function_exists( 'shieldcore_maybe_telegram_alert' ) ) {
 	/**
-	 * Fires from wpopsec_log_event() itself rather than a WP action hook.
+	 * Fires from shieldcore_log_event() itself rather than a WP action hook.
 	 *
 	 * A real block (mode=block) calls wp_die()/exit immediately after
 	 * logging, at mu-plugin time, before regular plugins have loaded — so
@@ -248,18 +248,18 @@ if ( ! function_exists( 'wpopsec_maybe_telegram_alert' ) ) {
 	 * for exactly the events worth alerting on. Being inline in the one
 	 * choke-point function is the only way this reaches those requests too.
 	 */
-	function wpopsec_maybe_telegram_alert( $module, $event, $action, $detail, $severity, $ip ) {
-		if ( ! get_option( 'wpopsec_telegram_enabled', false ) ) {
+	function shieldcore_maybe_telegram_alert( $module, $event, $action, $detail, $severity, $ip ) {
+		if ( ! get_option( 'shieldcore_telegram_enabled', false ) ) {
 			return;
 		}
 
-		$threshold = (int) get_option( 'wpopsec_telegram_threshold', 15 );
+		$threshold = (int) get_option( 'shieldcore_telegram_threshold', 15 );
 		if ( $severity <= $threshold ) {
 			return;
 		}
 
-		$token   = trim( (string) get_option( 'wpopsec_telegram_bot_token', '' ) );
-		$chat_id = trim( (string) get_option( 'wpopsec_telegram_chat_id', '' ) );
+		$token   = trim( (string) get_option( 'shieldcore_telegram_bot_token', '' ) );
+		$chat_id = trim( (string) get_option( 'shieldcore_telegram_chat_id', '' ) );
 		if ( '' === $token || '' === $chat_id ) {
 			return;
 		}
@@ -270,19 +270,19 @@ if ( ! function_exists( 'wpopsec_maybe_telegram_alert' ) ) {
 		// immediate without risking Telegram's rate limit on the rest. This
 		// only throttles the notification channel; the event log still
 		// records every event regardless.
-		$lock_key = 'wpopsec_tg_lock';
+		$lock_key = 'shieldcore_tg_lock';
 		if ( false !== get_transient( $lock_key ) ) {
 			return;
 		}
 		set_transient( $lock_key, 1, 5 );
 
-		list( $label ) = wpopsec_severity_meta( $severity );
+		list( $label ) = shieldcore_severity_meta( $severity );
 		$site = wp_specialchars_decode( get_option( 'blogname' ), ENT_QUOTES );
 		$host = wp_parse_url( get_option( 'siteurl' ), PHP_URL_HOST ) ?: '';
 
 		$lines = array(
 			// blogname alone reads fine on one site, but with multiple
-			// wp-opsec installs alerting into the same chat it's easy to
+			// wp-shieldcore installs alerting into the same chat it's easy to
 			// miss which one fired — the domain is what actually
 			// disambiguates them at a glance, and doubles as a reminder of
 			// which admin to open.
@@ -315,9 +315,9 @@ if ( ! function_exists( 'wpopsec_maybe_telegram_alert' ) ) {
 	}
 }
 
-if ( ! function_exists( 'wpopsec_maybe_email_alert' ) ) {
+if ( ! function_exists( 'shieldcore_maybe_email_alert' ) ) {
 	/**
-	 * Same trigger point as wpopsec_maybe_telegram_alert() and for the same
+	 * Same trigger point as shieldcore_maybe_telegram_alert() and for the same
 	 * reason, but can't reuse wp_mail(): mu-plugins load and run (see the
 	 * bottom of this file) before wp-includes/pluggable.php does, so
 	 * wp_mail() isn't defined yet at this call site — not just on the rare
@@ -327,30 +327,30 @@ if ( ! function_exists( 'wpopsec_maybe_email_alert' ) ) {
 	 * blocked request, which is the accepted tradeoff for having email as
 	 * an inline channel at all instead of not offering the fast path here.
 	 */
-	function wpopsec_maybe_email_alert( $module, $event, $action, $detail, $severity, $ip ) {
-		if ( ! get_option( 'wpopsec_email_enabled', false ) ) {
+	function shieldcore_maybe_email_alert( $module, $event, $action, $detail, $severity, $ip ) {
+		if ( ! get_option( 'shieldcore_email_enabled', false ) ) {
 			return;
 		}
 
-		$threshold = (int) get_option( 'wpopsec_email_threshold', 15 );
+		$threshold = (int) get_option( 'shieldcore_email_threshold', 15 );
 		if ( $severity <= $threshold ) {
 			return;
 		}
 
-		$to = trim( (string) get_option( 'wpopsec_email_address', '' ) ) ?: get_option( 'admin_email' );
+		$to = trim( (string) get_option( 'shieldcore_email_address', '' ) ) ?: get_option( 'admin_email' );
 		if ( '' === $to ) {
 			return;
 		}
 
 		// Same burst-suppression reasoning as the Telegram lock, separate key
 		// so the two channels don't throttle each other.
-		$lock_key = 'wpopsec_email_lock';
+		$lock_key = 'shieldcore_email_lock';
 		if ( false !== get_transient( $lock_key ) ) {
 			return;
 		}
 		set_transient( $lock_key, 1, 5 );
 
-		list( $label ) = wpopsec_severity_meta( $severity );
+		list( $label ) = shieldcore_severity_meta( $severity );
 		$site = wp_specialchars_decode( get_option( 'blogname' ), ENT_QUOTES );
 		$host = wp_parse_url( get_option( 'siteurl' ), PHP_URL_HOST ) ?: '';
 
@@ -386,11 +386,11 @@ if ( ! function_exists( 'wpopsec_maybe_email_alert' ) ) {
 	}
 }
 
-if ( ! function_exists( 'wpopsec_maybe_unwantedip_report' ) ) {
+if ( ! function_exists( 'shieldcore_maybe_unwantedip_report' ) ) {
 	/**
 	 * Shares a blocked IP with unwantedip.eagleeye-intelligence.com — a
 	 * self-hosted, cross-host reputation tracker, not a third-party service.
-	 * Fires from wpopsec_log_event() itself for the same reason the Telegram
+	 * Fires from shieldcore_log_event() itself for the same reason the Telegram
 	 * alert does: a real block calls wp_die() at mu-plugin time, before
 	 * 'plugins_loaded' — nothing hooked later would ever see these events.
 	 *
@@ -398,15 +398,15 @@ if ( ! function_exists( 'wpopsec_maybe_unwantedip_report' ) ) {
 	 * tracker is for "this IP did something and was stopped", not every
 	 * signature this install happens to be tuning.
 	 */
-	function wpopsec_maybe_unwantedip_report( $module, $event, $action, $detail, $severity, $ip ) {
+	function shieldcore_maybe_unwantedip_report( $module, $event, $action, $detail, $severity, $ip ) {
 		if ( 'blocked' !== $action ) {
 			return;
 		}
-		if ( ! get_option( 'wpopsec_unwantedip_enabled', false ) ) {
+		if ( ! get_option( 'shieldcore_unwantedip_enabled', false ) ) {
 			return;
 		}
 
-		$api_key = trim( (string) get_option( 'wpopsec_unwantedip_api_key', '' ) );
+		$api_key = trim( (string) get_option( 'shieldcore_unwantedip_api_key', '' ) );
 		if ( '' === $api_key ) {
 			return;
 		}
@@ -414,7 +414,7 @@ if ( ! function_exists( 'wpopsec_maybe_unwantedip_report' ) ) {
 		// Never report LAN/reserved/trusted addresses — they're never a
 		// genuine attacker by definition, and the service only accepts
 		// public IPv4 anyway.
-		if ( '' === $ip || false === strpos( $ip, '.' ) || wpopsec_ip_is_exempt( $ip ) ) {
+		if ( '' === $ip || false === strpos( $ip, '.' ) || shieldcore_ip_is_exempt( $ip ) ) {
 			return;
 		}
 
@@ -422,7 +422,7 @@ if ( ! function_exists( 'wpopsec_maybe_unwantedip_report' ) ) {
 		// report dozens of times a minute — one report per IP per hour is
 		// plenty for a reputation tracker; the local Event Log already has
 		// the full detail for this install's own records.
-		$lock_key = 'wpopsec_uip_lock_' . md5( $ip );
+		$lock_key = 'shieldcore_uip_lock_' . md5( $ip );
 		if ( false !== get_transient( $lock_key ) ) {
 			return;
 		}
@@ -497,7 +497,7 @@ if ( ! function_exists( 'wpopsec_maybe_unwantedip_report' ) ) {
 	}
 }
 
-if ( ! function_exists( 'wpopsec_reserved_cidrs' ) ) {
+if ( ! function_exists( 'shieldcore_reserved_cidrs' ) ) {
 	/**
 	 * Private/reserved IPv4 space (RFC 1918 + IANA special-purpose registry).
 	 * Shared by every module: REMOTE_ADDR can't be spoofed over TCP, so a
@@ -506,7 +506,7 @@ if ( ! function_exists( 'wpopsec_reserved_cidrs' ) ) {
 	 * on it has no security value and guarantees self-lockout, so nothing in
 	 * this plugin (external lists, local escalation) is allowed to block it.
 	 */
-	function wpopsec_reserved_cidrs() {
+	function shieldcore_reserved_cidrs() {
 		return array(
 			'0.0.0.0/8',
 			'10.0.0.0/8',
@@ -527,8 +527,8 @@ if ( ! function_exists( 'wpopsec_reserved_cidrs' ) ) {
 	}
 }
 
-if ( ! function_exists( 'wpopsec_cidr_to_range' ) ) {
-	function wpopsec_cidr_to_range( $cidr ) {
+if ( ! function_exists( 'shieldcore_cidr_to_range' ) ) {
+	function shieldcore_cidr_to_range( $cidr ) {
 		list( $ip, $prefix ) = explode( '/', $cidr );
 		$mask  = ( 0xFFFFFFFF << ( 32 - (int) $prefix ) ) & 0xFFFFFFFF;
 		$start = ip2long( $ip ) & $mask;
@@ -536,24 +536,24 @@ if ( ! function_exists( 'wpopsec_cidr_to_range' ) ) {
 	}
 }
 
-if ( ! function_exists( 'wpopsec_reserved_ranges' ) ) {
+if ( ! function_exists( 'shieldcore_reserved_ranges' ) ) {
 	/** @return array<int, array{0:int,1:int}> */
-	function wpopsec_reserved_ranges() {
+	function shieldcore_reserved_ranges() {
 		static $ranges = null;
 		if ( null === $ranges ) {
-			$ranges = array_map( 'wpopsec_cidr_to_range', wpopsec_reserved_cidrs() );
+			$ranges = array_map( 'shieldcore_cidr_to_range', shieldcore_reserved_cidrs() );
 		}
 		return $ranges;
 	}
 }
 
-if ( ! function_exists( 'wpopsec_ip_is_reserved' ) ) {
-	function wpopsec_ip_is_reserved( $ip ) {
+if ( ! function_exists( 'shieldcore_ip_is_reserved' ) ) {
+	function shieldcore_ip_is_reserved( $ip ) {
 		$long = is_int( $ip ) ? $ip : ip2long( $ip );
 		if ( false === $long ) {
 			return false;
 		}
-		foreach ( wpopsec_reserved_ranges() as $r ) {
+		foreach ( shieldcore_reserved_ranges() as $r ) {
 			if ( $long >= $r[0] && $long <= $r[1] ) {
 				return true;
 			}
@@ -562,20 +562,20 @@ if ( ! function_exists( 'wpopsec_ip_is_reserved' ) ) {
 	}
 }
 
-if ( ! function_exists( 'wpopsec_trusted_networks_remote_file' ) ) {
+if ( ! function_exists( 'shieldcore_trusted_networks_remote_file' ) ) {
 	/**
 	 * Local cache of a CIDR-per-line list fetched daily from
-	 * wpopsec_trusted_networks_url — lets every install point at one
+	 * shieldcore_trusted_networks_url — lets every install point at one
 	 * centrally-maintained file (e.g. hosted on the main site) instead of
 	 * each server needing its own local copy kept in sync by hand.
 	 */
-	function wpopsec_trusted_networks_remote_file() {
-		return WPMU_PLUGIN_DIR . '/wp-opsec-checks/data/trusted-networks-remote.conf';
+	function shieldcore_trusted_networks_remote_file() {
+		return WPMU_PLUGIN_DIR . '/wp-shieldcore-checks/data/trusted-networks-remote.conf';
 	}
 }
 
-if ( ! function_exists( 'wpopsec_parse_cidr_file' ) ) {
-	function wpopsec_parse_cidr_file( $path ) {
+if ( ! function_exists( 'shieldcore_parse_cidr_file' ) ) {
+	function shieldcore_parse_cidr_file( $path ) {
 		$ranges = array();
 		if ( ! is_readable( $path ) ) {
 			return $ranges;
@@ -585,25 +585,25 @@ if ( ! function_exists( 'wpopsec_parse_cidr_file' ) ) {
 			if ( '' === $line || '#' === $line[0] || false === strpos( $line, '/' ) ) {
 				continue;
 			}
-			$ranges[] = wpopsec_cidr_to_range( $line );
+			$ranges[] = shieldcore_cidr_to_range( $line );
 		}
 		return $ranges;
 	}
 }
 
-if ( ! function_exists( 'wpopsec_parse_cidr_file_by_heading' ) ) {
+if ( ! function_exists( 'shieldcore_parse_cidr_file_by_heading' ) ) {
 	/**
-	 * Same source file wpopsec_parse_cidr_file() reads, grouped by the
+	 * Same source file shieldcore_parse_cidr_file() reads, grouped by the
 	 * "# Heading" comment that starts each blank-line-delimited section —
 	 * crawler-nets.conf's own structure (a section is a "# Heading" line,
 	 * then CIDRs and optional dated sub-comments, until the next blank
 	 * line). Only used to attribute a trusted match to a human-readable
 	 * source for the Bot Log — never for the actual exemption decision,
-	 * which stays on the flat range list from wpopsec_parse_cidr_file().
+	 * which stays on the flat range list from shieldcore_parse_cidr_file().
 	 *
 	 * @return array<string,array<int,array{0:int,1:int}>> heading => ranges
 	 */
-	function wpopsec_parse_cidr_file_by_heading( $path ) {
+	function shieldcore_parse_cidr_file_by_heading( $path ) {
 		$by_heading = array();
 		if ( ! is_readable( $path ) ) {
 			return $by_heading;
@@ -612,7 +612,7 @@ if ( ! function_exists( 'wpopsec_parse_cidr_file_by_heading' ) ) {
 		$heading     = null;
 		$after_blank = true;
 		// Deliberately no FILE_SKIP_EMPTY_LINES here, unlike
-		// wpopsec_parse_cidr_file() — this function's whole job is
+		// shieldcore_parse_cidr_file() — this function's whole job is
 		// noticing blank lines (they mark section boundaries), so
 		// stripping them before the loop even sees them would mean only
 		// the very first heading in the file is ever detected.
@@ -633,42 +633,42 @@ if ( ! function_exists( 'wpopsec_parse_cidr_file_by_heading' ) ) {
 			if ( null === $heading || false === strpos( $line, '/' ) ) {
 				continue;
 			}
-			$by_heading[ $heading ][] = wpopsec_cidr_to_range( $line );
+			$by_heading[ $heading ][] = shieldcore_cidr_to_range( $line );
 		}
 		return $by_heading;
 	}
 }
 
-if ( ! function_exists( 'wpopsec_trusted_ranges' ) ) {
+if ( ! function_exists( 'shieldcore_trusted_ranges' ) ) {
 	/**
 	 * Trusted networks — e.g. known search-engine crawler ranges you never
 	 * want blocked — from a daily-downloaded cache of an operator-supplied
-	 * URL (wpopsec_trusted_networks_url). Optional; empty if unconfigured.
+	 * URL (shieldcore_trusted_networks_url). Optional; empty if unconfigured.
 	 */
-	function wpopsec_trusted_ranges() {
+	function shieldcore_trusted_ranges() {
 		static $ranges = null;
 		if ( null !== $ranges ) {
 			return $ranges;
 		}
 
-		$ranges = wpopsec_parse_cidr_file( wpopsec_trusted_networks_remote_file() );
+		$ranges = shieldcore_parse_cidr_file( shieldcore_trusted_networks_remote_file() );
 
 		return $ranges;
 	}
 }
 
-if ( ! function_exists( 'wpopsec_trusted_networks_by_source_file' ) ) {
-	function wpopsec_trusted_networks_by_source_file() {
-		return WPMU_PLUGIN_DIR . '/wp-opsec-checks/data/trusted-networks-by-source.php';
+if ( ! function_exists( 'shieldcore_trusted_networks_by_source_file' ) ) {
+	function shieldcore_trusted_networks_by_source_file() {
+		return WPMU_PLUGIN_DIR . '/wp-shieldcore-checks/data/trusted-networks-by-source.php';
 	}
 }
 
-if ( ! function_exists( 'wpopsec_trusted_network_source' ) ) {
+if ( ! function_exists( 'shieldcore_trusted_network_source' ) ) {
 	/** @return string|null the crawler-nets.conf section heading covering $needle, or null if unattributable */
-	function wpopsec_trusted_network_source( $needle ) {
+	function shieldcore_trusted_network_source( $needle ) {
 		static $by_heading = null;
 		if ( null === $by_heading ) {
-			$file       = wpopsec_trusted_networks_by_source_file();
+			$file       = shieldcore_trusted_networks_by_source_file();
 			$by_heading = file_exists( $file ) ? require $file : array();
 		}
 		foreach ( $by_heading as $heading => $ranges ) {
@@ -682,16 +682,16 @@ if ( ! function_exists( 'wpopsec_trusted_network_source' ) ) {
 	}
 }
 
-if ( ! function_exists( 'wpopsec_bot_log_table' ) ) {
-	function wpopsec_bot_log_table() {
+if ( ! function_exists( 'shieldcore_bot_log_table' ) ) {
+	function shieldcore_bot_log_table() {
 		global $wpdb;
-		return $wpdb->prefix . 'wpopsec_bot_log';
+		return $wpdb->prefix . 'shieldcore_bot_log';
 	}
 }
 
-if ( ! function_exists( 'wpopsec_bot_log_sighting' ) ) {
+if ( ! function_exists( 'shieldcore_bot_log_sighting' ) ) {
 	/**
-	 * Called from wpopsec_ip_is_trusted() itself, right where it finds a
+	 * Called from shieldcore_ip_is_trusted() itself, right where it finds a
 	 * match — not a separate check re-deciding anything. A verified match
 	 * here can never be blocked by anything else in this codebase: every
 	 * module checks exemption before ever reaching a block decision, so
@@ -702,16 +702,16 @@ if ( ! function_exists( 'wpopsec_bot_log_sighting' ) ) {
 	 * answered by cross-checking the main Event Log at render time
 	 * instead, not by tracking state here.
 	 */
-	function wpopsec_bot_log_sighting( $needle, $ip_string ) {
+	function shieldcore_bot_log_sighting( $needle, $ip_string ) {
 		static $logged_this_request = array();
 		if ( isset( $logged_this_request[ $ip_string ] ) ) {
-			return; // wpopsec_ip_is_trusted() can be called more than once
+			return; // shieldcore_ip_is_trusted() can be called more than once
 			        // per request (each module checks exemption itself) —
 			        // one row per IP per request, not one per call.
 		}
 		$logged_this_request[ $ip_string ] = true;
 
-		$source = wpopsec_trusted_network_source( $needle );
+		$source = shieldcore_trusted_network_source( $needle );
 		if ( null === $source ) {
 			return; // matched, but no section header covers it — nothing useful to attribute
 		}
@@ -731,7 +731,7 @@ if ( ! function_exists( 'wpopsec_bot_log_sighting' ) ) {
 		}
 
 		global $wpdb;
-		$table = wpopsec_bot_log_table();
+		$table = shieldcore_bot_log_table();
 		$wpdb->suppress_errors( true );
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- $wpdb->insert() already parameterizes every value; the raw REQUEST_URI is intentional here, same as the events-table insert above.
 		$wpdb->insert(
@@ -749,16 +749,16 @@ if ( ! function_exists( 'wpopsec_bot_log_sighting' ) ) {
 	}
 }
 
-if ( ! function_exists( 'wpopsec_ip_is_trusted' ) ) {
-	function wpopsec_ip_is_trusted( $ip ) {
+if ( ! function_exists( 'shieldcore_ip_is_trusted' ) ) {
+	function shieldcore_ip_is_trusted( $ip ) {
 		$long = is_int( $ip ) ? $ip : ip2long( $ip );
 		if ( false === $long ) {
 			return false;
 		}
-		foreach ( wpopsec_trusted_ranges() as $r ) {
+		foreach ( shieldcore_trusted_ranges() as $r ) {
 			if ( $long >= $r[0] && $long <= $r[1] ) {
-				if ( function_exists( 'wpopsec_bot_log_sighting' ) ) {
-					wpopsec_bot_log_sighting( $long, is_int( $ip ) ? long2ip( $long ) : (string) $ip );
+				if ( function_exists( 'shieldcore_bot_log_sighting' ) ) {
+					shieldcore_bot_log_sighting( $long, is_int( $ip ) ? long2ip( $long ) : (string) $ip );
 				}
 				return true;
 			}
@@ -767,7 +767,7 @@ if ( ! function_exists( 'wpopsec_ip_is_trusted' ) ) {
 	}
 }
 
-if ( ! function_exists( 'wpopsec_ip_is_exempt' ) ) {
+if ( ! function_exists( 'shieldcore_ip_is_exempt' ) ) {
 	/**
 	 * Combined "never enforce against this IP" check — reserved,
 	 * operator-trusted (CIDR file/URL), or explicitly allowlisted. This is
@@ -778,60 +778,60 @@ if ( ! function_exists( 'wpopsec_ip_is_exempt' ) ) {
 	 * Accepts either a dotted-decimal string or an ip2long() integer — most
 	 * callers pass whichever form they already have on hand.
 	 */
-	function wpopsec_ip_is_exempt( $ip ) {
-		if ( wpopsec_ip_is_reserved( $ip ) || wpopsec_ip_is_trusted( $ip ) ) {
+	function shieldcore_ip_is_exempt( $ip ) {
+		if ( shieldcore_ip_is_reserved( $ip ) || shieldcore_ip_is_trusted( $ip ) ) {
 			return true;
 		}
 
 		$ip_string = is_int( $ip ) ? long2ip( $ip ) : (string) $ip;
-		return in_array( $ip_string, (array) get_option( 'wpopsec_ip_allowlist', array() ), true );
+		return in_array( $ip_string, (array) get_option( 'shieldcore_ip_allowlist', array() ), true );
 	}
 }
 
-if ( ! function_exists( 'wpopsec_local_blocklist_file' ) ) {
+if ( ! function_exists( 'shieldcore_local_blocklist_file' ) ) {
 	/**
 	 * Shared cross-module IP escalation: any check can call this to add an
 	 * IP to a short-lived local blocklist that ip-blocklist also enforces,
 	 * so one module's detection protects against that IP everywhere, not
 	 * just for the request that triggered it.
 	 */
-	function wpopsec_local_blocklist_file() {
-		return WPMU_PLUGIN_DIR . '/wp-opsec-checks/data/local-blocklist-ranges.php';
+	function shieldcore_local_blocklist_file() {
+		return WPMU_PLUGIN_DIR . '/wp-shieldcore-checks/data/local-blocklist-ranges.php';
 	}
 }
 
-if ( ! function_exists( 'wpopsec_local_blocklist_add' ) ) {
-	function wpopsec_local_blocklist_add( $ip, $reason, $ttl_seconds = DAY_IN_SECONDS ) {
+if ( ! function_exists( 'shieldcore_local_blocklist_add' ) ) {
+	function shieldcore_local_blocklist_add( $ip, $reason, $ttl_seconds = DAY_IN_SECONDS ) {
 		$long = ip2long( $ip );
-		// wpopsec_ip_is_exempt() now covers the allowlist too, not just
+		// shieldcore_ip_is_exempt() now covers the allowlist too, not just
 		// reserved/trusted — an explicitly never-block IP shouldn't even
 		// appear in the Local Blocklist list in the first place: relying
 		// only on the enforcement check skipping it there is fragile (a
 		// future check.php could get the order wrong) and confusing in the
 		// admin UI (an IP sitting in "blocked" that never actually gets
 		// blocked).
-		if ( false === $long || wpopsec_ip_is_exempt( $long ) ) {
+		if ( false === $long || shieldcore_ip_is_exempt( $long ) ) {
 			return false;
 		}
 
-		$list        = get_option( 'wpopsec_local_blocklist', array() );
+		$list        = get_option( 'shieldcore_local_blocklist', array() );
 		$list[ $ip ] = array(
 			'reason'     => (string) $reason,
 			'added_at'   => time(),
 			'expires_at' => time() + (int) $ttl_seconds,
 		);
-		update_option( 'wpopsec_local_blocklist', $list, false );
+		update_option( 'shieldcore_local_blocklist', $list, false );
 
-		wpopsec_local_blocklist_rebuild();
+		shieldcore_local_blocklist_rebuild();
 
 		return true;
 	}
 }
 
-if ( ! function_exists( 'wpopsec_local_blocklist_rebuild' ) ) {
+if ( ! function_exists( 'shieldcore_local_blocklist_rebuild' ) ) {
 	/** Drops expired entries and rewrites the compiled range file. */
-	function wpopsec_local_blocklist_rebuild() {
-		$list = get_option( 'wpopsec_local_blocklist', array() );
+	function shieldcore_local_blocklist_rebuild() {
+		$list = get_option( 'shieldcore_local_blocklist', array() );
 		$now  = time();
 		$kept = array();
 
@@ -843,7 +843,7 @@ if ( ! function_exists( 'wpopsec_local_blocklist_rebuild' ) ) {
 		}
 
 		if ( count( $kept ) !== count( $list ) ) {
-			update_option( 'wpopsec_local_blocklist', $kept, false );
+			update_option( 'shieldcore_local_blocklist', $kept, false );
 		}
 
 		$ranges = array();
@@ -855,18 +855,18 @@ if ( ! function_exists( 'wpopsec_local_blocklist_rebuild' ) ) {
 		}
 		usort( $ranges, function ( $a, $b ) { return $a[0] <=> $b[0]; } );
 
-		$file = wpopsec_local_blocklist_file();
+		$file = shieldcore_local_blocklist_file();
 		$dir  = dirname( $file );
 		if ( ! file_exists( $dir ) ) {
 			wp_mkdir_p( $dir );
 		}
 
 		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_var_export -- serialization format for this auto-generated cache file, not leftover debug output.
-		$export = "<?php\n// Auto-generated by wp-opsec. Do not edit.\nreturn " . var_export( $ranges, true ) . ";\n";
+		$export = "<?php\n// Auto-generated by wp-shieldcore. Do not edit.\nreturn " . var_export( $ranges, true ) . ";\n";
 		$tmp    = $file . '.tmp-' . bin2hex( random_bytes( 4 ) );
 		file_put_contents( $tmp, $export, LOCK_EX );
 		// Deliberately raw rename(), not WP_Filesystem: this runs from the
-		// early gate (check.php files call wpopsec_local_blocklist_add() on
+		// early gate (check.php files call shieldcore_local_blocklist_add() on
 		// a live block, well before WordPress finishes bootstrapping), where
 		// WP_Filesystem() — which needs wp-admin/includes/file.php and can
 		// prompt for credentials on some hosts — isn't safely available.
@@ -878,7 +878,7 @@ if ( ! function_exists( 'wpopsec_local_blocklist_rebuild' ) ) {
 	}
 }
 
-if ( defined( 'WPOPSEC_DISABLE' ) && WPOPSEC_DISABLE ) {
+if ( defined( 'SHIELDCORE_DISABLE' ) && SHIELDCORE_DISABLE ) {
 	return;
 }
 
@@ -888,20 +888,20 @@ if ( defined( 'WP_CLI' ) && WP_CLI ) {
 	return;
 }
 
-$GLOBALS['wpopsec_checks'] = array();
+$GLOBALS['shieldcore_checks'] = array();
 
 // Wrapped in an IIFE rather than left as top-level statements: this file is
 // require()'d directly as an mu-plugin (not inside any function), so bare
 // top-level variables here would otherwise leak into the global PHP
 // namespace for the rest of the request.
 ( function () {
-	$checks_dir = WPMU_PLUGIN_DIR . '/wp-opsec-checks';
+	$checks_dir = WPMU_PLUGIN_DIR . '/wp-shieldcore-checks';
 	foreach ( glob( $checks_dir . '/*.php' ) ?: array() as $check_file ) {
 		require $check_file;
 	}
 
 	usort(
-		$GLOBALS['wpopsec_checks'],
+		$GLOBALS['shieldcore_checks'],
 		function ( $a, $b ) {
 			// usort() isn't guaranteed stable before PHP 8 (this plugin's floor
 			// is 7.4), so 'seq' (registration order) breaks priority ties
@@ -910,7 +910,7 @@ $GLOBALS['wpopsec_checks'] = array();
 		}
 	);
 
-	foreach ( $GLOBALS['wpopsec_checks'] as $entry ) {
+	foreach ( $GLOBALS['shieldcore_checks'] as $entry ) {
 		$result = call_user_func( $entry['check'] );
 		if ( is_array( $result ) ) {
 			wp_die(

@@ -11,9 +11,9 @@ if ( ! defined( 'ABSPATH' ) ) {
  * dashboard, dropping a webshell into uploads, and hiding a malicious plugin
  * from the plugin list (which is what the 2026 supply-chain backdoors did).
  */
-class WPOpsec_Module_Hardening {
+class ShieldCore_Module_Hardening {
 
-	const CRON_HOOK = 'wpopsec_hardening_scan';
+	const CRON_HOOK = 'shieldcore_hardening_scan';
 
 	public static function activate() {
 		if ( ! wp_next_scheduled( self::CRON_HOOK ) ) {
@@ -27,11 +27,11 @@ class WPOpsec_Module_Hardening {
 	}
 
 	public static function register() {
-		add_action( 'admin_post_wpopsec_hd_save_settings', array( __CLASS__, 'handle_save_settings' ) );
-		add_action( 'admin_post_wpopsec_hd_scan_now', array( __CLASS__, 'handle_scan_now' ) );
+		add_action( 'admin_post_shieldcore_hd_save_settings', array( __CLASS__, 'handle_save_settings' ) );
+		add_action( 'admin_post_shieldcore_hd_scan_now', array( __CLASS__, 'handle_scan_now' ) );
 		add_action( self::CRON_HOOK, array( __CLASS__, 'scan_hidden_plugins' ) );
 
-		if ( get_option( 'wpopsec_hardening_disable_file_edit', true ) && ! defined( 'DISALLOW_FILE_EDIT' ) ) {
+		if ( get_option( 'shieldcore_hardening_disable_file_edit', true ) && ! defined( 'DISALLOW_FILE_EDIT' ) ) {
 			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- this is WordPress core's own recognized constant name (the same one wp-config.php normally defines); prefixing it would make WP core stop recognizing it.
 			define( 'DISALLOW_FILE_EDIT', true );
 		}
@@ -87,7 +87,7 @@ class WPOpsec_Module_Hardening {
 		);
 
 		if ( '' === trim( (string) $cleaned ) ) {
-			WPOpsec_Module_Loader::filesystem()->delete( $path );
+			ShieldCore_Module_Loader::filesystem()->delete( $path );
 		} elseif ( $cleaned !== $content ) {
 			file_put_contents( $path, $cleaned, LOCK_EX );
 		}
@@ -163,10 +163,10 @@ class WPOpsec_Module_Hardening {
 		}
 
 		$result = array( 'at' => time(), 'hidden' => $hidden, 'mu_plugins' => $mu );
-		update_option( 'wpopsec_hardening_hidden_result', $result, false );
+		update_option( 'shieldcore_hardening_hidden_result', $result, false );
 
 		if ( $hidden ) {
-			wpopsec_log_event(
+			shieldcore_log_event(
 				'hardening',
 				'hidden_plugin',
 				'noted',
@@ -183,7 +183,7 @@ class WPOpsec_Module_Hardening {
 	}
 
 	public static function handle_scan_now() {
-		check_admin_referer( 'wpopsec_hd_scan_now' );
+		check_admin_referer( 'shieldcore_hd_scan_now' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
@@ -193,15 +193,15 @@ class WPOpsec_Module_Hardening {
 	}
 
 	public static function handle_save_settings() {
-		check_admin_referer( 'wpopsec_hd_save_settings' );
+		check_admin_referer( 'shieldcore_hd_save_settings' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
 
-		update_option( 'wpopsec_hardening_disable_file_edit', isset( $_POST['disable_file_edit'] ) );
+		update_option( 'shieldcore_hardening_disable_file_edit', isset( $_POST['disable_file_edit'] ) );
 
 		$want_guard = isset( $_POST['uploads_guard'] );
-		update_option( 'wpopsec_hardening_uploads_guard', $want_guard );
+		update_option( 'shieldcore_hardening_uploads_guard', $want_guard );
 
 		$notice = '1';
 		if ( $want_guard ) {
@@ -218,25 +218,25 @@ class WPOpsec_Module_Hardening {
 
 
 	public static function render_page() {
-		$hidden_result = get_option( 'wpopsec_hardening_hidden_result', array() );
+		$hidden_result = get_option( 'shieldcore_hardening_hidden_result', array() );
 		$guard_active  = self::uploads_guard_active();
 		$file_edit_off = defined( 'DISALLOW_FILE_EDIT' ) && DISALLOW_FILE_EDIT;
 		$hidden        = (array) ( $hidden_result['hidden'] ?? array() );
 
-		WPOpsec_UI::open( 'hardening' );
+		ShieldCore_UI::open( 'hardening' );
 
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only result flags set only by this module's own admin-post redirects, which already check_admin_referer() before redirecting.
 		if ( isset( $_GET['saved'] ) && '1' === $_GET['saved'] ) {
-			WPOpsec_UI::notice( 'success', 'Settings saved.' );
+			ShieldCore_UI::notice( 'success', 'Settings saved.' );
 		} elseif ( isset( $_GET['saved'] ) && 'guardfail' === $_GET['saved'] ) {
-			WPOpsec_UI::notice( 'error', 'Could not write ' . self::uploads_htaccess_path() . ' — check filesystem permissions.' );
+			ShieldCore_UI::notice( 'error', 'Could not write ' . self::uploads_htaccess_path() . ' — check filesystem permissions.' );
 		}
 		if ( isset( $_GET['scanned'] ) ) {
-			WPOpsec_UI::notice( 'success', 'Scan complete.' );
+			ShieldCore_UI::notice( 'success', 'Scan complete.' );
 		}
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
-		WPOpsec_UI::tiles(
+		ShieldCore_UI::tiles(
 			array(
 				array(
 					'icon'  => $file_edit_off ? 'yes-alt' : 'warning',
@@ -259,81 +259,81 @@ class WPOpsec_Module_Hardening {
 			)
 		);
 
-		WPOpsec_UI::section( 'Hidden plugins', 'visibility' );
-		echo '<p class="wpopsec-help" style="margin-top:0">Files with a plugin header that exist on disk but do not appear in the Plugins screen. A backdoor can filter itself out of that list while staying active, so this compares against the filtered list the admin actually sees.</p>';
+		ShieldCore_UI::section( 'Hidden plugins', 'visibility' );
+		echo '<p class="shieldcore-help" style="margin-top:0">Files with a plugin header that exist on disk but do not appear in the Plugins screen. A backdoor can filter itself out of that list while staying active, so this compares against the filtered list the admin actually sees.</p>';
 
 		if ( empty( $hidden_result ) ) {
-			echo '<div class="wpopsec-empty"><span class="dashicons dashicons-marker" style="color:#646970"></span><p>Not scanned yet.</p></div>';
+			echo '<div class="shieldcore-empty"><span class="dashicons dashicons-marker" style="color:#646970"></span><p>Not scanned yet.</p></div>';
 		} elseif ( empty( $hidden ) ) {
-			echo '<div class="wpopsec-empty"><span class="dashicons dashicons-yes-alt"></span><p>No hidden plugins found.</p></div>';
+			echo '<div class="shieldcore-empty"><span class="dashicons dashicons-yes-alt"></span><p>No hidden plugins found.</p></div>';
 		} else {
 			$list = '<p><strong>Plugin files not shown in the plugin list:</strong></p><ul>';
 			foreach ( $hidden as $h ) {
 				$list .= '<li><code>' . esc_html( $h ) . '</code></li>';
 			}
 			$list .= '</ul><p>Inspect these on disk before deleting — note the file, then read its contents.</p>';
-			WPOpsec_UI::notice( 'error', $list, true );
+			ShieldCore_UI::notice( 'error', $list, true );
 		}
 
 		if ( ! empty( $hidden_result['mu_plugins'] ) ) {
-			echo '<p style="margin-bottom:4px"><strong>Must-use plugins</strong> <span class="wpopsec-muted">(always active, never listed on the Plugins screen)</span></p>';
+			echo '<p style="margin-bottom:4px"><strong>Must-use plugins</strong> <span class="shieldcore-muted">(always active, never listed on the Plugins screen)</span></p>';
 			echo '<ul style="margin:0 0 0 1.4em;list-style:disc">';
 			foreach ( $hidden_result['mu_plugins'] as $mu ) {
 				echo '<li><code>' . esc_html( $mu ) . '</code>'
-					. ( 'wp-opsec-early.php' === $mu ? ' <span class="wpopsec-muted">— installed by this plugin</span>' : '' )
+					. ( 'wp-shieldcore-early.php' === $mu ? ' <span class="shieldcore-muted">— installed by this plugin</span>' : '' )
 					. '</li>';
 			}
 			echo '</ul>';
 		}
 		?>
-		<div class="wpopsec-actions" style="margin-top:14px">
+		<div class="shieldcore-actions" style="margin-top:14px">
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( 'wpopsec_hd_scan_now' ); ?>
-				<input type="hidden" name="action" value="wpopsec_hd_scan_now">
+				<?php wp_nonce_field( 'shieldcore_hd_scan_now' ); ?>
+				<input type="hidden" name="action" value="shieldcore_hd_scan_now">
 				<?php submit_button( 'Scan now', 'secondary', 'submit', false ); ?>
 			</form>
 		</div>
 		<?php
-		WPOpsec_UI::section_end();
+		ShieldCore_UI::section_end();
 		?>
 
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-			<?php wp_nonce_field( 'wpopsec_hd_save_settings' ); ?>
-			<input type="hidden" name="action" value="wpopsec_hd_save_settings">
+			<?php wp_nonce_field( 'shieldcore_hd_save_settings' ); ?>
+			<input type="hidden" name="action" value="shieldcore_hd_save_settings">
 
-			<?php WPOpsec_UI::section( 'Settings', 'admin-generic' ); ?>
+			<?php ShieldCore_UI::section( 'Settings', 'admin-generic' ); ?>
 				<?php
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Dashboard file editor',
 					function () use ( $file_edit_off ) {
 						?>
-						<label><input type="checkbox" name="disable_file_edit" <?php checked( get_option( 'wpopsec_hardening_disable_file_edit', true ) ); ?>> Disable the plugin/theme code editor</label>
+						<label><input type="checkbox" name="disable_file_edit" <?php checked( get_option( 'shieldcore_hardening_disable_file_edit', true ) ); ?>> Disable the plugin/theme code editor</label>
 						<?php
-						WPOpsec_UI::badge( $file_edit_off ? 'currently disabled' : 'currently enabled', $file_edit_off ? 'good' : 'warn' );
+						ShieldCore_UI::badge( $file_edit_off ? 'currently disabled' : 'currently enabled', $file_edit_off ? 'good' : 'warn' );
 					},
 					'Anyone who reaches wp-admin as an administrator can otherwise edit PHP straight into a live file — the shortest path from a stolen password to running code.'
 				);
 
 				$is_apache = self::is_apache();
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'PHP in uploads',
 					function () use ( $guard_active, $is_apache ) {
 						?>
-						<label><input type="checkbox" name="uploads_guard" <?php checked( get_option( 'wpopsec_hardening_uploads_guard', false ) ); ?>> Block PHP execution in <code>wp-content/uploads</code></label>
+						<label><input type="checkbox" name="uploads_guard" <?php checked( get_option( 'shieldcore_hardening_uploads_guard', false ) ); ?>> Block PHP execution in <code>wp-content/uploads</code></label>
 						<?php
-						WPOpsec_UI::badge( $guard_active ? 'active' : 'not active', $guard_active ? 'good' : 'warn' );
+						ShieldCore_UI::badge( $guard_active ? 'active' : 'not active', $guard_active ? 'good' : 'warn' );
 						if ( ! $is_apache ) {
-							echo '<p class="wpopsec-help"><strong>This server does not look like Apache.</strong> nginx ignores <code>.htaccess</code>, so this needs an equivalent server-block rule instead:<br><code>location ~* /wp-content/uploads/.*\.php$ { deny all; }</code></p>';
+							echo '<p class="shieldcore-help"><strong>This server does not look like Apache.</strong> nginx ignores <code>.htaccess</code>, so this needs an equivalent server-block rule instead:<br><code>location ~* /wp-content/uploads/.*\.php$ { deny all; }</code></p>';
 						}
 					},
 					'Writes an <code>.htaccess</code> into the uploads folder. Any attacker who gets an arbitrary-file-upload primitive lands there first, and a .php file that cannot execute is inert.'
 				);
 				?>
-			<?php WPOpsec_UI::section_end(); ?>
+			<?php ShieldCore_UI::section_end(); ?>
 
 			<?php submit_button( 'Save settings' ); ?>
 		</form>
 		<?php
-		WPOpsec_UI::close();
+		ShieldCore_UI::close();
 	}
 }

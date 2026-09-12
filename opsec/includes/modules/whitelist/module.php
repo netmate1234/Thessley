@@ -4,7 +4,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Owns everything that feeds wpopsec_ip_is_exempt()'s trusted/allowlist
+ * Owns everything that feeds shieldcore_ip_is_exempt()'s trusted/allowlist
  * checks — the base layer being a CIDR-per-line file fetched from a URL
  * (e.g. known crawler ranges), plus a short list of individually-listed
  * IPv4 addresses on top of it. Both used to live as separate fields on
@@ -12,25 +12,25 @@ if ( ! defined( 'ABSPATH' ) ) {
  * and, separately, at local-blocklist escalation time — Geo Blocker, Geo
  * Login, Rate Limiter, Login Guard, and Query Guard's signature scan all
  * ignored them. Fixed at the source instead of patching each one by
- * hand: wpopsec_ip_is_exempt() (mu-loader) now checks both itself, and
+ * hand: shieldcore_ip_is_exempt() (mu-loader) now checks both itself, and
  * that's the one exemption check nearly every blocking module already
  * calls — so an entry here is honored everywhere automatically,
  * including any future module that follows the same pattern.
  *
  * No check.php: this module doesn't gate anything itself, it just owns
  * the settings UI and the daily refresh for data the early gate reads
- * directly (wpopsec_trusted_ranges(), wpopsec_ip_allowlist option).
+ * directly (shieldcore_trusted_ranges(), shieldcore_ip_allowlist option).
  */
-class WPOpsec_Module_Whitelist {
+class ShieldCore_Module_Whitelist {
 
-	const CRON_HOOK      = 'wpopsec_trusted_networks_refresh';
+	const CRON_HOOK      = 'shieldcore_trusted_networks_refresh';
 	const DEFAULT_URL    = 'https://wp-opsec.eagleeye-intelligence.com/wp-content/uploads/wp-opsec/crawler-nets.conf';
 
 	public static function activate() {
 		// add_option() is a no-op if the option already exists, so this only
 		// ever sets the default on a fresh install — it won't override a
 		// site that's pointed elsewhere, or clobber an intentional clear.
-		add_option( 'wpopsec_trusted_networks_url', self::DEFAULT_URL );
+		add_option( 'shieldcore_trusted_networks_url', self::DEFAULT_URL );
 
 		if ( ! wp_next_scheduled( self::CRON_HOOK ) ) {
 			wp_schedule_event( time(), 'daily', self::CRON_HOOK );
@@ -46,8 +46,8 @@ class WPOpsec_Module_Whitelist {
 
 	public static function register() {
 		add_action( self::CRON_HOOK, array( __CLASS__, 'refresh' ) );
-		add_action( 'admin_post_wpopsec_wl_save_settings', array( __CLASS__, 'handle_save_settings' ) );
-		add_action( 'admin_post_wpopsec_wl_refresh_now', array( __CLASS__, 'handle_refresh_now' ) );
+		add_action( 'admin_post_shieldcore_wl_save_settings', array( __CLASS__, 'handle_save_settings' ) );
+		add_action( 'admin_post_shieldcore_wl_refresh_now', array( __CLASS__, 'handle_refresh_now' ) );
 		return __CLASS__;
 	}
 
@@ -59,21 +59,21 @@ class WPOpsec_Module_Whitelist {
 	 * cache rather than clearing trust on a transient network hiccup.
 	 */
 	public static function refresh() {
-		$url  = trim( (string) get_option( 'wpopsec_trusted_networks_url', '' ) );
-		$dest = wpopsec_trusted_networks_remote_file();
+		$url  = trim( (string) get_option( 'shieldcore_trusted_networks_url', '' ) );
+		$dest = shieldcore_trusted_networks_remote_file();
 
 		if ( '' === $url ) {
 			if ( file_exists( $dest ) ) {
-				WPOpsec_Module_Loader::filesystem()->delete( $dest );
+				ShieldCore_Module_Loader::filesystem()->delete( $dest );
 			}
-			delete_option( 'wpopsec_trusted_networks_remote_stats' );
+			delete_option( 'shieldcore_trusted_networks_remote_stats' );
 			return;
 		}
 
 		$response = wp_remote_get( $url, array( 'timeout' => 20 ) );
 		if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
 			update_option(
-				'wpopsec_trusted_networks_remote_stats',
+				'shieldcore_trusted_networks_remote_stats',
 				array(
 					'error'      => is_wp_error( $response ) ? $response->get_error_message() : 'HTTP ' . wp_remote_retrieve_response_code( $response ),
 					'checked_at' => time(),
@@ -90,16 +90,16 @@ class WPOpsec_Module_Whitelist {
 		}
 
 		$tmp = $dest . '.tmp-' . wp_generate_password( 8, false );
-		$fs  = WPOpsec_Module_Loader::filesystem();
+		$fs  = ShieldCore_Module_Loader::filesystem();
 		$fs->put_contents( $tmp, $body, FS_CHMOD_FILE );
-		$count = count( wpopsec_parse_cidr_file( $tmp ) );
+		$count = count( shieldcore_parse_cidr_file( $tmp ) );
 
 		if ( $count < 1 ) {
 			// Empty or unparseable response — don't let a bad fetch silently
 			// wipe out a previously-working trusted list.
 			$fs->delete( $tmp );
 			update_option(
-				'wpopsec_trusted_networks_remote_stats',
+				'shieldcore_trusted_networks_remote_stats',
 				array(
 					'error'      => 'downloaded file had no valid CIDR lines, previous cache kept',
 					'checked_at' => time(),
@@ -113,7 +113,7 @@ class WPOpsec_Module_Whitelist {
 		self::write_by_source( $dest );
 
 		update_option(
-			'wpopsec_trusted_networks_remote_stats',
+			'shieldcore_trusted_networks_remote_stats',
 			array(
 				'count'      => $count,
 				'updated_at' => time(),
@@ -130,19 +130,19 @@ class WPOpsec_Module_Whitelist {
 	 * "trusted". Not used for the exemption decision itself.
 	 */
 	private static function write_by_source( $source_file ) {
-		$by_heading = wpopsec_parse_cidr_file_by_heading( $source_file );
+		$by_heading = shieldcore_parse_cidr_file_by_heading( $source_file );
 
-		$file   = wpopsec_trusted_networks_by_source_file();
+		$file   = shieldcore_trusted_networks_by_source_file();
 		$dir    = dirname( $file );
 		if ( ! file_exists( $dir ) ) {
 			wp_mkdir_p( $dir );
 		}
 
 		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_var_export -- serialization format for this auto-generated cache file, not leftover debug output.
-		$export = "<?php\n// Auto-generated by wp-opsec whitelist module. Do not edit.\nreturn " . var_export( $by_heading, true ) . ";\n";
+		$export = "<?php\n// Auto-generated by shieldcore-security whitelist module. Do not edit.\nreturn " . var_export( $by_heading, true ) . ";\n";
 
 		$tmp = $file . '.tmp-' . wp_generate_password( 8, false );
-		$fs  = WPOpsec_Module_Loader::filesystem();
+		$fs  = ShieldCore_Module_Loader::filesystem();
 		$fs->put_contents( $tmp, $export, FS_CHMOD_FILE );
 		$fs->move( $tmp, $file, true );
 
@@ -152,7 +152,7 @@ class WPOpsec_Module_Whitelist {
 	}
 
 	public static function handle_refresh_now() {
-		check_admin_referer( 'wpopsec_wl_refresh_now' );
+		check_admin_referer( 'shieldcore_wl_refresh_now' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
@@ -162,7 +162,7 @@ class WPOpsec_Module_Whitelist {
 	}
 
 	public static function handle_save_settings() {
-		check_admin_referer( 'wpopsec_wl_save_settings' );
+		check_admin_referer( 'shieldcore_wl_save_settings' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
@@ -170,8 +170,8 @@ class WPOpsec_Module_Whitelist {
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- validated below via filter_var( ..., FILTER_VALIDATE_URL ) before it's ever stored.
 		$trusted_url_raw = isset( $_POST['trusted_networks_url'] ) ? trim( wp_unslash( $_POST['trusted_networks_url'] ) ) : '';
 		$trusted_url     = ( '' !== $trusted_url_raw && false !== filter_var( $trusted_url_raw, FILTER_VALIDATE_URL ) ) ? $trusted_url_raw : '';
-		$url_changed     = $trusted_url !== get_option( 'wpopsec_trusted_networks_url', '' );
-		update_option( 'wpopsec_trusted_networks_url', $trusted_url );
+		$url_changed     = $trusted_url !== get_option( 'shieldcore_trusted_networks_url', '' );
+		update_option( 'shieldcore_trusted_networks_url', $trusted_url );
 
 		if ( $url_changed ) {
 			// Fetch immediately on save rather than waiting for tomorrow's
@@ -190,29 +190,29 @@ class WPOpsec_Module_Whitelist {
 				}
 			)
 		);
-		update_option( 'wpopsec_ip_allowlist', $list );
+		update_option( 'shieldcore_ip_allowlist', $list );
 
 		wp_safe_redirect( add_query_arg( 'saved', '1', wp_get_referer() ) );
 		exit;
 	}
 
 	public static function render_page() {
-		$trusted_url          = get_option( 'wpopsec_trusted_networks_url', '' );
-		$trusted_remote_stats = get_option( 'wpopsec_trusted_networks_remote_stats', array() );
-		$allowlist            = get_option( 'wpopsec_ip_allowlist', array() );
+		$trusted_url          = get_option( 'shieldcore_trusted_networks_url', '' );
+		$trusted_remote_stats = get_option( 'shieldcore_trusted_networks_remote_stats', array() );
+		$allowlist            = get_option( 'shieldcore_ip_allowlist', array() );
 
-		WPOpsec_UI::open( 'whitelist' );
+		ShieldCore_UI::open( 'whitelist' );
 
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only result flags set only by this module's own admin-post redirects, which already check_admin_referer() before redirecting.
 		if ( isset( $_GET['saved'] ) ) {
-			WPOpsec_UI::notice( 'success', 'Settings saved.' );
+			ShieldCore_UI::notice( 'success', 'Settings saved.' );
 		}
 		if ( isset( $_GET['refreshed'] ) ) {
-			WPOpsec_UI::notice( 'success', 'Trusted networks list refreshed.' );
+			ShieldCore_UI::notice( 'success', 'Trusted networks list refreshed.' );
 		}
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
-		WPOpsec_UI::tiles(
+		ShieldCore_UI::tiles(
 			array(
 				array(
 					'icon'  => 'admin-site',
@@ -225,21 +225,21 @@ class WPOpsec_Module_Whitelist {
 		);
 
 		?>
-		<div class="wpopsec-actions" style="margin-bottom:18px">
+		<div class="shieldcore-actions" style="margin-bottom:18px">
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( 'wpopsec_wl_refresh_now' ); ?>
-				<input type="hidden" name="action" value="wpopsec_wl_refresh_now">
+				<?php wp_nonce_field( 'shieldcore_wl_refresh_now' ); ?>
+				<input type="hidden" name="action" value="shieldcore_wl_refresh_now">
 				<?php submit_button( 'Refresh trusted networks now', 'secondary', 'submit', false ); ?>
 			</form>
 		</div>
 
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-			<?php wp_nonce_field( 'wpopsec_wl_save_settings' ); ?>
-			<input type="hidden" name="action" value="wpopsec_wl_save_settings">
+			<?php wp_nonce_field( 'shieldcore_wl_save_settings' ); ?>
+			<input type="hidden" name="action" value="shieldcore_wl_save_settings">
 
-			<?php WPOpsec_UI::section( 'Trusted networks', 'admin-site' ); ?>
+			<?php ShieldCore_UI::section( 'Trusted networks', 'admin-site' ); ?>
 				<?php
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'URL',
 					function () use ( $trusted_url, $trusted_remote_stats ) {
 						?>
@@ -248,9 +248,9 @@ class WPOpsec_Module_Whitelist {
 						if ( '' !== $trusted_url ) {
 							echo ' ';
 							if ( ! empty( $trusted_remote_stats['error'] ) ) {
-								WPOpsec_UI::badge( 'fetch failed: ' . $trusted_remote_stats['error'], 'bad', 'warning' );
+								ShieldCore_UI::badge( 'fetch failed: ' . $trusted_remote_stats['error'], 'bad', 'warning' );
 							} elseif ( ! empty( $trusted_remote_stats['count'] ) ) {
-								WPOpsec_UI::badge(
+								ShieldCore_UI::badge(
 									sprintf( '%d networks — updated %s', $trusted_remote_stats['count'], human_time_diff( $trusted_remote_stats['updated_at'] ) . ' ago' ),
 									'good',
 									'yes-alt'
@@ -263,11 +263,11 @@ class WPOpsec_Module_Whitelist {
 					'The base of the whitelist — a CIDR-per-line file (e.g. known crawler ranges) that\'s always exempt, from every blocking module. Downloaded once a day (also re-fetched immediately when this URL changes) and cached locally, so every install can point at one centrally-maintained file instead of each server keeping its own copy in sync by hand.'
 				);
 				?>
-			<?php WPOpsec_UI::section_end(); ?>
+			<?php ShieldCore_UI::section_end(); ?>
 
-			<?php WPOpsec_UI::section( 'Individual IPs', 'yes-alt' ); ?>
+			<?php ShieldCore_UI::section( 'Individual IPs', 'yes-alt' ); ?>
 				<?php
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Never-block IPs',
 					function () use ( $allowlist ) {
 						?>
@@ -277,11 +277,11 @@ class WPOpsec_Module_Whitelist {
 					'One IPv4 per line, on top of the trusted networks above. Use this for your own address, a monitoring service, or anything else that should never be blocked no matter what triggers — the same way your LAN and reserved IP space always are.'
 				);
 				?>
-			<?php WPOpsec_UI::section_end(); ?>
+			<?php ShieldCore_UI::section_end(); ?>
 
 			<?php submit_button( 'Save settings' ); ?>
 		</form>
 		<?php
-		WPOpsec_UI::close();
+		ShieldCore_UI::close();
 	}
 }

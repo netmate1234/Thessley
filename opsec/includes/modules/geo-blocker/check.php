@@ -3,8 +3,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-// Copied verbatim into wp-content/mu-plugins/wp-opsec-checks/ by the
-// geo-blocker module on activation. Runs inside wp-opsec-early.php.
+// Copied verbatim into wp-content/mu-plugins/wp-shieldcore-checks/ by the
+// geo-blocker module on activation. Runs inside wp-shieldcore-early.php.
 //
 // Binary search over a flat file of fixed 9-byte records (4-byte start,
 // 4-byte end, 1-byte country index) rather than loading ~358,000 ranges
@@ -20,9 +20,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 // credentials on some hosts, neither appropriate for a per-request hot path
 // that must stay usable before WordPress finishes loading at all.
 
-if ( ! function_exists( 'wpopsec_geo_lookup' ) ) {
+if ( ! function_exists( 'shieldcore_geo_lookup' ) ) {
 	/** @return int|null country index, or null if the file is missing/IP not found */
-	function wpopsec_geo_lookup( $file, $needle ) {
+	function shieldcore_geo_lookup( $file, $needle ) {
 		static $fh = null;
 		static $opened_path = null;
 		static $count = null;
@@ -66,31 +66,31 @@ if ( ! function_exists( 'wpopsec_geo_lookup' ) ) {
 	}
 }
 
-if ( ! function_exists( 'wpopsec_geo_country_label' ) ) {
+if ( ! function_exists( 'shieldcore_geo_country_label' ) ) {
 	/**
 	 * Only called on an actual match (rare), so loading the small names
 	 * map here — rather than carrying the full country list into every
 	 * request — costs nothing on the hot path.
 	 */
-	function wpopsec_geo_country_label( $idx ) {
+	function shieldcore_geo_country_label( $idx ) {
 		static $labels = null;
 		if ( null === $labels ) {
-			$file   = WPMU_PLUGIN_DIR . '/wp-opsec-checks/data/geo-country-names.php';
+			$file   = WPMU_PLUGIN_DIR . '/wp-shieldcore-checks/data/geo-country-names.php';
 			$labels = is_readable( $file ) ? (array) include $file : array();
 		}
 		return $labels[ $idx ] ?? "index {$idx}";
 	}
 }
 
-wpopsec_register_check(
+shieldcore_register_check(
 	function () {
-		$indices = get_option( 'wpopsec_geo_country_indices', array() );
+		$indices = get_option( 'shieldcore_geo_country_indices', array() );
 		if ( empty( $indices ) ) {
 			return null; // nothing configured to block or allow
 		}
 
-		$ip = wpopsec_client_ip();
-		if ( '' === $ip || false === strpos( $ip, '.' ) || wpopsec_ip_is_exempt( $ip ) ) {
+		$ip = shieldcore_client_ip();
+		if ( '' === $ip || false === strpos( $ip, '.' ) || shieldcore_ip_is_exempt( $ip ) ) {
 			return null;
 		}
 
@@ -99,13 +99,13 @@ wpopsec_register_check(
 			return null;
 		}
 
-		$file = WPMU_PLUGIN_DIR . '/wp-opsec-checks/data/geo-country-index.bin';
-		$idx  = wpopsec_geo_lookup( $file, $needle );
+		$file = WPMU_PLUGIN_DIR . '/wp-shieldcore-checks/data/geo-country-index.bin';
+		$idx  = shieldcore_geo_lookup( $file, $needle );
 		if ( null === $idx ) {
 			return null; // unknown to the dataset — fail open, not closed
 		}
 
-		$mode    = get_option( 'wpopsec_geo_mode', 'blocklist' );
+		$mode    = get_option( 'shieldcore_geo_mode', 'blocklist' );
 		$in_list = in_array( $idx, $indices, true );
 
 		// blocklist: block if the country IS in the list.
@@ -115,15 +115,15 @@ wpopsec_register_check(
 			return null;
 		}
 
-		$enforce = get_option( 'wpopsec_geo_enforce_mode', 'log' );
-		$label   = wpopsec_geo_country_label( $idx );
+		$enforce = get_option( 'shieldcore_geo_enforce_mode', 'log' );
+		$label   = shieldcore_geo_country_label( $idx );
 
 		if ( 'block' !== $enforce ) {
-			wpopsec_log_event( 'geo-blocker', 'country_match', 'logged', "country {$label}, mode={$mode} (log-only)", 6 );
+			shieldcore_log_event( 'geo-blocker', 'country_match', 'logged', "country {$label}, mode={$mode} (log-only)", 6 );
 			return null;
 		}
 
-		wpopsec_log_event( 'geo-blocker', 'country_match', 'blocked', "country {$label}, mode={$mode}", 8 );
+		shieldcore_log_event( 'geo-blocker', 'country_match', 'blocked', "country {$label}, mode={$mode}", 8 );
 
 		return array( 'reason' => 'Access denied.' );
 	}

@@ -15,9 +15,9 @@ if ( ! defined( 'ABSPATH' ) ) {
  * snapshot diff catches anything written straight to the database, which
  * bypasses hooks entirely.
  */
-class WPOpsec_Module_User_Watchdog {
+class ShieldCore_Module_User_Watchdog {
 
-	const CRON_HOOK = 'wpopsec_user_watchdog_scan';
+	const CRON_HOOK = 'shieldcore_user_watchdog_scan';
 
 	/** Capabilities that make an account worth alerting on. */
 	const SENSITIVE_CAPS = array( 'manage_options', 'edit_users', 'install_plugins', 'edit_files', 'unfiltered_html' );
@@ -34,12 +34,12 @@ class WPOpsec_Module_User_Watchdog {
 	}
 
 	public static function register() {
-		add_action( 'admin_post_wpopsec_uw_save_settings', array( __CLASS__, 'handle_save_settings' ) );
-		add_action( 'admin_post_wpopsec_uw_scan_now', array( __CLASS__, 'handle_scan_now' ) );
-		add_action( 'admin_post_wpopsec_uw_acknowledge', array( __CLASS__, 'handle_acknowledge' ) );
+		add_action( 'admin_post_shieldcore_uw_save_settings', array( __CLASS__, 'handle_save_settings' ) );
+		add_action( 'admin_post_shieldcore_uw_scan_now', array( __CLASS__, 'handle_scan_now' ) );
+		add_action( 'admin_post_shieldcore_uw_acknowledge', array( __CLASS__, 'handle_acknowledge' ) );
 		add_action( self::CRON_HOOK, array( __CLASS__, 'scan' ) );
 
-		if ( get_option( 'wpopsec_user_watchdog_enabled', true ) ) {
+		if ( get_option( 'shieldcore_user_watchdog_enabled', true ) ) {
 			add_action( 'user_register', array( __CLASS__, 'on_user_register' ), 10, 1 );
 			add_action( 'set_user_role', array( __CLASS__, 'on_set_role' ), 10, 3 );
 			add_action( 'profile_update', array( __CLASS__, 'on_profile_update' ), 10, 2 );
@@ -122,13 +122,13 @@ class WPOpsec_Module_User_Watchdog {
 
 	public static function snapshot() {
 		$snap = self::build_snapshot();
-		update_option( 'wpopsec_user_watchdog_snapshot', $snap, false );
-		update_option( 'wpopsec_user_watchdog_snapshot_at', time(), false );
+		update_option( 'shieldcore_user_watchdog_snapshot', $snap, false );
+		update_option( 'shieldcore_user_watchdog_snapshot_at', time(), false );
 		return $snap;
 	}
 
 	private static function add_alert( $type, $message, $user_id = 0 ) {
-		$alerts   = (array) get_option( 'wpopsec_user_watchdog_alerts', array() );
+		$alerts   = (array) get_option( 'shieldcore_user_watchdog_alerts', array() );
 		$alerts[] = array(
 			'at'      => time(),
 			'type'    => $type,
@@ -141,9 +141,9 @@ class WPOpsec_Module_User_Watchdog {
 			$alerts = array_slice( $alerts, -100 );
 		}
 
-		update_option( 'wpopsec_user_watchdog_alerts', $alerts, false );
+		update_option( 'shieldcore_user_watchdog_alerts', $alerts, false );
 
-		if ( get_option( 'wpopsec_user_watchdog_email', false ) ) {
+		if ( get_option( 'shieldcore_user_watchdog_email', false ) ) {
 			self::send_alert_email( $type, $message );
 		}
 	}
@@ -152,11 +152,11 @@ class WPOpsec_Module_User_Watchdog {
 		// Rate-limited: a compromise can generate a burst of changes, and
 		// mailing each one risks the whole batch being throttled or spam-
 		// filtered — losing the first notification, which is the useful one.
-		$last = (int) get_option( 'wpopsec_user_watchdog_last_email', 0 );
+		$last = (int) get_option( 'shieldcore_user_watchdog_last_email', 0 );
 		if ( $last > time() - ( 15 * MINUTE_IN_SECONDS ) ) {
 			return;
 		}
-		update_option( 'wpopsec_user_watchdog_last_email', time(), false );
+		update_option( 'shieldcore_user_watchdog_last_email', time(), false );
 
 		$site = wp_specialchars_decode( get_option( 'blogname' ), ENT_QUOTES );
 
@@ -172,7 +172,7 @@ class WPOpsec_Module_User_Watchdog {
 					'Detail: ' . $message,
 					'Time:   ' . current_time( 'mysql' ),
 					'',
-					'Review: ' . WPOpsec_Menu_Router::url( 'user-watchdog' ),
+					'Review: ' . ShieldCore_Menu_Router::url( 'user-watchdog' ),
 					'',
 					'If this was not you or another administrator, treat the site as compromised:',
 					'check Users for accounts you do not recognise, and run a File Integrity scan.',
@@ -205,7 +205,7 @@ class WPOpsec_Module_User_Watchdog {
 			self::actor()
 		);
 
-		wpopsec_log_event( 'user-watchdog', 'privileged_user_created', 'noted', $detail );
+		shieldcore_log_event( 'user-watchdog', 'privileged_user_created', 'noted', $detail );
 		self::add_alert( 'privileged_user_created', $detail, $user_id );
 		self::snapshot();
 	}
@@ -241,7 +241,7 @@ class WPOpsec_Module_User_Watchdog {
 				$role,
 				self::actor()
 			);
-			wpopsec_log_event( 'user-watchdog', 'privilege_escalation', 'noted', $detail );
+			shieldcore_log_event( 'user-watchdog', 'privilege_escalation', 'noted', $detail );
 			self::add_alert( 'privilege_escalation', $detail, $user_id );
 		}
 
@@ -277,7 +277,7 @@ class WPOpsec_Module_User_Watchdog {
 				$user->user_email,
 				self::actor()
 			);
-			wpopsec_log_event( 'user-watchdog', 'admin_email_changed', 'noted', $detail );
+			shieldcore_log_event( 'user-watchdog', 'admin_email_changed', 'noted', $detail );
 			self::add_alert( 'admin_email_changed', $detail, $user_id );
 		}
 
@@ -285,10 +285,10 @@ class WPOpsec_Module_User_Watchdog {
 	}
 
 	public static function on_user_deleted( $user_id ) {
-		$snap = (array) get_option( 'wpopsec_user_watchdog_snapshot', array() );
+		$snap = (array) get_option( 'shieldcore_user_watchdog_snapshot', array() );
 		if ( isset( $snap[ $user_id ] ) ) {
 			$detail = sprintf( 'privileged account "%s" deleted by %s', $snap[ $user_id ]['login'], self::actor() );
-			wpopsec_log_event( 'user-watchdog', 'privileged_user_deleted', 'noted', $detail );
+			shieldcore_log_event( 'user-watchdog', 'privileged_user_deleted', 'noted', $detail );
 			self::add_alert( 'privileged_user_deleted', $detail, $user_id );
 		}
 		self::snapshot();
@@ -299,7 +299,7 @@ class WPOpsec_Module_User_Watchdog {
 	 * directly to wp_users/wp_usermeta with raw SQL, which fires no hooks.
 	 */
 	public static function scan() {
-		$previous = (array) get_option( 'wpopsec_user_watchdog_snapshot', array() );
+		$previous = (array) get_option( 'shieldcore_user_watchdog_snapshot', array() );
 		$current  = self::build_snapshot();
 
 		if ( empty( $previous ) ) {
@@ -329,7 +329,7 @@ class WPOpsec_Module_User_Watchdog {
 				$info['email'],
 				implode( ',', $info['roles'] )
 			);
-			wpopsec_log_event( 'user-watchdog', 'unexplained_privileged_user', 'noted', $detail );
+			shieldcore_log_event( 'user-watchdog', 'unexplained_privileged_user', 'noted', $detail );
 			self::add_alert( 'unexplained_privileged_user', $detail, $id );
 		}
 
@@ -342,7 +342,7 @@ class WPOpsec_Module_User_Watchdog {
 				$diff['before']['email'],
 				$diff['after']['email']
 			);
-			wpopsec_log_event( 'user-watchdog', 'privileged_user_changed', 'noted', $detail );
+			shieldcore_log_event( 'user-watchdog', 'privileged_user_changed', 'noted', $detail );
 			self::add_alert( 'privileged_user_changed', $detail, $id );
 		}
 
@@ -352,7 +352,7 @@ class WPOpsec_Module_User_Watchdog {
 	}
 
 	public static function handle_scan_now() {
-		check_admin_referer( 'wpopsec_uw_scan_now' );
+		check_admin_referer( 'shieldcore_uw_scan_now' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
@@ -362,43 +362,43 @@ class WPOpsec_Module_User_Watchdog {
 	}
 
 	public static function handle_acknowledge() {
-		check_admin_referer( 'wpopsec_uw_acknowledge' );
+		check_admin_referer( 'shieldcore_uw_acknowledge' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
-		update_option( 'wpopsec_user_watchdog_alerts', array(), false );
+		update_option( 'shieldcore_user_watchdog_alerts', array(), false );
 		wp_safe_redirect( add_query_arg( 'acknowledged', '1', wp_get_referer() ) );
 		exit;
 	}
 
 	public static function handle_save_settings() {
-		check_admin_referer( 'wpopsec_uw_save_settings' );
+		check_admin_referer( 'shieldcore_uw_save_settings' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
-		update_option( 'wpopsec_user_watchdog_enabled', isset( $_POST['enabled'] ) );
-		update_option( 'wpopsec_user_watchdog_email', isset( $_POST['email_alerts'] ) );
+		update_option( 'shieldcore_user_watchdog_enabled', isset( $_POST['enabled'] ) );
+		update_option( 'shieldcore_user_watchdog_email', isset( $_POST['email_alerts'] ) );
 		wp_safe_redirect( add_query_arg( 'saved', '1', wp_get_referer() ) );
 		exit;
 	}
 
 
 	public static function render_page() {
-		$alerts   = array_reverse( (array) get_option( 'wpopsec_user_watchdog_alerts', array() ) );
-		$snapshot = (array) get_option( 'wpopsec_user_watchdog_snapshot', array() );
-		$snap_at  = (int) get_option( 'wpopsec_user_watchdog_snapshot_at', 0 );
+		$alerts   = array_reverse( (array) get_option( 'shieldcore_user_watchdog_alerts', array() ) );
+		$snapshot = (array) get_option( 'shieldcore_user_watchdog_snapshot', array() );
+		$snap_at  = (int) get_option( 'shieldcore_user_watchdog_snapshot_at', 0 );
 
-		WPOpsec_UI::open( 'user-watchdog' );
+		ShieldCore_UI::open( 'user-watchdog' );
 
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only result flags set only by this module's own admin-post redirects, which already check_admin_referer() before redirecting.
 		foreach ( array( 'saved' => 'Settings saved.', 'scanned' => 'Scan complete.', 'acknowledged' => 'Alerts cleared.' ) as $k => $msg ) {
 			if ( isset( $_GET[ $k ] ) ) {
-				WPOpsec_UI::notice( 'success', $msg );
+				ShieldCore_UI::notice( 'success', $msg );
 			}
 		}
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
-		WPOpsec_UI::tiles(
+		ShieldCore_UI::tiles(
 			array(
 				array(
 					'icon'  => $alerts ? 'warning' : 'yes-alt',
@@ -421,91 +421,91 @@ class WPOpsec_Module_User_Watchdog {
 			)
 		);
 
-		WPOpsec_UI::section( 'Alerts', 'warning' );
+		ShieldCore_UI::section( 'Alerts', 'warning' );
 		if ( empty( $alerts ) ) {
-			echo '<div class="wpopsec-empty"><span class="dashicons dashicons-yes-alt"></span><p>No outstanding alerts.</p></div>';
+			echo '<div class="shieldcore-empty"><span class="dashicons dashicons-yes-alt"></span><p>No outstanding alerts.</p></div>';
 		} else {
 			?>
-			<table class="wpopsec-table">
+			<table class="shieldcore-table">
 				<thead><tr><th style="width:140px">When</th><th style="width:210px">Type</th><th>Detail</th></tr></thead>
 				<tbody>
 				<?php foreach ( $alerts as $a ) : ?>
 					<tr>
-						<td class="wpopsec-nowrap"><?php echo esc_html( date_i18n( 'M j, H:i', (int) $a['at'] ) ); ?></td>
-						<td><?php WPOpsec_UI::badge( $a['type'], 'bad' ); ?></td>
-						<td class="wpopsec-muted"><?php echo esc_html( $a['message'] ); ?></td>
+						<td class="shieldcore-nowrap"><?php echo esc_html( date_i18n( 'M j, H:i', (int) $a['at'] ) ); ?></td>
+						<td><?php ShieldCore_UI::badge( $a['type'], 'bad' ); ?></td>
+						<td class="shieldcore-muted"><?php echo esc_html( $a['message'] ); ?></td>
 					</tr>
 				<?php endforeach; ?>
 				</tbody>
 			</table>
-			<div class="wpopsec-actions" style="margin-top:14px">
+			<div class="shieldcore-actions" style="margin-top:14px">
 				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-					<?php wp_nonce_field( 'wpopsec_uw_acknowledge' ); ?>
-					<input type="hidden" name="action" value="wpopsec_uw_acknowledge">
+					<?php wp_nonce_field( 'shieldcore_uw_acknowledge' ); ?>
+					<input type="hidden" name="action" value="shieldcore_uw_acknowledge">
 					<?php submit_button( 'Acknowledge &amp; clear', 'secondary', 'submit', false ); ?>
 				</form>
 			</div>
 			<?php
 		}
-		WPOpsec_UI::section_end();
+		ShieldCore_UI::section_end();
 
-		WPOpsec_UI::section( 'Privileged accounts', 'admin-users', sprintf( '%d account(s)', count( $snapshot ) ) );
+		ShieldCore_UI::section( 'Privileged accounts', 'admin-users', sprintf( '%d account(s)', count( $snapshot ) ) );
 		?>
-		<table class="wpopsec-table">
+		<table class="shieldcore-table">
 			<thead><tr><th style="width:60px">ID</th><th style="width:180px">Login</th><th style="width:240px">Email</th><th>Roles</th></tr></thead>
 			<tbody>
 			<?php foreach ( $snapshot as $id => $info ) : ?>
 				<tr>
 					<td><?php echo esc_html( $id ); ?></td>
 					<td><strong><?php echo esc_html( $info['login'] ); ?></strong></td>
-					<td class="wpopsec-muted"><?php echo esc_html( $info['email'] ); ?></td>
-					<td><?php foreach ( $info['roles'] as $r ) { WPOpsec_UI::badge( $r, 'quiet' ); echo ' '; } ?></td>
+					<td class="shieldcore-muted"><?php echo esc_html( $info['email'] ); ?></td>
+					<td><?php foreach ( $info['roles'] as $r ) { ShieldCore_UI::badge( $r, 'quiet' ); echo ' '; } ?></td>
 				</tr>
 			<?php endforeach; ?>
 			</tbody>
 		</table>
-		<div class="wpopsec-actions" style="margin-top:14px">
+		<div class="shieldcore-actions" style="margin-top:14px">
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( 'wpopsec_uw_scan_now' ); ?>
-				<input type="hidden" name="action" value="wpopsec_uw_scan_now">
+				<?php wp_nonce_field( 'shieldcore_uw_scan_now' ); ?>
+				<input type="hidden" name="action" value="shieldcore_uw_scan_now">
 				<?php submit_button( 'Scan now', 'primary', 'submit', false ); ?>
 			</form>
 		</div>
 		<?php
-		WPOpsec_UI::section_end();
+		ShieldCore_UI::section_end();
 		?>
 
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-			<?php wp_nonce_field( 'wpopsec_uw_save_settings' ); ?>
-			<input type="hidden" name="action" value="wpopsec_uw_save_settings">
+			<?php wp_nonce_field( 'shieldcore_uw_save_settings' ); ?>
+			<input type="hidden" name="action" value="shieldcore_uw_save_settings">
 
-			<?php WPOpsec_UI::section( 'Settings', 'admin-generic' ); ?>
+			<?php ShieldCore_UI::section( 'Settings', 'admin-generic' ); ?>
 				<?php
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Enabled',
 					function () {
 						?>
-						<label><input type="checkbox" name="enabled" <?php checked( get_option( 'wpopsec_user_watchdog_enabled', true ) ); ?>> Watch privileged account changes</label>
+						<label><input type="checkbox" name="enabled" <?php checked( get_option( 'shieldcore_user_watchdog_enabled', true ) ); ?>> Watch privileged account changes</label>
 						<?php
 					},
 					'Checked live through WordPress hooks, and by an hourly snapshot diff that also catches accounts written straight to the database.'
 				);
 
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Email',
 					function () {
 						?>
-						<label><input type="checkbox" name="email_alerts" <?php checked( get_option( 'wpopsec_user_watchdog_email', false ) ); ?>> Email the site admin when an alert fires</label>
+						<label><input type="checkbox" name="email_alerts" <?php checked( get_option( 'shieldcore_user_watchdog_email', false ) ); ?>> Email the site admin when an alert fires</label>
 						<?php
 					},
 					'Sent to <code>' . esc_html( get_option( 'admin_email' ) ) . '</code>, rate-limited to one every 15 minutes. Note that an attacker who already has admin access can change that address — the event log is the more reliable record.'
 				);
 				?>
-			<?php WPOpsec_UI::section_end(); ?>
+			<?php ShieldCore_UI::section_end(); ?>
 
 			<?php submit_button( 'Save settings' ); ?>
 		</form>
 		<?php
-		WPOpsec_UI::close();
+		ShieldCore_UI::close();
 	}
 }

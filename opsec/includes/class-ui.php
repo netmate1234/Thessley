@@ -10,7 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * wp-admin already loads, so the plugin's own screens keep working under a
  * strict Content-Security-Policy — which this plugin can itself set.
  */
-class WPOpsec_UI {
+class ShieldCore_UI {
 
 	/** @var bool emitted once per request */
 	private static $styles_done = false;
@@ -52,13 +52,13 @@ class WPOpsec_UI {
 		self::styles();
 		list( $icon, $title, $desc ) = self::meta( $key );
 		?>
-		<div class="wrap wpopsec">
-			<div class="wpopsec-head">
-				<span class="wpopsec-head__icon dashicons dashicons-<?php echo esc_attr( $icon ); ?>"></span>
+		<div class="wrap shieldcore">
+			<div class="shieldcore-head">
+				<span class="shieldcore-head__icon dashicons dashicons-<?php echo esc_attr( $icon ); ?>"></span>
 				<div>
 					<h1><?php echo esc_html( $title ); ?></h1>
 					<?php if ( $desc ) : ?>
-						<p class="wpopsec-head__desc"><?php echo esc_html( $desc ); ?></p>
+						<p class="shieldcore-head__desc"><?php echo esc_html( $desc ); ?></p>
 					<?php endif; ?>
 				</div>
 			</div>
@@ -81,7 +81,7 @@ class WPOpsec_UI {
 		);
 		$icon = $icons[ $type ] ?? 'info-outline';
 		?>
-		<div class="wpopsec-notice wpopsec-notice--<?php echo esc_attr( $type ); ?>">
+		<div class="shieldcore-notice shieldcore-notice--<?php echo esc_attr( $type ); ?>">
 			<span class="dashicons dashicons-<?php echo esc_attr( $icon ); ?>"></span>
 			<div><?php echo $allow_html ? wp_kses_post( $message ) : esc_html( $message ); ?></div>
 		</div>
@@ -91,17 +91,17 @@ class WPOpsec_UI {
 	/** Opens a titled section card. Pair with self::section_end(). */
 	public static function section( $title, $icon = '', $subtitle = '' ) {
 		?>
-		<section class="wpopsec-section">
-			<header class="wpopsec-section__head">
+		<section class="shieldcore-section">
+			<header class="shieldcore-section__head">
 				<?php if ( $icon ) : ?>
 					<span class="dashicons dashicons-<?php echo esc_attr( $icon ); ?>"></span>
 				<?php endif; ?>
 				<h2><?php echo esc_html( $title ); ?></h2>
 				<?php if ( $subtitle ) : ?>
-					<span class="wpopsec-section__sub"><?php echo esc_html( $subtitle ); ?></span>
+					<span class="shieldcore-section__sub"><?php echo esc_html( $subtitle ); ?></span>
 				<?php endif; ?>
 			</header>
-			<div class="wpopsec-section__body">
+			<div class="shieldcore-section__body">
 		<?php
 	}
 
@@ -116,7 +116,7 @@ class WPOpsec_UI {
 	 */
 	public static function badge( $text, $tone = 'quiet', $icon = '' ) {
 		printf(
-			'<span class="wpopsec-badge wpopsec-badge--%s">%s%s</span>',
+			'<span class="shieldcore-badge shieldcore-badge--%s">%s%s</span>',
 			esc_attr( $tone ),
 			$icon ? '<span class="dashicons dashicons-' . esc_attr( $icon ) . '"></span>' : '',
 			esc_html( $text )
@@ -125,10 +125,10 @@ class WPOpsec_UI {
 
 	/** Compact key/value tiles for a status row. */
 	public static function tiles( array $tiles ) {
-		echo '<div class="wpopsec-tiles">';
+		echo '<div class="shieldcore-tiles">';
 		foreach ( $tiles as $tile ) {
 			printf(
-				'<div class="wpopsec-tile wpopsec-tile--%s"><span class="dashicons dashicons-%s"></span><div><strong>%s</strong><span>%s</span></div></div>',
+				'<div class="shieldcore-tile shieldcore-tile--%s"><span class="dashicons dashicons-%s"></span><div><strong>%s</strong><span>%s</span></div></div>',
 				esc_attr( $tile['tone'] ?? 'quiet' ),
 				esc_attr( $tile['icon'] ?? 'marker' ),
 				esc_html( $tile['value'] ),
@@ -141,12 +141,12 @@ class WPOpsec_UI {
 	/** A labelled row inside a settings card (replaces .form-table). */
 	public static function row( $label, $body_cb, $help = '' ) {
 		?>
-		<div class="wpopsec-row">
-			<div class="wpopsec-row__label"><?php echo esc_html( $label ); ?></div>
-			<div class="wpopsec-row__field">
+		<div class="shieldcore-row">
+			<div class="shieldcore-row__label"><?php echo esc_html( $label ); ?></div>
+			<div class="shieldcore-row__field">
 				<?php call_user_func( $body_cb ); ?>
 				<?php if ( $help ) : ?>
-					<p class="wpopsec-help"><?php echo wp_kses_post( $help ); ?></p>
+					<p class="shieldcore-help"><?php echo wp_kses_post( $help ); ?></p>
 				<?php endif; ?>
 			</div>
 		</div>
@@ -154,18 +154,18 @@ class WPOpsec_UI {
 	}
 
 	public static function severity_badge( $severity, $with_label = true ) {
-		list( $label, $color ) = wpopsec_severity_meta( $severity );
+		list( $label, $color ) = shieldcore_severity_meta( $severity );
 		printf(
-			'<span class="wpopsec-sev"><span class="wpopsec-sev__num" style="background:%s">%d</span>%s</span>',
+			'<span class="shieldcore-sev"><span class="shieldcore-sev__num" style="background:%s">%d</span>%s</span>',
 			esc_attr( $color ),
 			(int) $severity,
-			$with_label ? '<span class="wpopsec-sev__label">' . esc_html( $label ) . '</span>' : ''
+			$with_label ? '<span class="shieldcore-sev__label">' . esc_html( $label ) . '</span>' : ''
 		);
 	}
 
 	/**
 	 * No-op now that the CSS is enqueued externally by
-	 * WPOpsec_Module_Loader::enqueue_assets() (admin_enqueue_scripts) —
+	 * ShieldCore_Module_Loader::enqueue_assets() (admin_enqueue_scripts) —
 	 * kept as a harmless call target since open() and the dashboard both
 	 * still call it, and admin_enqueue_scripts runs well before any of
 	 * their render callbacks (wp-admin's <head> is already sent by then,

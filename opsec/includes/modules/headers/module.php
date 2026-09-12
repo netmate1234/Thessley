@@ -10,7 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * break a site (HSTS, CSP) are exactly the two people most want. Defaults
  * enable only the headers that cannot break normal WordPress rendering.
  */
-class WPOpsec_Module_Headers {
+class ShieldCore_Module_Headers {
 
 	/** id => [label, description, default, breaks-things?] */
 	public static function definitions() {
@@ -52,7 +52,7 @@ class WPOpsec_Module_Headers {
 	public static function deactivate() {}
 
 	public static function register() {
-		add_action( 'admin_post_wpopsec_hdr_save_settings', array( __CLASS__, 'handle_save_settings' ) );
+		add_action( 'admin_post_shieldcore_hdr_save_settings', array( __CLASS__, 'handle_save_settings' ) );
 		add_filter( 'wp_headers', array( __CLASS__, 'add_headers' ) );
 
 		// wp_headers doesn't cover wp-admin or login screens; send there too.
@@ -63,7 +63,7 @@ class WPOpsec_Module_Headers {
 	}
 
 	private static function enabled( $id ) {
-		$saved = get_option( 'wpopsec_headers_enabled', null );
+		$saved = get_option( 'shieldcore_headers_enabled', null );
 		if ( null === $saved ) {
 			$defs = self::definitions();
 			return ! empty( $defs[ $id ]['default'] );
@@ -86,7 +86,7 @@ class WPOpsec_Module_Headers {
 			return true;
 		}
 
-		if ( ! get_option( 'wpopsec_headers_behind_proxy', false ) ) {
+		if ( ! get_option( 'shieldcore_headers_behind_proxy', false ) ) {
 			return false;
 		}
 
@@ -127,21 +127,21 @@ class WPOpsec_Module_Headers {
 		// (a browser that sees it on a working HTTP-only site will pin HTTPS
 		// and the site becomes unreachable).
 		if ( self::enabled( 'hsts' ) && self::request_is_https() ) {
-			$max_age  = max( 0, (int) get_option( 'wpopsec_headers_hsts_max_age', 15552000 ) );
+			$max_age  = max( 0, (int) get_option( 'shieldcore_headers_hsts_max_age', 15552000 ) );
 			$value    = 'max-age=' . $max_age;
-			if ( get_option( 'wpopsec_headers_hsts_subdomains', false ) ) {
+			if ( get_option( 'shieldcore_headers_hsts_subdomains', false ) ) {
 				$value .= '; includeSubDomains';
 			}
-			if ( get_option( 'wpopsec_headers_hsts_preload', false ) ) {
+			if ( get_option( 'shieldcore_headers_hsts_preload', false ) ) {
 				$value .= '; preload';
 			}
 			$headers['Strict-Transport-Security'] = $value;
 		}
 
 		if ( self::enabled( 'csp' ) ) {
-			$policy = trim( (string) get_option( 'wpopsec_headers_csp_policy', '' ) );
+			$policy = trim( (string) get_option( 'shieldcore_headers_csp_policy', '' ) );
 			if ( '' !== $policy ) {
-				$header = get_option( 'wpopsec_headers_csp_report_only', true )
+				$header = get_option( 'shieldcore_headers_csp_report_only', true )
 					? 'Content-Security-Policy-Report-Only'
 					: 'Content-Security-Policy';
 				$headers[ $header ] = $policy;
@@ -166,7 +166,7 @@ class WPOpsec_Module_Headers {
 
 
 	public static function handle_save_settings() {
-		check_admin_referer( 'wpopsec_hdr_save_settings' );
+		check_admin_referer( 'shieldcore_hdr_save_settings' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
@@ -174,20 +174,20 @@ class WPOpsec_Module_Headers {
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- already unslashed, and array_intersect() against self::definitions()'s own keys below discards anything not a real header id; nothing unvalidated ever reaches update_option().
 		$posted  = isset( $_POST['headers'] ) ? (array) wp_unslash( $_POST['headers'] ) : array();
 		$enabled = array_values( array_intersect( $posted, array_keys( self::definitions() ) ) );
-		update_option( 'wpopsec_headers_enabled', $enabled );
+		update_option( 'shieldcore_headers_enabled', $enabled );
 
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- (int) cast is itself the sanitizer; wp_unslash() is a no-op on a value that's about to be cast to int.
-		update_option( 'wpopsec_headers_hsts_max_age', max( 0, (int) ( $_POST['hsts_max_age'] ?? 15552000 ) ) );
-		update_option( 'wpopsec_headers_hsts_subdomains', isset( $_POST['hsts_subdomains'] ) );
-		update_option( 'wpopsec_headers_hsts_preload', isset( $_POST['hsts_preload'] ) );
-		update_option( 'wpopsec_headers_behind_proxy', isset( $_POST['behind_proxy'] ) );
+		update_option( 'shieldcore_headers_hsts_max_age', max( 0, (int) ( $_POST['hsts_max_age'] ?? 15552000 ) ) );
+		update_option( 'shieldcore_headers_hsts_subdomains', isset( $_POST['hsts_subdomains'] ) );
+		update_option( 'shieldcore_headers_hsts_preload', isset( $_POST['hsts_preload'] ) );
+		update_option( 'shieldcore_headers_behind_proxy', isset( $_POST['behind_proxy'] ) );
 
-		update_option( 'wpopsec_headers_csp_report_only', isset( $_POST['csp_report_only'] ) );
+		update_option( 'shieldcore_headers_csp_report_only', isset( $_POST['csp_report_only'] ) );
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- flattened below (CR/LF stripped to prevent header response-splitting) before it's ever stored.
 		$policy = isset( $_POST['csp_policy'] ) ? trim( wp_unslash( $_POST['csp_policy'] ) ) : '';
 		// Header values can't contain newlines — a CR/LF here would be a
 		// response-splitting bug, so flatten before storing.
-		update_option( 'wpopsec_headers_csp_policy', preg_replace( '/[\r\n]+/', ' ', $policy ) );
+		update_option( 'shieldcore_headers_csp_policy', preg_replace( '/[\r\n]+/', ' ', $policy ) );
 
 		wp_safe_redirect( add_query_arg( 'saved', '1', wp_get_referer() ) );
 		exit;
@@ -197,28 +197,28 @@ class WPOpsec_Module_Headers {
 		$defs    = self::definitions();
 		$current = self::build();
 
-		WPOpsec_UI::open( 'headers' );
+		ShieldCore_UI::open( 'headers' );
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only result flag set only by this module's own admin-post redirect, which already check_admin_referer()'d before redirecting.
 		if ( isset( $_GET['saved'] ) ) {
-			WPOpsec_UI::notice( 'success', 'Settings saved.' );
+			ShieldCore_UI::notice( 'success', 'Settings saved.' );
 		}
 
 		if ( self::enabled( 'hsts' ) && ! self::request_is_https() ) {
 			$msg = '<p><strong>HSTS is enabled but this request is not recognised as HTTPS</strong>, so the header is withheld — sending it over plain HTTP would pin browsers to a scheme the site may not serve.</p>';
-			if ( ! get_option( 'wpopsec_headers_behind_proxy', false ) && ! empty( $_SERVER['HTTP_X_FORWARDED_PROTO'] ) ) {
+			if ( ! get_option( 'shieldcore_headers_behind_proxy', false ) && ! empty( $_SERVER['HTTP_X_FORWARDED_PROTO'] ) ) {
 				$msg .= '<p>This request arrived with <code>X-Forwarded-Proto: '
 					. esc_html( sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_FORWARDED_PROTO'] ) ) )
 					. '</code>, which suggests a reverse proxy is terminating TLS. Tick the proxy option below to honour it.</p>';
 			}
-			WPOpsec_UI::notice( 'warning', $msg, true );
+			ShieldCore_UI::notice( 'warning', $msg, true );
 		}
 
-		WPOpsec_UI::section( 'Currently sent', 'visibility', sprintf( '%d header(s)', count( $current ) ) );
+		ShieldCore_UI::section( 'Currently sent', 'visibility', sprintf( '%d header(s)', count( $current ) ) );
 		if ( empty( $current ) ) {
-			echo '<div class="wpopsec-empty"><span class="dashicons dashicons-warning" style="color:#b26e00"></span><p>No security headers are being sent.</p></div>';
+			echo '<div class="shieldcore-empty"><span class="dashicons dashicons-warning" style="color:#b26e00"></span><p>No security headers are being sent.</p></div>';
 		} else {
-			echo '<table class="wpopsec-table"><tbody>';
+			echo '<table class="shieldcore-table"><tbody>';
 			foreach ( $current as $name => $value ) {
 				printf(
 					'<tr><td style="width:270px"><strong>%s</strong></td><td><code>%s</code></td></tr>',
@@ -228,86 +228,86 @@ class WPOpsec_Module_Headers {
 			}
 			echo '</tbody></table>';
 		}
-		WPOpsec_UI::section_end();
+		ShieldCore_UI::section_end();
 		?>
 
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-			<?php wp_nonce_field( 'wpopsec_hdr_save_settings' ); ?>
-			<input type="hidden" name="action" value="wpopsec_hdr_save_settings">
+			<?php wp_nonce_field( 'shieldcore_hdr_save_settings' ); ?>
+			<input type="hidden" name="action" value="shieldcore_hdr_save_settings">
 
-			<?php WPOpsec_UI::section( 'Headers', 'shield' ); ?>
+			<?php ShieldCore_UI::section( 'Headers', 'shield' ); ?>
 				<?php foreach ( $defs as $id => $def ) : ?>
-					<div class="wpopsec-row">
-						<div class="wpopsec-row__label">
+					<div class="shieldcore-row">
+						<div class="shieldcore-row__label">
 							<label style="font-weight:600">
 								<input type="checkbox" name="headers[]" value="<?php echo esc_attr( $id ); ?>" <?php checked( self::enabled( $id ) ); ?>>
 								<?php echo esc_html( $def['label'] ); ?>
 							</label>
 						</div>
-						<div class="wpopsec-row__field">
+						<div class="shieldcore-row__field">
 							<?php
 							if ( empty( $def['default'] ) ) {
-								WPOpsec_UI::badge( 'can break a site', 'warn', 'warning' );
+								ShieldCore_UI::badge( 'can break a site', 'warn', 'warning' );
 							} else {
-								WPOpsec_UI::badge( 'safe default', 'good', 'yes-alt' );
+								ShieldCore_UI::badge( 'safe default', 'good', 'yes-alt' );
 							}
 							?>
-							<p class="wpopsec-help"><?php echo esc_html( $def['desc'] ); ?></p>
+							<p class="shieldcore-help"><?php echo esc_html( $def['desc'] ); ?></p>
 						</div>
 					</div>
 				<?php endforeach; ?>
-			<?php WPOpsec_UI::section_end(); ?>
+			<?php ShieldCore_UI::section_end(); ?>
 
-			<?php WPOpsec_UI::section( 'HSTS options', 'admin-site-alt3' ); ?>
+			<?php ShieldCore_UI::section( 'HSTS options', 'admin-site-alt3' ); ?>
 				<?php
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'max-age',
 					function () {
 						?>
-						<input type="number" name="hsts_max_age" value="<?php echo esc_attr( (int) get_option( 'wpopsec_headers_hsts_max_age', 15552000 ) ); ?>" min="0" style="width:9em"> seconds
+						<input type="number" name="hsts_max_age" value="<?php echo esc_attr( (int) get_option( 'shieldcore_headers_hsts_max_age', 15552000 ) ); ?>" min="0" style="width:9em"> seconds
 						<?php
 					}
 				);
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Scope',
 					function () {
 						?>
-						<label><input type="checkbox" name="hsts_subdomains" <?php checked( get_option( 'wpopsec_headers_hsts_subdomains', false ) ); ?>> includeSubDomains</label>
-						<label><input type="checkbox" name="hsts_preload" <?php checked( get_option( 'wpopsec_headers_hsts_preload', false ) ); ?>> preload</label>
+						<label><input type="checkbox" name="hsts_subdomains" <?php checked( get_option( 'shieldcore_headers_hsts_subdomains', false ) ); ?>> includeSubDomains</label>
+						<label><input type="checkbox" name="hsts_preload" <?php checked( get_option( 'shieldcore_headers_hsts_preload', false ) ); ?>> preload</label>
 						<?php
 					},
 					'<code>preload</code> submits to a browser-baked list that is slow and awkward to reverse — do not set it casually.'
 				);
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Reverse proxy',
 					function () {
 						?>
-						<label><input type="checkbox" name="behind_proxy" <?php checked( get_option( 'wpopsec_headers_behind_proxy', false ) ); ?>> This site is behind a proxy that terminates HTTPS</label>
+						<label><input type="checkbox" name="behind_proxy" <?php checked( get_option( 'shieldcore_headers_behind_proxy', false ) ); ?>> This site is behind a proxy that terminates HTTPS</label>
 						<?php
 					},
 					'Tick this if TLS ends at nginx/Cloudflare/a load balancer and PHP is served plain HTTP — otherwise <code>is_ssl()</code> is false and HSTS is never sent. Only tick it when a proxy really is in front, since <code>X-Forwarded-Proto</code> can be forged by anyone able to reach the backend directly.'
 				);
 				?>
-			<?php WPOpsec_UI::section_end(); ?>
+			<?php ShieldCore_UI::section_end(); ?>
 
-			<?php WPOpsec_UI::section( 'Content-Security-Policy', 'editor-code' ); ?>
+			<?php ShieldCore_UI::section( 'Content-Security-Policy', 'editor-code' ); ?>
 				<?php
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Policy',
 					function () {
 						?>
-						<textarea name="csp_policy" rows="4" style="width:100%;max-width:640px" placeholder="default-src 'self'; img-src 'self' data:; script-src 'self' 'unsafe-inline'"><?php echo esc_textarea( (string) get_option( 'wpopsec_headers_csp_policy', '' ) ); ?></textarea>
-						<label style="margin-top:8px"><input type="checkbox" name="csp_report_only" <?php checked( get_option( 'wpopsec_headers_csp_report_only', true ) ); ?>> Report-only (log violations, do not enforce)</label>
+						<textarea name="csp_policy" rows="4" style="width:100%;max-width:640px" placeholder="default-src 'self'; img-src 'self' data:; script-src 'self' 'unsafe-inline'"><?php echo esc_textarea( (string) get_option( 'shieldcore_headers_csp_policy', '' ) ); ?></textarea>
+						<label style="margin-top:8px"><input type="checkbox" name="csp_report_only" <?php checked( get_option( 'shieldcore_headers_csp_report_only', true ) ); ?>> Report-only (log violations, do not enforce)</label>
 						<?php
 					},
 					'Leave report-only until your browser console shows no violations on the front end <em>and</em> in wp-admin. CSP is the single most likely header to break themes, page builders and embeds.'
 				);
 				?>
-			<?php WPOpsec_UI::section_end(); ?>
+			<?php ShieldCore_UI::section_end(); ?>
 
 			<?php submit_button( 'Save settings' ); ?>
 		</form>
 		<?php
-		WPOpsec_UI::close();
+		ShieldCore_UI::close();
 	}
 }

@@ -5,11 +5,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /**
  * Central event log. Owns the table every other module writes to via
- * wpopsec_log_event(), plus the admin view for reading it.
+ * shieldcore_log_event(), plus the admin view for reading it.
  */
-class WPOpsec_Module_Event_Log {
+class ShieldCore_Module_Event_Log {
 
-	const CRON_HOOK      = 'wpopsec_event_log_prune';
+	const CRON_HOOK      = 'shieldcore_event_log_prune';
 	const DB_VERSION     = 2;
 	const PER_PAGE       = 50;
 	const DEFAULT_RETAIN = 30; // days
@@ -32,8 +32,8 @@ class WPOpsec_Module_Event_Log {
 		self::maybe_upgrade_table();
 
 		add_action( self::CRON_HOOK, array( __CLASS__, 'prune' ) );
-		add_action( 'admin_post_wpopsec_el_save_settings', array( __CLASS__, 'handle_save_settings' ) );
-		add_action( 'admin_post_wpopsec_el_clear', array( __CLASS__, 'handle_clear' ) );
+		add_action( 'admin_post_shieldcore_el_save_settings', array( __CLASS__, 'handle_save_settings' ) );
+		add_action( 'admin_post_shieldcore_el_clear', array( __CLASS__, 'handle_clear' ) );
 
 		return __CLASS__;
 	}
@@ -41,7 +41,7 @@ class WPOpsec_Module_Event_Log {
 	public static function install_table() {
 		global $wpdb;
 
-		$table   = wpopsec_events_table();
+		$table   = shieldcore_events_table();
 		$collate = $wpdb->get_charset_collate();
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
@@ -67,7 +67,7 @@ class WPOpsec_Module_Event_Log {
 
 		self::backfill_severity();
 
-		update_option( 'wpopsec_event_log_db_version', self::DB_VERSION, false );
+		update_option( 'shieldcore_event_log_db_version', self::DB_VERSION, false );
 	}
 
 	/**
@@ -78,9 +78,9 @@ class WPOpsec_Module_Event_Log {
 	private static function backfill_severity() {
 		global $wpdb;
 
-		$table = wpopsec_events_table();
+		$table = shieldcore_events_table();
 
-		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $table is wpopsec_events_table() (no user input, identifiers can't use $wpdb->prepare() placeholders); $wpdb->update() below already parameterizes its own values via the format arrays.
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $table is shieldcore_events_table() (no user input, identifiers can't use $wpdb->prepare() placeholders); $wpdb->update() below already parameterizes its own values via the format arrays.
 		$pairs = $wpdb->get_results(
 			"SELECT DISTINCT module, event, action FROM {$table} WHERE severity = 0",
 			ARRAY_A
@@ -89,7 +89,7 @@ class WPOpsec_Module_Event_Log {
 		foreach ( (array) $pairs as $p ) {
 			$wpdb->update(
 				$table,
-				array( 'severity' => wpopsec_event_severity( $p['module'], $p['event'], $p['action'] ) ),
+				array( 'severity' => shieldcore_event_severity( $p['module'], $p['event'], $p['action'] ) ),
 				array( 'module' => $p['module'], 'event' => $p['event'], 'action' => $p['action'], 'severity' => 0 ),
 				array( '%d' ),
 				array( '%s', '%s', '%s', '%d' )
@@ -99,7 +99,7 @@ class WPOpsec_Module_Event_Log {
 	}
 
 	private static function maybe_upgrade_table() {
-		if ( (int) get_option( 'wpopsec_event_log_db_version', 0 ) !== self::DB_VERSION ) {
+		if ( (int) get_option( 'shieldcore_event_log_db_version', 0 ) !== self::DB_VERSION ) {
 			self::install_table();
 		}
 	}
@@ -107,8 +107,8 @@ class WPOpsec_Module_Event_Log {
 	public static function prune() {
 		global $wpdb;
 
-		$days = max( 1, (int) get_option( 'wpopsec_event_log_retain_days', self::DEFAULT_RETAIN ) );
-		$table = wpopsec_events_table();
+		$days = max( 1, (int) get_option( 'shieldcore_event_log_retain_days', self::DEFAULT_RETAIN ) );
+		$table = shieldcore_events_table();
 
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- table name only, built from $wpdb->prefix, no user input; the actual value ($days) is bound via the %d placeholder above.
 		$wpdb->query(
@@ -122,27 +122,27 @@ class WPOpsec_Module_Event_Log {
 
 
 	public static function handle_save_settings() {
-		check_admin_referer( 'wpopsec_el_save_settings' );
+		check_admin_referer( 'shieldcore_el_save_settings' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
 
 		$days = isset( $_POST['retain_days'] ) ? max( 1, (int) $_POST['retain_days'] ) : self::DEFAULT_RETAIN;
-		update_option( 'wpopsec_event_log_retain_days', $days );
+		update_option( 'shieldcore_event_log_retain_days', $days );
 
 		wp_safe_redirect( add_query_arg( 'saved', '1', wp_get_referer() ) );
 		exit;
 	}
 
 	public static function handle_clear() {
-		check_admin_referer( 'wpopsec_el_clear' );
+		check_admin_referer( 'shieldcore_el_clear' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
 
 		global $wpdb;
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- table name only, built from $wpdb->prefix, no user input; identifiers can't be bound via $wpdb->prepare() placeholders.
-		$wpdb->query( 'TRUNCATE TABLE ' . wpopsec_events_table() );
+		$wpdb->query( 'TRUNCATE TABLE ' . shieldcore_events_table() );
 
 		wp_safe_redirect( add_query_arg( 'cleared', '1', wp_get_referer() ) );
 		exit;
@@ -152,7 +152,7 @@ class WPOpsec_Module_Event_Log {
 	private static function query_events( $filters, $page ) {
 		global $wpdb;
 
-		$table  = wpopsec_events_table();
+		$table  = shieldcore_events_table();
 		$where  = array( '1=1' );
 		$params = array();
 
@@ -202,22 +202,22 @@ class WPOpsec_Module_Event_Log {
 	private static function ip_info( $ip ) {
 		$info = array( 'country' => '', 'host' => '' );
 
-		if ( wpopsec_ip_is_reserved( $ip ) ) {
+		if ( shieldcore_ip_is_reserved( $ip ) ) {
 			return $info; // LAN/loopback — nothing meaningful to resolve
 		}
 
-		if ( function_exists( 'wpopsec_geo_lookup' ) && function_exists( 'wpopsec_geo_country_label' ) ) {
-			$file = WPMU_PLUGIN_DIR . '/wp-opsec-checks/data/geo-country-index.bin';
+		if ( function_exists( 'shieldcore_geo_lookup' ) && function_exists( 'shieldcore_geo_country_label' ) ) {
+			$file = WPMU_PLUGIN_DIR . '/wp-shieldcore-checks/data/geo-country-index.bin';
 			$long = ip2long( $ip );
 			if ( false !== $long ) {
-				$idx = wpopsec_geo_lookup( $file, $long );
+				$idx = shieldcore_geo_lookup( $file, $long );
 				if ( null !== $idx ) {
-					$info['country'] = wpopsec_geo_country_label( $idx );
+					$info['country'] = shieldcore_geo_country_label( $idx );
 				}
 			}
 		}
 
-		$cache_key = 'wpopsec_rdns_' . md5( $ip );
+		$cache_key = 'shieldcore_rdns_' . md5( $ip );
 		$cached    = get_transient( $cache_key );
 		if ( false !== $cached ) {
 			$info['host'] = $cached;
@@ -247,11 +247,11 @@ class WPOpsec_Module_Event_Log {
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
 		$result = self::query_events( $filters, $page );
-		$table  = wpopsec_events_table();
+		$table  = shieldcore_events_table();
 
-		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $table is wpopsec_events_table() (no user input, identifiers can't use $wpdb->prepare() placeholders); these are fixed summary tiles, not worth an object-cache group for.
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $table is shieldcore_events_table() (no user input, identifiers can't use $wpdb->prepare() placeholders); these are fixed summary tiles, not worth an object-cache group for.
 		$modules = $wpdb->get_col( "SELECT DISTINCT module FROM {$table} ORDER BY module" ) ?: array();
-		$retain  = (int) get_option( 'wpopsec_event_log_retain_days', self::DEFAULT_RETAIN );
+		$retain  = (int) get_option( 'shieldcore_event_log_retain_days', self::DEFAULT_RETAIN );
 
 		$last24    = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE created_at > DATE_SUB(NOW(), INTERVAL 1 DAY)" );
 		$blocked24 = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE action = 'blocked' AND created_at > DATE_SUB(NOW(), INTERVAL 1 DAY)" );
@@ -259,19 +259,19 @@ class WPOpsec_Module_Event_Log {
 		$high_open = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE severity >= 14 AND created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)" );
 		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 
-		WPOpsec_UI::open( 'event-log' );
+		ShieldCore_UI::open( 'event-log' );
 
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only result flags set only by this module's own admin-post redirects, which already check_admin_referer() before redirecting.
 		if ( isset( $_GET['saved'] ) ) {
-			WPOpsec_UI::notice( 'success', 'Settings saved.' );
+			ShieldCore_UI::notice( 'success', 'Settings saved.' );
 		}
 		if ( isset( $_GET['cleared'] ) ) {
-			WPOpsec_UI::notice( 'success', 'Event log cleared.' );
+			ShieldCore_UI::notice( 'success', 'Event log cleared.' );
 		}
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
-		$worst_meta = wpopsec_severity_meta( $worst24 );
-		WPOpsec_UI::tiles(
+		$worst_meta = shieldcore_severity_meta( $worst24 );
+		ShieldCore_UI::tiles(
 			array(
 				array( 'icon' => 'list-view', 'tone' => 'quiet', 'value' => number_format_i18n( $result['total'] ), 'label' => 'events stored' ),
 				array( 'icon' => 'clock', 'tone' => 'quiet', 'value' => number_format_i18n( $last24 ), 'label' => 'in the last 24h' ),
@@ -286,18 +286,18 @@ class WPOpsec_Module_Event_Log {
 		);
 
 		if ( $high_open ) {
-			WPOpsec_UI::notice(
+			ShieldCore_UI::notice(
 				'error',
 				'<p><strong>' . esc_html( number_format_i18n( $high_open ) ) . '</strong> event(s) at severity 14+ in the last 7 days. '
-				. '<a href="' . esc_url( WPOpsec_Menu_Router::url( 'event-log', array( 'f_sev' => 14, 'sort' => 'severity' ) ) ) . '">Review them →</a></p>',
+				. '<a href="' . esc_url( ShieldCore_Menu_Router::url( 'event-log', array( 'f_sev' => 14, 'sort' => 'severity' ) ) ) . '">Review them →</a></p>',
 				true
 			);
 		}
 
-		WPOpsec_UI::section( 'Events', 'list-view', sprintf( '%s matching', number_format_i18n( $result['total'] ) ) );
+		ShieldCore_UI::section( 'Events', 'list-view', sprintf( '%s matching', number_format_i18n( $result['total'] ) ) );
 		?>
-		<form method="get" class="wpopsec-actions" style="margin-bottom:14px">
-			<?php wp_parse_str( WPOpsec_Menu_Router::query( 'event-log' ), $route ); ?>
+		<form method="get" class="shieldcore-actions" style="margin-bottom:14px">
+			<?php wp_parse_str( ShieldCore_Menu_Router::query( 'event-log' ), $route ); ?>
 			<?php foreach ( $route as $k => $v ) : ?>
 				<input type="hidden" name="<?php echo esc_attr( $k ); ?>" value="<?php echo esc_attr( $v ); ?>">
 			<?php endforeach; ?>
@@ -327,19 +327,19 @@ class WPOpsec_Module_Event_Log {
 			<?php submit_button( 'Filter', 'secondary', 'submit', false ); ?>
 		</form>
 
-		<div class="wpopsec-actions" style="margin:-6px 0 14px">
+		<div class="shieldcore-actions" style="margin:-6px 0 14px">
 			<label style="font-size:13px;font-weight:normal">
-				<input type="checkbox" id="wpopsec-el-autorefresh"> Auto-refresh every 30s
+				<input type="checkbox" id="shieldcore-el-autorefresh"> Auto-refresh every 30s
 			</label>
 		</div>
 		<?php
-		wp_register_script( 'wpopsec-event-log', false, array(), WPOPSEC_VERSION, true );
-		wp_enqueue_script( 'wpopsec-event-log' );
+		wp_register_script( 'shieldcore-event-log', false, array(), SHIELDCORE_VERSION, true );
+		wp_enqueue_script( 'shieldcore-event-log' );
 		wp_add_inline_script(
-			'wpopsec-event-log',
+			'shieldcore-event-log',
 			"(function () {
-				var cb  = document.getElementById( 'wpopsec-el-autorefresh' );
-				var key = 'wpopsec_el_autorefresh';
+				var cb  = document.getElementById( 'shieldcore-el-autorefresh' );
+				var key = 'shieldcore_el_autorefresh';
 				var timer = null;
 				function schedule() {
 					if ( timer ) { clearTimeout( timer ); }
@@ -355,7 +355,7 @@ class WPOpsec_Module_Event_Log {
 		);
 		?>
 
-		<table class="wpopsec-table">
+		<table class="shieldcore-table">
 			<thead>
 				<tr>
 					<th style="width:120px">Severity</th>
@@ -369,38 +369,38 @@ class WPOpsec_Module_Event_Log {
 			</thead>
 			<tbody>
 			<?php if ( empty( $result['rows'] ) ) : ?>
-				<tr><td colspan="7"><div class="wpopsec-empty"><span class="dashicons dashicons-yes-alt"></span><p>No events match.</p></div></td></tr>
+				<tr><td colspan="7"><div class="shieldcore-empty"><span class="dashicons dashicons-yes-alt"></span><p>No events match.</p></div></td></tr>
 			<?php else : ?>
 				<?php foreach ( $result['rows'] as $row ) : ?>
 					<tr>
-						<td><?php WPOpsec_UI::severity_badge( $row->severity ); ?></td>
-						<td class="wpopsec-nowrap"><?php echo esc_html( mysql2date( 'M j, H:i', $row->created_at ) ); ?></td>
+						<td><?php ShieldCore_UI::severity_badge( $row->severity ); ?></td>
+						<td class="shieldcore-nowrap"><?php echo esc_html( mysql2date( 'M j, H:i', $row->created_at ) ); ?></td>
 						<td><span style="font-size:12px;font-weight:600;color:#2271b1"><?php echo esc_html( $row->module ); ?></span></td>
 						<td><code><?php echo esc_html( $row->event ); ?></code></td>
 						<td>
 							<?php
 							if ( 'blocked' === $row->action ) {
-								WPOpsec_UI::badge( 'blocked', 'bad' );
+								ShieldCore_UI::badge( 'blocked', 'bad' );
 							} elseif ( 'logged' === $row->action ) {
-								WPOpsec_UI::badge( 'logged', 'warn' );
+								ShieldCore_UI::badge( 'logged', 'warn' );
 							} else {
-								WPOpsec_UI::badge( 'noted', 'quiet' );
+								ShieldCore_UI::badge( 'noted', 'quiet' );
 							}
 							?>
 						</td>
 						<td style="max-width:170px">
-							<code class="wpopsec-nowrap"><?php echo esc_html( $row->ip ); ?></code>
+							<code class="shieldcore-nowrap"><?php echo esc_html( $row->ip ); ?></code>
 							<?php
 							$ip_info = self::ip_info( $row->ip );
 							if ( $ip_info['country'] ) {
-								echo '<br><span class="wpopsec-muted" style="font-size:11px;word-break:break-all">' . esc_html( $ip_info['country'] ) . '</span>';
+								echo '<br><span class="shieldcore-muted" style="font-size:11px;word-break:break-all">' . esc_html( $ip_info['country'] ) . '</span>';
 							}
 							if ( $ip_info['host'] ) {
-								echo '<br><span class="wpopsec-muted" style="font-size:11px;word-break:break-all">' . esc_html( $ip_info['host'] ) . '</span>';
+								echo '<br><span class="shieldcore-muted" style="font-size:11px;word-break:break-all">' . esc_html( $ip_info['host'] ) . '</span>';
 							}
 							?>
 						</td>
-						<td class="wpopsec-muted">
+						<td class="shieldcore-muted">
 							<?php if ( $row->uri ) : ?>
 								<code style="font-size:11px"><?php echo esc_html( $row->uri ); ?></code><br>
 							<?php endif; ?>
@@ -429,16 +429,16 @@ class WPOpsec_Module_Event_Log {
 			echo '</div></div>';
 		}
 
-		WPOpsec_UI::section_end();
+		ShieldCore_UI::section_end();
 		?>
 
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-			<?php wp_nonce_field( 'wpopsec_el_save_settings' ); ?>
-			<input type="hidden" name="action" value="wpopsec_el_save_settings">
+			<?php wp_nonce_field( 'shieldcore_el_save_settings' ); ?>
+			<input type="hidden" name="action" value="shieldcore_el_save_settings">
 
-			<?php WPOpsec_UI::section( 'Settings', 'admin-generic' ); ?>
+			<?php ShieldCore_UI::section( 'Settings', 'admin-generic' ); ?>
 				<?php
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Retention',
 					function () use ( $retain ) {
 						?>
@@ -448,20 +448,20 @@ class WPOpsec_Module_Event_Log {
 					'Older events are deleted daily.'
 				);
 				?>
-			<?php WPOpsec_UI::section_end(); ?>
+			<?php ShieldCore_UI::section_end(); ?>
 
 			<?php submit_button( 'Save settings' ); ?>
 		</form>
 
-		<div class="wpopsec-actions" style="margin-top:14px">
+		<div class="shieldcore-actions" style="margin-top:14px">
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"
 				onsubmit="return confirm('Delete all recorded events? This cannot be undone.');">
-				<?php wp_nonce_field( 'wpopsec_el_clear' ); ?>
-				<input type="hidden" name="action" value="wpopsec_el_clear">
+				<?php wp_nonce_field( 'shieldcore_el_clear' ); ?>
+				<input type="hidden" name="action" value="shieldcore_el_clear">
 				<?php submit_button( 'Clear event log', 'delete', 'submit', false ); ?>
 			</form>
 		</div>
 		<?php
-		WPOpsec_UI::close();
+		ShieldCore_UI::close();
 	}
 }

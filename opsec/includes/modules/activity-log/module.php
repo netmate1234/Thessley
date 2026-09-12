@@ -12,12 +12,12 @@ if ( ! defined( 'ABSPATH' ) ) {
  * frequently useful question competitors call an "audit log" — who edited
  * that page, who installed that plugin, who changed the site's URL.
  *
- * It writes into the same shared events table via wpopsec_log_event()
+ * It writes into the same shared events table via shieldcore_log_event()
  * rather than keeping its own — the Event Log's existing filter-by-module
  * view is the browsing UI, so there is no second table or page to keep
  * in sync.
  */
-class WPOpsec_Module_Activity_Log {
+class ShieldCore_Module_Activity_Log {
 
 	/** Options worth a log line. Logging every option WordPress writes
 	 * (transients, autoload housekeeping) would drown real changes in noise. */
@@ -31,9 +31,9 @@ class WPOpsec_Module_Activity_Log {
 	public static function deactivate() {}
 
 	public static function register() {
-		add_action( 'admin_post_wpopsec_al_save_settings', array( __CLASS__, 'handle_save_settings' ) );
+		add_action( 'admin_post_shieldcore_al_save_settings', array( __CLASS__, 'handle_save_settings' ) );
 
-		$enabled = get_option( 'wpopsec_activity_categories', array( 'content', 'plugins_themes', 'settings' ) );
+		$enabled = get_option( 'shieldcore_activity_categories', array( 'content', 'plugins_themes', 'settings' ) );
 
 		if ( in_array( 'content', $enabled, true ) ) {
 			add_action( 'transition_post_status', array( __CLASS__, 'on_transition_post_status' ), 10, 3 );
@@ -87,7 +87,7 @@ class WPOpsec_Module_Activity_Log {
 			return;
 		}
 
-		wpopsec_log_event(
+		shieldcore_log_event(
 			'activity-log',
 			'post_status_changed',
 			'noted',
@@ -101,7 +101,7 @@ class WPOpsec_Module_Activity_Log {
 		if ( ! $post || ! in_array( $post->post_type, array( 'post', 'page' ), true ) ) {
 			return;
 		}
-		wpopsec_log_event(
+		shieldcore_log_event(
 			'activity-log',
 			'post_deleted',
 			'noted',
@@ -111,20 +111,20 @@ class WPOpsec_Module_Activity_Log {
 	}
 
 	public static function on_plugin_activated( $plugin ) {
-		wpopsec_log_event( 'activity-log', 'plugin_activated', 'noted', sprintf( '%s, by %s', $plugin, self::actor() ), 4 );
+		shieldcore_log_event( 'activity-log', 'plugin_activated', 'noted', sprintf( '%s, by %s', $plugin, self::actor() ), 4 );
 	}
 
 	public static function on_plugin_deactivated( $plugin ) {
-		wpopsec_log_event( 'activity-log', 'plugin_deactivated', 'noted', sprintf( '%s, by %s', $plugin, self::actor() ), 3 );
+		shieldcore_log_event( 'activity-log', 'plugin_deactivated', 'noted', sprintf( '%s, by %s', $plugin, self::actor() ), 3 );
 	}
 
 	public static function on_delete_plugin( $plugin ) {
-		wpopsec_log_event( 'activity-log', 'plugin_deleted', 'noted', sprintf( '%s, by %s', $plugin, self::actor() ), 4 );
+		shieldcore_log_event( 'activity-log', 'plugin_deleted', 'noted', sprintf( '%s, by %s', $plugin, self::actor() ), 4 );
 	}
 
 	public static function on_switch_theme( $new_name, $new_theme, $old_theme ) {
 		$old_name = $old_theme ? $old_theme->get( 'Name' ) : 'unknown';
-		wpopsec_log_event( 'activity-log', 'theme_switched', 'noted', sprintf( '%s -> %s, by %s', $old_name, $new_name, self::actor() ), 4 );
+		shieldcore_log_event( 'activity-log', 'theme_switched', 'noted', sprintf( '%s -> %s, by %s', $old_name, $new_name, self::actor() ), 4 );
 	}
 
 	/**
@@ -146,7 +146,7 @@ class WPOpsec_Module_Activity_Log {
 			return;
 		}
 
-		wpopsec_log_event(
+		shieldcore_log_event(
 			'activity-log',
 			"{$type}_{$action}",
 			'noted',
@@ -159,7 +159,7 @@ class WPOpsec_Module_Activity_Log {
 		if ( $old_value === $new_value ) {
 			return;
 		}
-		wpopsec_log_event(
+		shieldcore_log_event(
 			'activity-log',
 			'setting_changed',
 			'noted',
@@ -176,7 +176,7 @@ class WPOpsec_Module_Activity_Log {
 
 
 	public static function handle_save_settings() {
-		check_admin_referer( 'wpopsec_al_save_settings' );
+		check_admin_referer( 'shieldcore_al_save_settings' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
@@ -184,7 +184,7 @@ class WPOpsec_Module_Activity_Log {
 		$posted  = isset( $_POST['categories'] ) ? (array) wp_unslash( $_POST['categories'] ) : array();
 		$allowed = array( 'content', 'plugins_themes', 'settings' );
 		$enabled = array_values( array_intersect( $posted, $allowed ) );
-		update_option( 'wpopsec_activity_categories', $enabled );
+		update_option( 'shieldcore_activity_categories', $enabled );
 		wp_safe_redirect( add_query_arg( 'saved', '1', wp_get_referer() ) );
 		exit;
 	}
@@ -192,62 +192,62 @@ class WPOpsec_Module_Activity_Log {
 	public static function render_page() {
 		global $wpdb;
 
-		$enabled = get_option( 'wpopsec_activity_categories', array( 'content', 'plugins_themes', 'settings' ) );
-		$table   = wpopsec_events_table();
+		$enabled = get_option( 'shieldcore_activity_categories', array( 'content', 'plugins_themes', 'settings' ) );
+		$table   = shieldcore_events_table();
 
-		WPOpsec_UI::open( 'activity-log' );
+		ShieldCore_UI::open( 'activity-log' );
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only "settings saved" notice flag, not a state-changing action.
 		if ( isset( $_GET['saved'] ) ) {
-			WPOpsec_UI::notice( 'success', 'Settings saved.' );
+			ShieldCore_UI::notice( 'success', 'Settings saved.' );
 		}
 
 		$recent = array();
 		$total  = 0;
-		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $table is wpopsec_events_table() (no user input, identifiers can't use $wpdb->prepare() placeholders); the WHERE value itself is properly bound below.
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $table is shieldcore_events_table() (no user input, identifiers can't use $wpdb->prepare() placeholders); the WHERE value itself is properly bound below.
 		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) === $table ) {
 			$total  = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE module = %s", 'activity-log' ) );
 			$recent = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE module = %s ORDER BY id DESC LIMIT 50", 'activity-log' ) ) ?: array();
 		}
 		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 
-		WPOpsec_UI::tiles(
+		ShieldCore_UI::tiles(
 			array(
 				array( 'icon' => 'list-view', 'tone' => 'quiet', 'value' => number_format_i18n( $total ), 'label' => 'entries recorded' ),
 			)
 		);
 
-		WPOpsec_UI::section( 'Recent activity', 'clock', 'showing latest 50 — full history in the ' );
-		echo '<p class="wpopsec-help" style="margin-top:0"><a href="' . esc_url( WPOpsec_Menu_Router::url( 'event-log', array( 'f_module' => 'activity-log' ) ) ) . '">Event Log, filtered to this module</a>, which also supports pagination and search.</p>';
+		ShieldCore_UI::section( 'Recent activity', 'clock', 'showing latest 50 — full history in the ' );
+		echo '<p class="shieldcore-help" style="margin-top:0"><a href="' . esc_url( ShieldCore_Menu_Router::url( 'event-log', array( 'f_module' => 'activity-log' ) ) ) . '">Event Log, filtered to this module</a>, which also supports pagination and search.</p>';
 
 		if ( empty( $recent ) ) {
-			echo '<div class="wpopsec-empty"><span class="dashicons dashicons-info-outline"></span><p>No activity recorded yet.</p></div>';
+			echo '<div class="shieldcore-empty"><span class="dashicons dashicons-info-outline"></span><p>No activity recorded yet.</p></div>';
 		} else {
 			?>
-			<table class="wpopsec-table">
+			<table class="shieldcore-table">
 				<thead><tr><th style="width:130px">Time</th><th style="width:170px">Event</th><th>Detail</th></tr></thead>
 				<tbody>
 				<?php foreach ( $recent as $row ) : ?>
 					<tr>
-						<td class="wpopsec-nowrap"><?php echo esc_html( mysql2date( 'M j, H:i', $row->created_at ) ); ?></td>
+						<td class="shieldcore-nowrap"><?php echo esc_html( mysql2date( 'M j, H:i', $row->created_at ) ); ?></td>
 						<td><code><?php echo esc_html( $row->event ); ?></code></td>
-						<td class="wpopsec-muted"><?php echo esc_html( $row->detail ); ?></td>
+						<td class="shieldcore-muted"><?php echo esc_html( $row->detail ); ?></td>
 					</tr>
 				<?php endforeach; ?>
 				</tbody>
 			</table>
 			<?php
 		}
-		WPOpsec_UI::section_end();
+		ShieldCore_UI::section_end();
 		?>
 
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-			<?php wp_nonce_field( 'wpopsec_al_save_settings' ); ?>
-			<input type="hidden" name="action" value="wpopsec_al_save_settings">
+			<?php wp_nonce_field( 'shieldcore_al_save_settings' ); ?>
+			<input type="hidden" name="action" value="shieldcore_al_save_settings">
 
-			<?php WPOpsec_UI::section( 'Settings', 'admin-generic' ); ?>
+			<?php ShieldCore_UI::section( 'Settings', 'admin-generic' ); ?>
 				<?php
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Categories',
 					function () use ( $enabled ) {
 						$labels = array(
@@ -264,11 +264,11 @@ class WPOpsec_Module_Activity_Log {
 					'Custom post types, and every WordPress option write, are deliberately excluded to keep this a record of things worth reading rather than a firehose.'
 				);
 				?>
-			<?php WPOpsec_UI::section_end(); ?>
+			<?php ShieldCore_UI::section_end(); ?>
 
 			<?php submit_button( 'Save settings' ); ?>
 		</form>
 		<?php
-		WPOpsec_UI::close();
+		ShieldCore_UI::close();
 	}
 }

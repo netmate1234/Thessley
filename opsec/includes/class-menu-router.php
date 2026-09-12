@@ -8,12 +8,12 @@ if ( ! defined( 'ABSPATH' ) ) {
  * clustered pages with in-page tabs, instead of one long flat sidebar
  * list. Every module's own render_page()/render_settings_page() is
  * completely unchanged — still fully self-contained, with its own
- * WPOpsec_UI::open()/close() and its own header — this only changes
+ * ShieldCore_UI::open()/close() and its own header — this only changes
  * *where* that output appears (as a tab's content), not what it is.
  * Modules no longer register their own add_submenu_page(); this is the
  * single place the menu structure is defined.
  */
-class WPOpsec_Menu_Router {
+class ShieldCore_Menu_Router {
 
 	/**
 	 * cluster slug => [title, tabs => [module slug => [class, method]]].
@@ -24,54 +24,54 @@ class WPOpsec_Menu_Router {
 			'overview' => array(
 				'title' => 'Logs',
 				'tabs'  => array(
-					'event-log'    => array( 'WPOpsec_Module_Event_Log', 'render_page' ),
-					'geo-map'      => array( 'WPOpsec_Module_Geo_Map', 'render_page' ),
-					'activity-log' => array( 'WPOpsec_Module_Activity_Log', 'render_page' ),
-					'bot-log'      => array( 'WPOpsec_Module_Bot_Log', 'render_page' ),
+					'event-log'    => array( 'ShieldCore_Module_Event_Log', 'render_page' ),
+					'geo-map'      => array( 'ShieldCore_Module_Geo_Map', 'render_page' ),
+					'activity-log' => array( 'ShieldCore_Module_Activity_Log', 'render_page' ),
+					'bot-log'      => array( 'ShieldCore_Module_Bot_Log', 'render_page' ),
 				),
 			),
 			'perimeter' => array(
 				'title' => 'Perimeter',
 				'tabs'  => array(
-					'ip-blocklist' => array( 'WPOpsec_Module_IP_Blocklist', 'render_settings_page' ),
-				'whitelist'    => array( 'WPOpsec_Module_Whitelist', 'render_page' ),
-					'geo-blocker'  => array( 'WPOpsec_Module_Geo_Blocker', 'render_page' ),
-					'geo-login'    => array( 'WPOpsec_Module_Geo_Login', 'render_page' ),
-					'rate-limiter' => array( 'WPOpsec_Module_Rate_Limiter', 'render_page' ),
+					'ip-blocklist' => array( 'ShieldCore_Module_IP_Blocklist', 'render_settings_page' ),
+				'whitelist'    => array( 'ShieldCore_Module_Whitelist', 'render_page' ),
+					'geo-blocker'  => array( 'ShieldCore_Module_Geo_Blocker', 'render_page' ),
+					'geo-login'    => array( 'ShieldCore_Module_Geo_Login', 'render_page' ),
+					'rate-limiter' => array( 'ShieldCore_Module_Rate_Limiter', 'render_page' ),
 				),
 			),
 			'inspection' => array(
 				'title' => 'Inspection',
 				'tabs'  => array(
-					'query-guard' => array( 'WPOpsec_Module_Query_Guard', 'render_settings_page' ),
-					'login-guard' => array( 'WPOpsec_Module_Login_Guard', 'render_settings_page' ),
+					'query-guard' => array( 'ShieldCore_Module_Query_Guard', 'render_settings_page' ),
+					'login-guard' => array( 'ShieldCore_Module_Login_Guard', 'render_settings_page' ),
 				),
 			),
 			'detection' => array(
 				'title' => 'Detection',
 				'tabs'  => array(
-					'file-integrity'  => array( 'WPOpsec_Module_File_Integrity', 'render_page' ),
-					'malware-scanner' => array( 'WPOpsec_Module_Malware_Scanner', 'render_page' ),
-					'vuln-scanner'    => array( 'WPOpsec_Module_Vuln_Scanner', 'render_page' ),
-					'user-watchdog'   => array( 'WPOpsec_Module_User_Watchdog', 'render_page' ),
+					'file-integrity'  => array( 'ShieldCore_Module_File_Integrity', 'render_page' ),
+					'malware-scanner' => array( 'ShieldCore_Module_Malware_Scanner', 'render_page' ),
+					'vuln-scanner'    => array( 'ShieldCore_Module_Vuln_Scanner', 'render_page' ),
+					'user-watchdog'   => array( 'ShieldCore_Module_User_Watchdog', 'render_page' ),
 				),
 			),
 			'hardening' => array(
 				'title' => 'Hardening',
 				'tabs'  => array(
-					'headers'   => array( 'WPOpsec_Module_Headers', 'render_settings_page' ),
-					'user-enum' => array( 'WPOpsec_Module_User_Enum', 'render_settings_page' ),
-					'hardening' => array( 'WPOpsec_Module_Hardening', 'render_page' ),
+					'headers'   => array( 'ShieldCore_Module_Headers', 'render_settings_page' ),
+					'user-enum' => array( 'ShieldCore_Module_User_Enum', 'render_settings_page' ),
+					'hardening' => array( 'ShieldCore_Module_Hardening', 'render_page' ),
 				),
 			),
 			'ops' => array(
 				'title' => 'Other',
 				'tabs'  => array(
-					'auto-update'     => array( 'WPOpsec_Module_Auto_Update', 'render_settings_page' ),
-					'alerts'          => array( 'WPOpsec_Module_Alerts', 'render_page' ),
-				'ip-sharing'      => array( 'WPOpsec_Module_IP_Sharing', 'render_page' ),
-				'scan-all'        => array( 'WPOpsec_Module_Scan_All', 'render_page' ),
-				'config-io'       => array( 'WPOpsec_Module_Config_IO', 'render_page' ),
+					'auto-update'     => array( 'ShieldCore_Module_Auto_Update', 'render_settings_page' ),
+					'alerts'          => array( 'ShieldCore_Module_Alerts', 'render_page' ),
+				'ip-sharing'      => array( 'ShieldCore_Module_IP_Sharing', 'render_page' ),
+				'scan-all'        => array( 'ShieldCore_Module_Scan_All', 'render_page' ),
+				'config-io'       => array( 'ShieldCore_Module_Config_IO', 'render_page' ),
 				),
 			),
 		);
@@ -80,7 +80,7 @@ class WPOpsec_Menu_Router {
 	/** Tab-label badge, e.g. User Watchdog's pending-alert count. Cheap to check; only real state reads happen for tabs that need one. */
 	private static function badge( $module_slug ) {
 		if ( 'user-watchdog' === $module_slug ) {
-			$n = count( (array) get_option( 'wpopsec_user_watchdog_alerts', array() ) );
+			$n = count( (array) get_option( 'shieldcore_user_watchdog_alerts', array() ) );
 			return $n ? sprintf( '<span class="awaiting-mod"><span class="pending-count">%d</span></span>', $n ) : '';
 		}
 		return '';
@@ -88,18 +88,18 @@ class WPOpsec_Menu_Router {
 
 	public static function register() {
 		// Priority 6: after the top-level page itself (registered at 5),
-		// so 'wp-opsec' already exists as a parent when these attach to it.
+		// so 'wp-shieldcore' already exists as a parent when these attach to it.
 		add_action( 'admin_menu', array( __CLASS__, 'admin_menu' ), 6 );
 	}
 
 	public static function admin_menu() {
 		foreach ( self::clusters() as $slug => $cluster ) {
 			add_submenu_page(
-				'wp-opsec',
+				'wp-shieldcore',
 				$cluster['title'],
 				$cluster['title'],
 				'manage_options',
-				'wp-opsec-' . $slug,
+				'wp-shieldcore-' . $slug,
 				function () use ( $slug ) {
 					self::render( $slug );
 				}
@@ -129,7 +129,7 @@ class WPOpsec_Menu_Router {
 	 */
 	public static function query( $module_slug, array $extra = array() ) {
 		$cluster = self::module_cluster_map()[ $module_slug ] ?? $module_slug;
-		$args    = array_merge( array( 'page' => 'wp-opsec-' . $cluster, 'tab' => $module_slug ), $extra );
+		$args    = array_merge( array( 'page' => 'wp-shieldcore-' . $cluster, 'tab' => $module_slug ), $extra );
 		return http_build_query( $args );
 	}
 
@@ -148,12 +148,12 @@ class WPOpsec_Menu_Router {
 		$requested_tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : '';
 		$tab           = isset( $tabs[ $requested_tab ] ) ? $requested_tab : array_key_first( $tabs );
 
-		WPOpsec_UI::styles();
+		ShieldCore_UI::styles();
 		?>
 		<div class="wrap">
-			<h2 class="nav-tab-wrapper wpopsec-tabs">
+			<h2 class="nav-tab-wrapper shieldcore-tabs">
 				<?php foreach ( $tabs as $mod_slug => $cb ) : ?>
-					<?php list( $icon, $title ) = WPOpsec_UI::meta( $mod_slug ); ?>
+					<?php list( $icon, $title ) = ShieldCore_UI::meta( $mod_slug ); ?>
 					<a href="<?php echo esc_url( self::url( $mod_slug ) ); ?>"
 						class="nav-tab <?php echo $mod_slug === $tab ? 'nav-tab-active' : ''; ?>">
 						<span class="dashicons dashicons-<?php echo esc_attr( $icon ); ?>" style="font-size:16px;vertical-align:text-bottom;margin-right:4px"></span>

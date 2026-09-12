@@ -16,15 +16,15 @@ if ( ! defined( 'ABSPATH' ) ) {
  *    detects change *since the baseline*, which is why the baseline is
  *    re-taken explicitly (after an update) rather than silently.
  */
-class WPOpsec_Module_File_Integrity {
+class ShieldCore_Module_File_Integrity {
 
-	const CRON_HOOK  = 'wpopsec_file_integrity_scan';
+	const CRON_HOOK  = 'shieldcore_file_integrity_scan';
 	const DB_VERSION = 1;
 	const TIME_LIMIT = 25; // seconds per scan pass, to stay well inside PHP limits
 
 	public static function table() {
 		global $wpdb;
-		return $wpdb->prefix . 'wpopsec_baseline';
+		return $wpdb->prefix . 'shieldcore_baseline';
 	}
 
 	public static function activate() {
@@ -40,14 +40,14 @@ class WPOpsec_Module_File_Integrity {
 	}
 
 	public static function register() {
-		if ( (int) get_option( 'wpopsec_integrity_db_version', 0 ) !== self::DB_VERSION ) {
+		if ( (int) get_option( 'shieldcore_integrity_db_version', 0 ) !== self::DB_VERSION ) {
 			self::install_table();
 		}
 
 		add_action( self::CRON_HOOK, array( __CLASS__, 'run_scan' ) );
-		add_action( 'admin_post_wpopsec_fi_scan_now', array( __CLASS__, 'handle_scan_now' ) );
-		add_action( 'admin_post_wpopsec_fi_rebaseline', array( __CLASS__, 'handle_rebaseline' ) );
-		add_action( 'admin_post_wpopsec_fi_save_settings', array( __CLASS__, 'handle_save_settings' ) );
+		add_action( 'admin_post_shieldcore_fi_scan_now', array( __CLASS__, 'handle_scan_now' ) );
+		add_action( 'admin_post_shieldcore_fi_rebaseline', array( __CLASS__, 'handle_rebaseline' ) );
+		add_action( 'admin_post_shieldcore_fi_save_settings', array( __CLASS__, 'handle_save_settings' ) );
 
 		return __CLASS__;
 	}
@@ -75,7 +75,7 @@ class WPOpsec_Module_File_Integrity {
 			) {$collate};"
 		);
 
-		update_option( 'wpopsec_integrity_db_version', self::DB_VERSION, false );
+		update_option( 'shieldcore_integrity_db_version', self::DB_VERSION, false );
 	}
 
 	/**
@@ -122,7 +122,7 @@ class WPOpsec_Module_File_Integrity {
 		// Filterable so a large site that legitimately can't finish in the
 		// default budget can raise it rather than living with permanently
 		// partial scans (which suppress deleted-file detection).
-		$budget   = max( 1, (int) apply_filters( 'wpopsec_integrity_time_limit', self::TIME_LIMIT ) );
+		$budget   = max( 1, (int) apply_filters( 'shieldcore_integrity_time_limit', self::TIME_LIMIT ) );
 		$deadline = time() + $budget;
 
 		// Root-level PHP (wp-config.php, index.php, xmlrpc.php, ...)
@@ -151,7 +151,7 @@ class WPOpsec_Module_File_Integrity {
 				foreach ( $iter as $file ) {
 					if ( time() > $deadline ) {
 						$partial  = true;
-						$errors[] = sprintf( 'time limit (%ds) reached while scanning %s — raise it with the wpopsec_integrity_time_limit filter', $budget, $root );
+						$errors[] = sprintf( 'time limit (%ds) reached while scanning %s — raise it with the shieldcore_integrity_time_limit filter', $budget, $root );
 						break 2;
 					}
 
@@ -171,7 +171,7 @@ class WPOpsec_Module_File_Integrity {
 						continue;
 					}
 					$path = self::relative_path( $file->getPathname() );
-					if ( false !== strpos( $path, '/wp-opsec-checks/data/' ) ) {
+					if ( false !== strpos( $path, '/wp-shieldcore-checks/data/' ) ) {
 						// Compiled data this plugin regenerates on its own schedule
 						// (IP-reputation ranges daily, local-blocklist ranges on every
 						// new escalation, geo country names on refresh) — a diff here
@@ -227,13 +227,13 @@ class WPOpsec_Module_File_Integrity {
 		// missing files would show up as "added" on the next scan, which is
 		// indistinguishable from an attacker dropping files.
 		if ( $scan['partial'] ) {
-			wpopsec_log_event(
+			shieldcore_log_event(
 				'file-integrity',
 				'baseline_aborted',
 				'noted',
 				'incomplete crawl, baseline left unchanged: ' . implode( '; ', $scan['errors'] )
 			);
-			return new WP_Error( 'wpopsec_partial_scan', implode( '; ', $scan['errors'] ) );
+			return new WP_Error( 'shieldcore_partial_scan', implode( '; ', $scan['errors'] ) );
 		}
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- table name only, built from $wpdb->prefix, no user input; identifiers can't be bound via $wpdb->prepare() placeholders anyway.
@@ -255,10 +255,10 @@ class WPOpsec_Module_File_Integrity {
 			$wpdb->query( "INSERT INTO {$table} (path_hash,path,file_hash,size,recorded_at) VALUES " . implode( ',', $values ) );
 		}
 
-		update_option( 'wpopsec_integrity_baseline_at', time(), false );
-		update_option( 'wpopsec_integrity_baseline_count', count( $files ), false );
+		update_option( 'shieldcore_integrity_baseline_at', time(), false );
+		update_option( 'shieldcore_integrity_baseline_count', count( $files ), false );
 
-		wpopsec_log_event( 'file-integrity', 'baseline_taken', 'noted', sprintf( '%d files hashed', count( $files ) ) );
+		shieldcore_log_event( 'file-integrity', 'baseline_taken', 'noted', sprintf( '%d files hashed', count( $files ) ) );
 
 		return count( $files );
 	}
@@ -362,13 +362,13 @@ class WPOpsec_Module_File_Integrity {
 	public static function run_scan() {
 		$result = array( 'at' => time() );
 
-		if ( get_option( 'wpopsec_integrity_check_core', true ) ) {
+		if ( get_option( 'shieldcore_integrity_check_core', true ) ) {
 			$core             = self::verify_core();
 			$result['core']   = $core;
 			$core_problems    = count( $core['modified'] ) + count( $core['missing'] );
 
 			if ( $core_problems > 0 ) {
-				wpopsec_log_event(
+				shieldcore_log_event(
 					'file-integrity',
 					'core_mismatch',
 					'noted',
@@ -377,12 +377,12 @@ class WPOpsec_Module_File_Integrity {
 			}
 		}
 
-		if ( get_option( 'wpopsec_integrity_check_baseline', true ) ) {
+		if ( get_option( 'shieldcore_integrity_check_baseline', true ) ) {
 			$diff             = self::diff_baseline();
 			$result['diff']   = $diff;
 
 			if ( ! empty( $diff['partial'] ) ) {
-				wpopsec_log_event(
+				shieldcore_log_event(
 					'file-integrity',
 					'scan_incomplete',
 					'noted',
@@ -393,7 +393,7 @@ class WPOpsec_Module_File_Integrity {
 			if ( empty( $diff['no_baseline'] ) ) {
 				$changes = count( $diff['added'] ) + count( $diff['modified'] ) + count( $diff['deleted'] );
 				if ( $changes > 0 ) {
-					wpopsec_log_event(
+					shieldcore_log_event(
 						'file-integrity',
 						'baseline_drift',
 						'noted',
@@ -409,13 +409,13 @@ class WPOpsec_Module_File_Integrity {
 			}
 		}
 
-		update_option( 'wpopsec_integrity_last_result', $result, false );
+		update_option( 'shieldcore_integrity_last_result', $result, false );
 
 		return $result;
 	}
 
 	public static function handle_scan_now() {
-		check_admin_referer( 'wpopsec_fi_scan_now' );
+		check_admin_referer( 'shieldcore_fi_scan_now' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
@@ -425,7 +425,7 @@ class WPOpsec_Module_File_Integrity {
 	}
 
 	public static function handle_rebaseline() {
-		check_admin_referer( 'wpopsec_fi_rebaseline' );
+		check_admin_referer( 'shieldcore_fi_rebaseline' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
@@ -442,12 +442,12 @@ class WPOpsec_Module_File_Integrity {
 	}
 
 	public static function handle_save_settings() {
-		check_admin_referer( 'wpopsec_fi_save_settings' );
+		check_admin_referer( 'shieldcore_fi_save_settings' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
-		update_option( 'wpopsec_integrity_check_core', isset( $_POST['check_core'] ) );
-		update_option( 'wpopsec_integrity_check_baseline', isset( $_POST['check_baseline'] ) );
+		update_option( 'shieldcore_integrity_check_core', isset( $_POST['check_core'] ) );
+		update_option( 'shieldcore_integrity_check_baseline', isset( $_POST['check_baseline'] ) );
 		wp_safe_redirect( add_query_arg( 'saved', '1', wp_get_referer() ) );
 		exit;
 	}
@@ -457,36 +457,36 @@ class WPOpsec_Module_File_Integrity {
 		if ( empty( $files ) ) {
 			return;
 		}
-		echo '<div class="wpopsec-files"><p class="wpopsec-files__title">';
-		WPOpsec_UI::badge( $label . ' (' . count( $files ) . ')', $tone );
+		echo '<div class="shieldcore-files"><p class="shieldcore-files__title">';
+		ShieldCore_UI::badge( $label . ' (' . count( $files ) . ')', $tone );
 		echo '</p><ul>';
 		foreach ( array_slice( $files, 0, 50 ) as $f ) {
 			echo '<li><code>' . esc_html( $f ) . '</code></li>';
 		}
 		if ( count( $files ) > 50 ) {
-			echo '<li class="wpopsec-muted">… and ' . esc_html( count( $files ) - 50 ) . ' more</li>';
+			echo '<li class="shieldcore-muted">… and ' . esc_html( count( $files ) - 50 ) . ' more</li>';
 		}
 		echo '</ul></div>';
 	}
 
 	public static function render_page() {
-		$last        = get_option( 'wpopsec_integrity_last_result', array() );
-		$baseline_at = (int) get_option( 'wpopsec_integrity_baseline_at', 0 );
-		$baseline_ct = (int) get_option( 'wpopsec_integrity_baseline_count', 0 );
+		$last        = get_option( 'shieldcore_integrity_last_result', array() );
+		$baseline_at = (int) get_option( 'shieldcore_integrity_baseline_at', 0 );
+		$baseline_ct = (int) get_option( 'shieldcore_integrity_baseline_count', 0 );
 
-		WPOpsec_UI::open( 'file-integrity' );
+		ShieldCore_UI::open( 'file-integrity' );
 
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only result flags set only by this module's own admin-post redirects, which already check_admin_referer() before redirecting.
 		if ( isset( $_GET['saved'] ) ) {
-			WPOpsec_UI::notice( 'success', 'Settings saved.' );
+			ShieldCore_UI::notice( 'success', 'Settings saved.' );
 		}
 		if ( isset( $_GET['scanned'] ) ) {
-			WPOpsec_UI::notice( 'success', 'Scan complete.' );
+			ShieldCore_UI::notice( 'success', 'Scan complete.' );
 		}
 		if ( isset( $_GET['rebaselined'] ) && 'partial' === $_GET['rebaselined'] ) {
-			WPOpsec_UI::notice( 'error', 'The scan could not read every file, so the baseline was left unchanged — replacing it with a partial crawl would make the unread files look like new files on the next scan.' );
+			ShieldCore_UI::notice( 'error', 'The scan could not read every file, so the baseline was left unchanged — replacing it with a partial crawl would make the unread files look like new files on the next scan.' );
 		} elseif ( isset( $_GET['rebaselined'] ) ) {
-			WPOpsec_UI::notice( 'success', 'Baseline re-taken.' );
+			ShieldCore_UI::notice( 'success', 'Baseline re-taken.' );
 		}
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
@@ -496,7 +496,7 @@ class WPOpsec_Module_File_Integrity {
 				$msg .= '<li>' . esc_html( $err ) . '</li>';
 			}
 			$msg .= '</ul><p>Deleted-file detection is skipped while a scan is partial.</p>';
-			WPOpsec_UI::notice( 'warning', $msg, true );
+			ShieldCore_UI::notice( 'warning', $msg, true );
 		}
 
 		$core_issues = count( (array) ( $last['core']['modified'] ?? array() ) ) + count( (array) ( $last['core']['missing'] ?? array() ) );
@@ -504,7 +504,7 @@ class WPOpsec_Module_File_Integrity {
 			+ count( (array) ( $last['diff']['modified'] ?? array() ) )
 			+ count( (array) ( $last['diff']['deleted'] ?? array() ) );
 
-		WPOpsec_UI::tiles(
+		ShieldCore_UI::tiles(
 			array(
 				array(
 					'icon'  => $core_issues ? 'dismiss' : 'yes-alt',
@@ -527,78 +527,78 @@ class WPOpsec_Module_File_Integrity {
 			)
 		);
 
-		WPOpsec_UI::section( 'Core files', 'wordpress-alt' );
-		echo '<p class="wpopsec-help" style="margin-top:0">Verified against WordPress.org&#39;s published checksums for your exact version and locale — authoritative, and valid even if this plugin was installed after a compromise.</p>';
+		ShieldCore_UI::section( 'Core files', 'wordpress-alt' );
+		echo '<p class="shieldcore-help" style="margin-top:0">Verified against WordPress.org&#39;s published checksums for your exact version and locale — authoritative, and valid even if this plugin was installed after a compromise.</p>';
 		if ( empty( $last['core'] ) ) {
-			echo '<div class="wpopsec-empty"><span class="dashicons dashicons-marker" style="color:#646970"></span><p>Not checked yet.</p></div>';
+			echo '<div class="shieldcore-empty"><span class="dashicons dashicons-marker" style="color:#646970"></span><p>Not checked yet.</p></div>';
 		} elseif ( ! empty( $last['core']['error'] ) ) {
-			WPOpsec_UI::notice( 'warning', $last['core']['error'] );
+			ShieldCore_UI::notice( 'warning', $last['core']['error'] );
 		} elseif ( empty( $last['core']['modified'] ) && empty( $last['core']['missing'] ) ) {
-			echo '<div class="wpopsec-empty"><span class="dashicons dashicons-yes-alt"></span><p>All '
+			echo '<div class="shieldcore-empty"><span class="dashicons dashicons-yes-alt"></span><p>All '
 				. esc_html( number_format_i18n( $last['core']['checked'] ) ) . ' core files match.</p></div>';
 		} else {
 			self::render_file_list( 'Modified core files', $last['core']['modified'], 'bad' );
 			self::render_file_list( 'Missing core files', $last['core']['missing'], 'bad' );
-			echo '<p class="wpopsec-help">Dashboard → Updates → "Re-install now" restores core files without touching your content.</p>';
+			echo '<p class="shieldcore-help">Dashboard → Updates → "Re-install now" restores core files without touching your content.</p>';
 		}
-		WPOpsec_UI::section_end();
+		ShieldCore_UI::section_end();
 
-		WPOpsec_UI::section( 'Plugins, themes &amp; mu-plugins', 'admin-plugins' );
-		echo '<p class="wpopsec-help" style="margin-top:0">No published checksums exist for these, so they are compared against a snapshot taken on this site.</p>';
+		ShieldCore_UI::section( 'Plugins, themes &amp; mu-plugins', 'admin-plugins' );
+		echo '<p class="shieldcore-help" style="margin-top:0">No published checksums exist for these, so they are compared against a snapshot taken on this site.</p>';
 		if ( empty( $last['diff'] ) ) {
-			echo '<div class="wpopsec-empty"><span class="dashicons dashicons-marker" style="color:#646970"></span><p>Not checked yet.</p></div>';
+			echo '<div class="shieldcore-empty"><span class="dashicons dashicons-marker" style="color:#646970"></span><p>Not checked yet.</p></div>';
 		} elseif ( ! empty( $last['diff']['no_baseline'] ) ) {
-			WPOpsec_UI::notice( 'info', 'Take a baseline to start detecting changes.' );
+			ShieldCore_UI::notice( 'info', 'Take a baseline to start detecting changes.' );
 		} else {
 			$d = $last['diff'];
 			if ( empty( $d['added'] ) && empty( $d['modified'] ) && empty( $d['deleted'] ) ) {
-				echo '<div class="wpopsec-empty"><span class="dashicons dashicons-yes-alt"></span><p>No changes since the baseline.</p></div>';
+				echo '<div class="shieldcore-empty"><span class="dashicons dashicons-yes-alt"></span><p>No changes since the baseline.</p></div>';
 			} else {
 				self::render_file_list( 'Added', $d['added'], 'bad' );
 				self::render_file_list( 'Modified', $d['modified'], 'bad' );
 				self::render_file_list( 'Deleted', $d['deleted'], 'warn' );
-				echo '<p class="wpopsec-help">Updating or installing a plugin/theme legitimately changes these files. Re-take the baseline once you have confirmed the changes are yours.</p>';
+				echo '<p class="shieldcore-help">Updating or installing a plugin/theme legitimately changes these files. Re-take the baseline once you have confirmed the changes are yours.</p>';
 			}
 		}
-		WPOpsec_UI::section_end();
+		ShieldCore_UI::section_end();
 		?>
 
-		<div class="wpopsec-actions" style="margin-bottom:18px">
+		<div class="shieldcore-actions" style="margin-bottom:18px">
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( 'wpopsec_fi_scan_now' ); ?>
-				<input type="hidden" name="action" value="wpopsec_fi_scan_now">
+				<?php wp_nonce_field( 'shieldcore_fi_scan_now' ); ?>
+				<input type="hidden" name="action" value="shieldcore_fi_scan_now">
 				<?php submit_button( 'Scan now', 'primary', 'submit', false ); ?>
 			</form>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"
 				onsubmit="return confirm('Re-take the baseline? Current files become the new known-good reference — only do this if you trust the current state.');">
-				<?php wp_nonce_field( 'wpopsec_fi_rebaseline' ); ?>
-				<input type="hidden" name="action" value="wpopsec_fi_rebaseline">
+				<?php wp_nonce_field( 'shieldcore_fi_rebaseline' ); ?>
+				<input type="hidden" name="action" value="shieldcore_fi_rebaseline">
 				<?php submit_button( 'Take / re-take baseline', 'secondary', 'submit', false ); ?>
 			</form>
 		</div>
 
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-			<?php wp_nonce_field( 'wpopsec_fi_save_settings' ); ?>
-			<input type="hidden" name="action" value="wpopsec_fi_save_settings">
+			<?php wp_nonce_field( 'shieldcore_fi_save_settings' ); ?>
+			<input type="hidden" name="action" value="shieldcore_fi_save_settings">
 
-			<?php WPOpsec_UI::section( 'Settings', 'admin-generic' ); ?>
+			<?php ShieldCore_UI::section( 'Settings', 'admin-generic' ); ?>
 				<?php
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Daily scan checks',
 					function () {
 						?>
-						<label><input type="checkbox" name="check_core" <?php checked( get_option( 'wpopsec_integrity_check_core', true ) ); ?>> Core files vs WordPress.org checksums</label>
-						<label><input type="checkbox" name="check_baseline" <?php checked( get_option( 'wpopsec_integrity_check_baseline', true ) ); ?>> Plugins/themes vs local baseline</label>
+						<label><input type="checkbox" name="check_core" <?php checked( get_option( 'shieldcore_integrity_check_core', true ) ); ?>> Core files vs WordPress.org checksums</label>
+						<label><input type="checkbox" name="check_baseline" <?php checked( get_option( 'shieldcore_integrity_check_baseline', true ) ); ?>> Plugins/themes vs local baseline</label>
 						<?php
 					},
 					'Findings are written to the Event Log. A scan that cannot finish within its time budget is reported as partial rather than treated as complete.'
 				);
 				?>
-			<?php WPOpsec_UI::section_end(); ?>
+			<?php ShieldCore_UI::section_end(); ?>
 
 			<?php submit_button( 'Save settings' ); ?>
 		</form>
 		<?php
-		WPOpsec_UI::close();
+		ShieldCore_UI::close();
 	}
 }

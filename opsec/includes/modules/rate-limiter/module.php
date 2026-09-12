@@ -10,10 +10,10 @@ if ( ! defined( 'ABSPATH' ) ) {
  * PHP at all, since it's a plain request-count check with no WordPress
  * context needed, unlike Login Guard which has to hook actual auth events.
  */
-class WPOpsec_Module_Rate_Limiter {
+class ShieldCore_Module_Rate_Limiter {
 
 	public static function check_dest() {
-		return WPOPSEC_CHECKS_DIR . '/rate-limiter.php';
+		return SHIELDCORE_CHECKS_DIR . '/rate-limiter.php';
 	}
 
 	public static function activate() {
@@ -22,13 +22,13 @@ class WPOpsec_Module_Rate_Limiter {
 
 	public static function deactivate() {
 		if ( file_exists( self::check_dest() ) ) {
-			WPOpsec_Module_Loader::filesystem()->delete( self::check_dest() );
+			ShieldCore_Module_Loader::filesystem()->delete( self::check_dest() );
 		}
 	}
 
 	public static function register() {
 		self::deploy_check_file();
-		add_action( 'admin_post_wpopsec_rl_save_settings', array( __CLASS__, 'handle_save_settings' ) );
+		add_action( 'admin_post_shieldcore_rl_save_settings', array( __CLASS__, 'handle_save_settings' ) );
 		return __CLASS__;
 	}
 
@@ -53,41 +53,41 @@ class WPOpsec_Module_Rate_Limiter {
 
 
 	public static function handle_save_settings() {
-		check_admin_referer( 'wpopsec_rl_save_settings' );
+		check_admin_referer( 'shieldcore_rl_save_settings' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
 
-		update_option( 'wpopsec_ratelimit_enabled', isset( $_POST['enabled'] ) );
-		update_option( 'wpopsec_ratelimit_mode', ( isset( $_POST['mode'] ) && 'block' === $_POST['mode'] ) ? 'block' : 'log' );
+		update_option( 'shieldcore_ratelimit_enabled', isset( $_POST['enabled'] ) );
+		update_option( 'shieldcore_ratelimit_mode', ( isset( $_POST['mode'] ) && 'block' === $_POST['mode'] ) ? 'block' : 'log' );
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- (int) cast is itself the sanitizer; wp_unslash() would be a no-op on a value about to be cast to int.
-		update_option( 'wpopsec_ratelimit_per_minute', max( 10, (int) ( $_POST['per_minute'] ?? 300 ) ) );
-		update_option( 'wpopsec_ratelimit_escalate', isset( $_POST['escalate'] ) );
+		update_option( 'shieldcore_ratelimit_per_minute', max( 10, (int) ( $_POST['per_minute'] ?? 300 ) ) );
+		update_option( 'shieldcore_ratelimit_escalate', isset( $_POST['escalate'] ) );
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- same as per_minute above.
-		update_option( 'wpopsec_ratelimit_escalate_after', max( 1, (int) ( $_POST['escalate_after'] ?? 3 ) ) );
+		update_option( 'shieldcore_ratelimit_escalate_after', max( 1, (int) ( $_POST['escalate_after'] ?? 3 ) ) );
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- same as per_minute above.
-		update_option( 'wpopsec_ratelimit_escalate_minutes', max( 1, (int) ( $_POST['escalate_minutes'] ?? 30 ) ) );
+		update_option( 'shieldcore_ratelimit_escalate_minutes', max( 1, (int) ( $_POST['escalate_minutes'] ?? 30 ) ) );
 
 		wp_safe_redirect( add_query_arg( 'saved', '1', wp_get_referer() ) );
 		exit;
 	}
 
 	public static function render_page() {
-		$enabled  = get_option( 'wpopsec_ratelimit_enabled', true );
-		$mode     = get_option( 'wpopsec_ratelimit_mode', 'log' );
-		$per_min  = (int) get_option( 'wpopsec_ratelimit_per_minute', 300 );
-		$escalate = get_option( 'wpopsec_ratelimit_escalate', true );
-		$after    = (int) get_option( 'wpopsec_ratelimit_escalate_after', 3 );
-		$minutes  = (int) get_option( 'wpopsec_ratelimit_escalate_minutes', 30 );
+		$enabled  = get_option( 'shieldcore_ratelimit_enabled', true );
+		$mode     = get_option( 'shieldcore_ratelimit_mode', 'log' );
+		$per_min  = (int) get_option( 'shieldcore_ratelimit_per_minute', 300 );
+		$escalate = get_option( 'shieldcore_ratelimit_escalate', true );
+		$after    = (int) get_option( 'shieldcore_ratelimit_escalate_after', 3 );
+		$minutes  = (int) get_option( 'shieldcore_ratelimit_escalate_minutes', 30 );
 
-		WPOpsec_UI::open( 'rate-limiter' );
+		ShieldCore_UI::open( 'rate-limiter' );
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only result flag set only by this module's own admin-post redirect, which already check_admin_referer()'d before redirecting.
 		if ( isset( $_GET['saved'] ) ) {
-			WPOpsec_UI::notice( 'success', 'Settings saved.' );
+			ShieldCore_UI::notice( 'success', 'Settings saved.' );
 		}
 
-		WPOpsec_UI::tiles(
+		ShieldCore_UI::tiles(
 			array(
 				array(
 					'icon'  => $enabled ? ( 'block' === $mode ? 'shield-alt' : 'visibility' ) : 'warning',
@@ -101,12 +101,12 @@ class WPOpsec_Module_Rate_Limiter {
 
 		?>
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-			<?php wp_nonce_field( 'wpopsec_rl_save_settings' ); ?>
-			<input type="hidden" name="action" value="wpopsec_rl_save_settings">
+			<?php wp_nonce_field( 'shieldcore_rl_save_settings' ); ?>
+			<input type="hidden" name="action" value="shieldcore_rl_save_settings">
 
-			<?php WPOpsec_UI::section( 'Settings', 'clock' ); ?>
+			<?php ShieldCore_UI::section( 'Settings', 'clock' ); ?>
 				<?php
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Enabled',
 					function () use ( $enabled ) {
 						?>
@@ -115,7 +115,7 @@ class WPOpsec_Module_Rate_Limiter {
 					}
 				);
 
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Limit',
 					function () use ( $per_min ) {
 						?>
@@ -125,7 +125,7 @@ class WPOpsec_Module_Rate_Limiter {
 					'Only counts requests that reach PHP — a page\'s CSS/JS/image sub-resources are served directly by the web server and never counted. 300/min (5/sec) comfortably covers normal browsing, editing, and REST/heartbeat polling while catching genuine floods.'
 				);
 
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Mode',
 					function () use ( $mode ) {
 						?>
@@ -135,7 +135,7 @@ class WPOpsec_Module_Rate_Limiter {
 					}
 				);
 
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Escalation',
 					function () use ( $escalate, $after, $minutes ) {
 						?>
@@ -149,11 +149,11 @@ class WPOpsec_Module_Rate_Limiter {
 					'Distinguishes a brief legitimate burst (one busy minute) from a sustained flood, before handing it to the IP Blocklist module for a longer, cheaper block at the early gate.'
 				);
 				?>
-			<?php WPOpsec_UI::section_end(); ?>
+			<?php ShieldCore_UI::section_end(); ?>
 
 			<?php submit_button( 'Save settings' ); ?>
 		</form>
 		<?php
-		WPOpsec_UI::close();
+		ShieldCore_UI::close();
 	}
 }

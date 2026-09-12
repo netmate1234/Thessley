@@ -11,25 +11,25 @@ if ( ! defined( 'ABSPATH' ) ) {
  * All checks bail for logged-in users with list_users — the REST users
  * endpoint and author archives are legitimately used by the editor.
  */
-class WPOpsec_Module_User_Enum {
+class ShieldCore_Module_User_Enum {
 
 	public static function activate() {}
 	public static function deactivate() {}
 
 	public static function register() {
-		add_action( 'admin_post_wpopsec_ue_save_settings', array( __CLASS__, 'handle_save_settings' ) );
+		add_action( 'admin_post_shieldcore_ue_save_settings', array( __CLASS__, 'handle_save_settings' ) );
 
-		if ( get_option( 'wpopsec_user_enum_block_author_scan', true ) ) {
+		if ( get_option( 'shieldcore_user_enum_block_author_scan', true ) ) {
 			add_action( 'template_redirect', array( __CLASS__, 'block_author_scan' ) );
 		}
-		if ( get_option( 'wpopsec_user_enum_block_rest_users', true ) ) {
+		if ( get_option( 'shieldcore_user_enum_block_rest_users', true ) ) {
 			add_filter( 'rest_request_before_callbacks', array( __CLASS__, 'block_rest_users' ), 20, 3 );
 			add_filter( 'rest_endpoints', array( __CLASS__, 'remove_user_endpoints' ) );
 		}
-		if ( get_option( 'wpopsec_user_enum_disable_oembed_author', true ) ) {
+		if ( get_option( 'shieldcore_user_enum_disable_oembed_author', true ) ) {
 			add_filter( 'oembed_response_data', array( __CLASS__, 'strip_oembed_author' ) );
 		}
-		if ( get_option( 'wpopsec_user_enum_hide_user_sitemap', true ) ) {
+		if ( get_option( 'shieldcore_user_enum_hide_user_sitemap', true ) ) {
 			add_filter( 'wp_sitemaps_add_provider', array( __CLASS__, 'remove_user_sitemap_provider' ), 10, 2 );
 			add_action( 'template_redirect', array( __CLASS__, 'block_user_sitemap_request' ), 1 );
 		}
@@ -93,7 +93,7 @@ class WPOpsec_Module_User_Enum {
 		if ( self::viewer_may_list_users() ) {
 			return;
 		}
-		if ( wpopsec_ip_is_exempt( wpopsec_client_ip() ) ) {
+		if ( shieldcore_ip_is_exempt( shieldcore_client_ip() ) ) {
 			return;
 		}
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- read-only probe detection, not a state-changing action; validated below via preg_match( '/^\d+$/', ... ) before use.
@@ -105,7 +105,7 @@ class WPOpsec_Module_User_Enum {
 		}
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 
-		wpopsec_log_event( 'user-enum', 'author_scan', 'blocked', 'numeric ?author= probe' );
+		shieldcore_log_event( 'user-enum', 'author_scan', 'blocked', 'numeric ?author= probe' );
 
 		status_header( 403 );
 		nocache_headers();
@@ -170,7 +170,7 @@ class WPOpsec_Module_User_Enum {
 		if ( is_wp_error( $response ) || self::viewer_may_list_users() ) {
 			return $response;
 		}
-		if ( wpopsec_ip_is_exempt( wpopsec_client_ip() ) ) {
+		if ( shieldcore_ip_is_exempt( shieldcore_client_ip() ) ) {
 			return $response;
 		}
 
@@ -199,10 +199,10 @@ class WPOpsec_Module_User_Enum {
 			return $response;
 		}
 
-		wpopsec_log_event( 'user-enum', 'rest_users', 'blocked', 'anonymous REST user/customer listing: ' . $route );
+		shieldcore_log_event( 'user-enum', 'rest_users', 'blocked', 'anonymous REST user/customer listing: ' . $route );
 
 		return new WP_Error(
-			'wpopsec_rest_users_forbidden',
+			'shieldcore_rest_users_forbidden',
 			__( 'Authentication required.', 'shieldcore-security' ),
 			array( 'status' => 401 )
 		);
@@ -226,81 +226,81 @@ class WPOpsec_Module_User_Enum {
 
 
 	public static function handle_save_settings() {
-		check_admin_referer( 'wpopsec_ue_save_settings' );
+		check_admin_referer( 'shieldcore_ue_save_settings' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
 
-		update_option( 'wpopsec_user_enum_block_author_scan', isset( $_POST['block_author_scan'] ) );
-		update_option( 'wpopsec_user_enum_block_rest_users', isset( $_POST['block_rest_users'] ) );
-		update_option( 'wpopsec_user_enum_disable_oembed_author', isset( $_POST['disable_oembed_author'] ) );
-		update_option( 'wpopsec_user_enum_hide_user_sitemap', isset( $_POST['hide_user_sitemap'] ) );
+		update_option( 'shieldcore_user_enum_block_author_scan', isset( $_POST['block_author_scan'] ) );
+		update_option( 'shieldcore_user_enum_block_rest_users', isset( $_POST['block_rest_users'] ) );
+		update_option( 'shieldcore_user_enum_disable_oembed_author', isset( $_POST['disable_oembed_author'] ) );
+		update_option( 'shieldcore_user_enum_hide_user_sitemap', isset( $_POST['hide_user_sitemap'] ) );
 
 		wp_safe_redirect( add_query_arg( 'saved', '1', wp_get_referer() ) );
 		exit;
 	}
 
 	public static function render_settings_page() {
-		WPOpsec_UI::open( 'user-enum' );
+		ShieldCore_UI::open( 'user-enum' );
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only result flag set only by this module's own admin-post redirect, which already check_admin_referer()'d before redirecting.
 		if ( isset( $_GET['saved'] ) ) {
-			WPOpsec_UI::notice( 'success', 'Settings saved.' );
+			ShieldCore_UI::notice( 'success', 'Settings saved.' );
 		}
 		?>
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-			<?php wp_nonce_field( 'wpopsec_ue_save_settings' ); ?>
-			<input type="hidden" name="action" value="wpopsec_ue_save_settings">
+			<?php wp_nonce_field( 'shieldcore_ue_save_settings' ); ?>
+			<input type="hidden" name="action" value="shieldcore_ue_save_settings">
 
-			<?php WPOpsec_UI::section( 'What to block', 'hidden' ); ?>
+			<?php ShieldCore_UI::section( 'What to block', 'hidden' ); ?>
 
 				<?php
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Author scans',
 					function () {
 						?>
-						<label><input type="checkbox" name="block_author_scan" <?php checked( get_option( 'wpopsec_user_enum_block_author_scan', true ) ); ?>> Block <code>?author=1</code> probes</label>
+						<label><input type="checkbox" name="block_author_scan" <?php checked( get_option( 'shieldcore_user_enum_block_author_scan', true ) ); ?>> Block <code>?author=1</code> probes</label>
 						<?php
 					},
 					'WordPress redirects the numeric form to <code>/author/&lt;login-name&gt;/</code>, which reveals the account name. Normal author archive URLs still work.'
 				);
 
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'REST API',
 					function () {
 						?>
-						<label><input type="checkbox" name="block_rest_users" <?php checked( get_option( 'wpopsec_user_enum_block_rest_users', true ) ); ?>> Require authentication for <code>/wp-json/wp/v2/users</code></label>
+						<label><input type="checkbox" name="block_rest_users" <?php checked( get_option( 'shieldcore_user_enum_block_rest_users', true ) ); ?>> Require authentication for <code>/wp-json/wp/v2/users</code></label>
 						<?php
 					},
 					'By default this endpoint lists every account with a published post, to anyone. <code>/users/me</code> is left alone. Disable if a headless front end reads it anonymously.'
 				);
 
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'oEmbed',
 					function () {
 						?>
-						<label><input type="checkbox" name="disable_oembed_author" <?php checked( get_option( 'wpopsec_user_enum_disable_oembed_author', true ) ); ?>> Strip author details from oEmbed responses</label>
+						<label><input type="checkbox" name="disable_oembed_author" <?php checked( get_option( 'shieldcore_user_enum_disable_oembed_author', true ) ); ?>> Strip author details from oEmbed responses</label>
 						<?php
 					},
 					'oEmbed output includes <code>author_name</code> and <code>author_url</code> for any public post.'
 				);
 
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'User sitemap',
 					function () {
 						?>
-						<label><input type="checkbox" name="hide_user_sitemap" <?php checked( get_option( 'wpopsec_user_enum_hide_user_sitemap', true ) ); ?>> Remove <code>/wp-sitemap-users-1.xml</code></label>
+						<label><input type="checkbox" name="hide_user_sitemap" <?php checked( get_option( 'shieldcore_user_enum_hide_user_sitemap', true ) ); ?>> Remove <code>/wp-sitemap-users-1.xml</code></label>
 						<?php
 					},
 					'WordPress\'s built-in Sitemaps API lists every account with public content here by default, same disclosure as <code>?author=N</code> probing — just a URL those checks never touch. Post and page sitemaps are unaffected.'
 				);
 				?>
 
-			<?php WPOpsec_UI::section_end(); ?>
+			<?php ShieldCore_UI::section_end(); ?>
 
 			<?php submit_button( 'Save settings' ); ?>
 		</form>
 		<?php
-		WPOpsec_UI::close();
+		ShieldCore_UI::close();
 	}
 }

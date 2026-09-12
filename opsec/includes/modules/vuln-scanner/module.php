@@ -15,9 +15,9 @@ if ( ! defined( 'ABSPATH' ) ) {
  *  3. Known CVEs — real vulnerability records, but this needs a WPScan API
  *     token. Optional: everything above still works without one.
  */
-class WPOpsec_Module_Vuln_Scanner {
+class ShieldCore_Module_Vuln_Scanner {
 
-	const CRON_HOOK      = 'wpopsec_vuln_scan';
+	const CRON_HOOK      = 'shieldcore_vuln_scan';
 	const STALE_YEARS    = 2;
 	const WPSCAN_API     = 'https://wpscan.com/api/v3/';
 
@@ -33,8 +33,8 @@ class WPOpsec_Module_Vuln_Scanner {
 
 	public static function register() {
 		add_action( self::CRON_HOOK, array( __CLASS__, 'run_scan' ) );
-		add_action( 'admin_post_wpopsec_vs_scan_now', array( __CLASS__, 'handle_scan_now' ) );
-		add_action( 'admin_post_wpopsec_vs_save_settings', array( __CLASS__, 'handle_save_settings' ) );
+		add_action( 'admin_post_shieldcore_vs_scan_now', array( __CLASS__, 'handle_scan_now' ) );
+		add_action( 'admin_post_shieldcore_vs_save_settings', array( __CLASS__, 'handle_save_settings' ) );
 
 		return __CLASS__;
 	}
@@ -106,7 +106,7 @@ class WPOpsec_Module_Vuln_Scanner {
 	 * @return array{closed:bool,last_updated:string,error:string}
 	 */
 	private static function directory_status( $slug ) {
-		$cache_key = 'wpopsec_dirstat_' . md5( $slug );
+		$cache_key = 'shieldcore_dirstat_' . md5( $slug );
 		$cached    = get_transient( $cache_key );
 		if ( is_array( $cached ) ) {
 			return $cached;
@@ -147,7 +147,7 @@ class WPOpsec_Module_Vuln_Scanner {
 
 	/** @return array{items:array,error:string} */
 	private static function wpscan_lookup( $components ) {
-		$token = trim( (string) get_option( 'wpopsec_vuln_wpscan_token', '' ) );
+		$token = trim( (string) get_option( 'shieldcore_vuln_wpscan_token', '' ) );
 		if ( '' === $token ) {
 			return array( 'items' => array(), 'error' => '' );
 		}
@@ -160,7 +160,7 @@ class WPOpsec_Module_Vuln_Scanner {
 				continue; // themes use a different endpoint; plugins are the bulk of real risk
 			}
 
-			$cache_key = 'wpopsec_wpscan_' . md5( $c['slug'] . '|' . $c['version'] );
+			$cache_key = 'shieldcore_wpscan_' . md5( $c['slug'] . '|' . $c['version'] );
 			$cached    = get_transient( $cache_key );
 			if ( is_array( $cached ) ) {
 				if ( $cached ) {
@@ -241,7 +241,7 @@ class WPOpsec_Module_Vuln_Scanner {
 				);
 			}
 
-			if ( 'plugin' === $c['type'] && get_option( 'wpopsec_vuln_check_directory', true ) ) {
+			if ( 'plugin' === $c['type'] && get_option( 'shieldcore_vuln_check_directory', true ) ) {
 				$status = self::directory_status( $c['slug'] );
 
 				if ( $status['closed'] ) {
@@ -311,7 +311,7 @@ class WPOpsec_Module_Vuln_Scanner {
 			'wpscan_error'  => $wpscan['error'],
 		);
 
-		update_option( 'wpopsec_vuln_last_result', $result, false );
+		update_option( 'shieldcore_vuln_last_result', $result, false );
 
 		$critical = 0;
 		foreach ( $findings as $f ) {
@@ -323,7 +323,7 @@ class WPOpsec_Module_Vuln_Scanner {
 		}
 
 		if ( $findings ) {
-			wpopsec_log_event(
+			shieldcore_log_event(
 				'vuln-scanner',
 				'scan_findings',
 				'noted',
@@ -335,7 +335,7 @@ class WPOpsec_Module_Vuln_Scanner {
 	}
 
 	public static function handle_scan_now() {
-		check_admin_referer( 'wpopsec_vs_scan_now' );
+		check_admin_referer( 'shieldcore_vs_scan_now' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
@@ -345,13 +345,13 @@ class WPOpsec_Module_Vuln_Scanner {
 	}
 
 	public static function handle_save_settings() {
-		check_admin_referer( 'wpopsec_vs_save_settings' );
+		check_admin_referer( 'shieldcore_vs_save_settings' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
 
-		update_option( 'wpopsec_vuln_check_directory', isset( $_POST['check_directory'] ) );
-		update_option( 'wpopsec_vuln_wpscan_token', sanitize_text_field( wp_unslash( $_POST['wpscan_token'] ?? '' ) ) );
+		update_option( 'shieldcore_vuln_check_directory', isset( $_POST['check_directory'] ) );
+		update_option( 'shieldcore_vuln_wpscan_token', sanitize_text_field( wp_unslash( $_POST['wpscan_token'] ?? '' ) ) );
 
 		wp_safe_redirect( add_query_arg( 'saved', '1', wp_get_referer() ) );
 		exit;
@@ -369,22 +369,22 @@ class WPOpsec_Module_Vuln_Scanner {
 	}
 
 	public static function render_page() {
-		$last  = get_option( 'wpopsec_vuln_last_result', array() );
-		$token = (string) get_option( 'wpopsec_vuln_wpscan_token', '' );
+		$last  = get_option( 'shieldcore_vuln_last_result', array() );
+		$token = (string) get_option( 'shieldcore_vuln_wpscan_token', '' );
 
-		WPOpsec_UI::open( 'vuln-scanner' );
+		ShieldCore_UI::open( 'vuln-scanner' );
 
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only result flags set only by this module's own admin-post redirects, which already check_admin_referer() before redirecting.
 		if ( isset( $_GET['saved'] ) ) {
-			WPOpsec_UI::notice( 'success', 'Settings saved.' );
+			ShieldCore_UI::notice( 'success', 'Settings saved.' );
 		}
 		if ( isset( $_GET['scanned'] ) ) {
-			WPOpsec_UI::notice( 'success', 'Scan complete.' );
+			ShieldCore_UI::notice( 'success', 'Scan complete.' );
 		}
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
 		if ( empty( $last ) ) {
-			WPOpsec_UI::notice( 'info', 'No scan has run yet.' );
+			ShieldCore_UI::notice( 'info', 'No scan has run yet.' );
 		} else {
 			$findings = (array) $last['findings'];
 			$critical = 0;
@@ -397,7 +397,7 @@ class WPOpsec_Module_Vuln_Scanner {
 				}
 			}
 
-			WPOpsec_UI::tiles(
+			ShieldCore_UI::tiles(
 				array(
 					array(
 						'icon'  => $findings ? 'warning' : 'yes-alt',
@@ -427,18 +427,18 @@ class WPOpsec_Module_Vuln_Scanner {
 			);
 
 			if ( ! empty( $last['wpscan_error'] ) ) {
-				WPOpsec_UI::notice( 'warning', $last['wpscan_error'] );
+				ShieldCore_UI::notice( 'warning', $last['wpscan_error'] );
 			}
 			if ( ! empty( $last['core_update'] ) ) {
-				WPOpsec_UI::notice( 'warning', 'WordPress core update available: ' . $last['core_update'] );
+				ShieldCore_UI::notice( 'warning', 'WordPress core update available: ' . $last['core_update'] );
 			}
 
-			WPOpsec_UI::section( 'Findings', 'warning' );
+			ShieldCore_UI::section( 'Findings', 'warning' );
 			if ( empty( $findings ) ) {
-				echo '<div class="wpopsec-empty"><span class="dashicons dashicons-yes-alt"></span><p>Nothing flagged.</p></div>';
+				echo '<div class="shieldcore-empty"><span class="dashicons dashicons-yes-alt"></span><p>Nothing flagged.</p></div>';
 			} else {
 				?>
-				<table class="wpopsec-table">
+				<table class="shieldcore-table">
 					<thead>
 						<tr>
 							<th style="width:230px">Component</th>
@@ -455,21 +455,21 @@ class WPOpsec_Module_Vuln_Scanner {
 								<strong><?php echo esc_html( $f['name'] ); ?></strong><br>
 								<code style="font-size:11px"><?php echo esc_html( $f['slug'] ); ?></code>
 							</td>
-							<td class="wpopsec-muted"><?php echo esc_html( $f['type'] ); ?></td>
+							<td class="shieldcore-muted"><?php echo esc_html( $f['type'] ); ?></td>
 							<td><?php echo esc_html( $f['version'] ); ?></td>
 							<td>
 								<?php if ( $f['active'] ) : ?>
-									<?php WPOpsec_UI::badge( 'active', 'warn' ); ?>
+									<?php ShieldCore_UI::badge( 'active', 'warn' ); ?>
 								<?php else : ?>
-									<span class="wpopsec-muted">no</span>
+									<span class="shieldcore-muted">no</span>
 								<?php endif; ?>
 							</td>
 							<td>
 								<?php foreach ( $f['issues'] as $issue ) : ?>
 									<?php list( $label, $tone ) = self::kind_tone( $issue['kind'] ); ?>
 									<div style="margin-bottom:5px">
-										<?php WPOpsec_UI::badge( $label, $tone ); ?>
-										<span class="wpopsec-muted"><?php echo esc_html( $issue['detail'] ); ?></span>
+										<?php ShieldCore_UI::badge( $label, $tone ); ?>
+										<span class="shieldcore-muted"><?php echo esc_html( $issue['detail'] ); ?></span>
 									</div>
 								<?php endforeach; ?>
 							</td>
@@ -477,38 +477,38 @@ class WPOpsec_Module_Vuln_Scanner {
 					<?php endforeach; ?>
 					</tbody>
 				</table>
-				<p class="wpopsec-help">An inactive plugin still has files on disk that can be reached directly — uninstall what you do not use rather than just deactivating it.</p>
+				<p class="shieldcore-help">An inactive plugin still has files on disk that can be reached directly — uninstall what you do not use rather than just deactivating it.</p>
 				<?php
 			}
-			WPOpsec_UI::section_end();
+			ShieldCore_UI::section_end();
 		}
 		?>
 
-		<div class="wpopsec-actions" style="margin-bottom:18px">
+		<div class="shieldcore-actions" style="margin-bottom:18px">
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( 'wpopsec_vs_scan_now' ); ?>
-				<input type="hidden" name="action" value="wpopsec_vs_scan_now">
+				<?php wp_nonce_field( 'shieldcore_vs_scan_now' ); ?>
+				<input type="hidden" name="action" value="shieldcore_vs_scan_now">
 				<?php submit_button( 'Scan now', 'primary', 'submit', false ); ?>
 			</form>
 		</div>
 
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-			<?php wp_nonce_field( 'wpopsec_vs_save_settings' ); ?>
-			<input type="hidden" name="action" value="wpopsec_vs_save_settings">
+			<?php wp_nonce_field( 'shieldcore_vs_save_settings' ); ?>
+			<input type="hidden" name="action" value="shieldcore_vs_save_settings">
 
-			<?php WPOpsec_UI::section( 'Settings', 'admin-generic' ); ?>
+			<?php ShieldCore_UI::section( 'Settings', 'admin-generic' ); ?>
 				<?php
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Directory checks',
 					function () {
 						?>
-						<label><input type="checkbox" name="check_directory" <?php checked( get_option( 'wpopsec_vuln_check_directory', true ) ); ?>> Check WordPress.org for removed / unmaintained plugins</label>
+						<label><input type="checkbox" name="check_directory" <?php checked( get_option( 'shieldcore_vuln_check_directory', true ) ); ?>> Check WordPress.org for removed / unmaintained plugins</label>
 						<?php
 					},
 					'Results are cached for a day. Plugins that were never on .org (premium, custom) are simply not reported on.'
 				);
 
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'WPScan API token',
 					function () use ( $token ) {
 						?>
@@ -516,17 +516,17 @@ class WPOpsec_Module_Vuln_Scanner {
 						<?php
 						if ( '' !== $token ) {
 							echo ' ';
-							WPOpsec_UI::badge( 'configured', 'good', 'yes-alt' );
+							ShieldCore_UI::badge( 'configured', 'good', 'yes-alt' );
 						}
 					},
 					'Optional. Adds real CVE data from <a href="https://wpscan.com/api" target="_blank" rel="noopener">wpscan.com/api</a> (free tier: 25 requests/day, which is why results are cached for 24h). Everything else on this page works without a token.'
 				);
 				?>
-			<?php WPOpsec_UI::section_end(); ?>
+			<?php ShieldCore_UI::section_end(); ?>
 
 			<?php submit_button( 'Save settings' ); ?>
 		</form>
 		<?php
-		WPOpsec_UI::close();
+		ShieldCore_UI::close();
 	}
 }

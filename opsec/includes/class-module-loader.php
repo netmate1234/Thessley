@@ -5,10 +5,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /**
  * Discovers and wires up modules under includes/modules/*.
- * Each module dir has a module.php defining a class WPOpsec_Module_<Name>
+ * Each module dir has a module.php defining a class ShieldCore_Module_<Name>
  * with static activate(), deactivate(), register() methods.
  */
-class WPOpsec_Module_Loader {
+class ShieldCore_Module_Loader {
 
 	/**
 	 * Base64-embedded so the dashboard header has no external asset
@@ -35,41 +35,41 @@ class WPOpsec_Module_Loader {
 	private static $modules = array(
 		// Overview — read/audit views over the shared events table.
 		// event-log first: it owns that table.
-		'event-log'       => 'WPOpsec_Module_Event_Log',
-		'geo-map'         => 'WPOpsec_Module_Geo_Map',
-		'activity-log'    => 'WPOpsec_Module_Activity_Log',
-		'bot-log'         => 'WPOpsec_Module_Bot_Log',
+		'event-log'       => 'ShieldCore_Module_Event_Log',
+		'geo-map'         => 'ShieldCore_Module_Geo_Map',
+		'activity-log'    => 'ShieldCore_Module_Activity_Log',
+		'bot-log'         => 'ShieldCore_Module_Bot_Log',
 
 		// Perimeter — blocks by IP/identity before WordPress finishes loading.
-		'ip-blocklist'    => 'WPOpsec_Module_IP_Blocklist',
-		'whitelist'       => 'WPOpsec_Module_Whitelist',
-		'geo-blocker'     => 'WPOpsec_Module_Geo_Blocker',
+		'ip-blocklist'    => 'ShieldCore_Module_IP_Blocklist',
+		'whitelist'       => 'ShieldCore_Module_Whitelist',
+		'geo-blocker'     => 'ShieldCore_Module_Geo_Blocker',
 		// geo-login right after geo-blocker: it reuses that module's
 		// compiled country dataset and class, so must load after it.
-		'geo-login'       => 'WPOpsec_Module_Geo_Login',
-		'rate-limiter'    => 'WPOpsec_Module_Rate_Limiter',
+		'geo-login'       => 'ShieldCore_Module_Geo_Login',
+		'rate-limiter'    => 'ShieldCore_Module_Rate_Limiter',
 
 		// Request inspection — looks at what a request is doing, not just who it's from.
-		'query-guard'     => 'WPOpsec_Module_Query_Guard',
-		'login-guard'     => 'WPOpsec_Module_Login_Guard',
+		'query-guard'     => 'ShieldCore_Module_Query_Guard',
+		'login-guard'     => 'ShieldCore_Module_Login_Guard',
 
 		// Integrity & detection — is anything already wrong.
-		'file-integrity'  => 'WPOpsec_Module_File_Integrity',
-		'malware-scanner' => 'WPOpsec_Module_Malware_Scanner',
-		'vuln-scanner'    => 'WPOpsec_Module_Vuln_Scanner',
-		'user-watchdog'   => 'WPOpsec_Module_User_Watchdog',
+		'file-integrity'  => 'ShieldCore_Module_File_Integrity',
+		'malware-scanner' => 'ShieldCore_Module_Malware_Scanner',
+		'vuln-scanner'    => 'ShieldCore_Module_Vuln_Scanner',
+		'user-watchdog'   => 'ShieldCore_Module_User_Watchdog',
 
 		// Hardening — reduces what an attacker can do after getting in.
-		'headers'         => 'WPOpsec_Module_Headers',
-		'user-enum'       => 'WPOpsec_Module_User_Enum',
-		'hardening'       => 'WPOpsec_Module_Hardening',
+		'headers'         => 'ShieldCore_Module_Headers',
+		'user-enum'       => 'ShieldCore_Module_User_Enum',
+		'hardening'       => 'ShieldCore_Module_Hardening',
 
 		// Ops — keeping the above current and knowing when it fires.
-		'auto-update'     => 'WPOpsec_Module_Auto_Update',
-		'alerts'          => 'WPOpsec_Module_Alerts',
-		'ip-sharing'      => 'WPOpsec_Module_IP_Sharing',
-		'scan-all'        => 'WPOpsec_Module_Scan_All',
-		'config-io'       => 'WPOpsec_Module_Config_IO',
+		'auto-update'     => 'ShieldCore_Module_Auto_Update',
+		'alerts'          => 'ShieldCore_Module_Alerts',
+		'ip-sharing'      => 'ShieldCore_Module_IP_Sharing',
+		'scan-all'        => 'ShieldCore_Module_Scan_All',
+		'config-io'       => 'ShieldCore_Module_Config_IO',
 	);
 
 	/**
@@ -92,7 +92,82 @@ class WPOpsec_Module_Loader {
 		return $wp_filesystem;
 	}
 
+	/**
+	 * One-time upgrade from the pre-rename `wpopsec_` identifiers (options,
+	 * hooks, and the three custom tables) to `shieldcore_`. Table names are
+	 * renamed in place (RENAME TABLE) rather than copied, so existing rows
+	 * survive without a copy/drop step; options are renamed the same way via
+	 * a single UPDATE rather than read/write per key, since a plain string
+	 * substitution on option_name is equivalent and touches the DB once.
+	 * Gated on a flag under the *new* option name so it runs at most once
+	 * per site regardless of whether the site's deploy path re-fires
+	 * activate() or just swaps files and lets init() pick it up.
+	 */
+	private static function migrate_legacy_wpopsec() {
+		if ( get_option( 'shieldcore_legacy_migrated' ) ) {
+			return;
+		}
+
+		global $wpdb;
+
+		$table_renames = array(
+			$wpdb->prefix . 'wpopsec_events'   => $wpdb->prefix . 'shieldcore_events',
+			$wpdb->prefix . 'wpopsec_baseline' => $wpdb->prefix . 'shieldcore_baseline',
+			$wpdb->prefix . 'wpopsec_bot_log'  => $wpdb->prefix . 'shieldcore_bot_log',
+		);
+		foreach ( $table_renames as $old_table => $new_table ) {
+			$old_exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $old_table ) ) === $old_table;
+			$new_exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $new_table ) ) === $new_table;
+			if ( $old_exists && ! $new_exists ) {
+				$wpdb->query( "RENAME TABLE `{$old_table}` TO `{$new_table}`" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- identifiers built from $wpdb->prefix plus fixed literals, not user input; RENAME TABLE can't use placeholders.
+			}
+		}
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- REPLACE()/LIKE arguments below are fixed literals, no user input.
+		$wpdb->query(
+			$wpdb->prepare(
+				"UPDATE {$wpdb->options} SET option_name = REPLACE(option_name, %s, %s) WHERE option_name LIKE %s",
+				'wpopsec_',
+				'shieldcore_',
+				$wpdb->esc_like( 'wpopsec_' ) . '%'
+			)
+		);
+
+		// The old-named mu-plugin file and its checks dir are a separate file
+		// on disk from the new one (WPMU_PLUGIN_DIR . '/wp-opsec-early.php'
+		// vs SHIELDCORE_MU_DEST) — deploying the renamed code and reactivating
+		// copies the new file in but never touches the old one under its old
+		// name, so both get loaded by WordPress every request until this runs.
+		// The old file's own gate logic then executes a second time and
+		// queries the just-renamed tables under their old names, which no
+		// longer exist. Raw fopen-family calls, not WP_Filesystem: this must
+		// also run from init() on a plain front-end request, same reasoning
+		// as copy_mu_loader()/ensure_mu_loader_current() above.
+		$legacy_mu_file = WPMU_PLUGIN_DIR . '/wp-opsec-early.php';
+		if ( file_exists( $legacy_mu_file ) ) {
+			unlink( $legacy_mu_file );
+		}
+		$legacy_checks_dir = WPMU_PLUGIN_DIR . '/wp-opsec-checks';
+		if ( is_dir( $legacy_checks_dir ) ) {
+			self::rrmdir( $legacy_checks_dir );
+		}
+
+		update_option( 'shieldcore_legacy_migrated', 1 );
+	}
+
+	private static function rrmdir( $dir ) {
+		foreach ( scandir( $dir ) ?: array() as $item ) {
+			if ( '.' === $item || '..' === $item ) {
+				continue;
+			}
+			$path = $dir . '/' . $item;
+			is_dir( $path ) ? self::rrmdir( $path ) : unlink( $path );
+		}
+		rmdir( $dir );
+	}
+
 	public static function init() {
+		self::migrate_legacy_wpopsec();
 		self::ensure_mu_loader_current();
 
 		// The mu-plugin WordPress loaded this request is whatever was on disk
@@ -101,13 +176,13 @@ class WPOpsec_Module_Loader {
 		// defined yet — the copy above only fixes the next request. Load the
 		// fresh file now if anything is missing. require_once dedups by path,
 		// so this is a no-op once the current file is already loaded.
-		if ( ! function_exists( 'wpopsec_log_event' ) && file_exists( WPOPSEC_MU_DEST ) ) {
-			require_once WPOPSEC_MU_DEST;
+		if ( ! function_exists( 'shieldcore_log_event' ) && file_exists( SHIELDCORE_MU_DEST ) ) {
+			require_once SHIELDCORE_MU_DEST;
 		}
 
 		add_action( 'admin_menu', array( __CLASS__, 'admin_menu' ), 5 );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_assets' ) );
-		WPOpsec_Menu_Router::register();
+		ShieldCore_Menu_Router::register();
 
 		foreach ( self::$modules as $module => $class ) {
 			self::load_module( $module );
@@ -118,16 +193,17 @@ class WPOpsec_Module_Loader {
 	}
 
 	public static function activate() {
+		self::migrate_legacy_wpopsec();
 		self::copy_mu_loader();
 
-		// Guarantee the shared helpers (wpopsec_local_blocklist_add() etc.)
+		// Guarantee the shared helpers (shieldcore_local_blocklist_add() etc.)
 		// are defined in *this* process before module activate() hooks run.
 		// Normal bootstrap loads this file as an actual mu-plugin before
 		// plugins_loaded fires, but on a fresh/re-activation the file may
 		// not have existed yet when that happened this same request —
 		// require_once dedups by path, so this is a no-op when it's already
 		// loaded and a real load when it wasn't.
-		require_once WPOPSEC_MU_DEST;
+		require_once SHIELDCORE_MU_DEST;
 
 		foreach ( self::$modules as $module => $class ) {
 			self::load_module( $module );
@@ -153,17 +229,17 @@ class WPOpsec_Module_Loader {
 			'ShieldCore Security',
 			'ShieldCore Security',
 			'manage_options',
-			'wp-opsec',
+			'wp-shieldcore',
 			array( __CLASS__, 'render_dashboard' ),
 			'dashicons-shield'
 		);
 	}
 
 	/**
-	 * Every Opsec admin page's hook suffix contains "wp-opsec" — the
-	 * top-level page is "toplevel_page_wp-opsec", every cluster submenu
-	 * (registered by WPOpsec_Menu_Router against the "wp-opsec" parent) is
-	 * "wp-opsec_page_wp-opsec-<cluster>". Enqueued unconditionally across
+	 * Every Opsec admin page's hook suffix contains "wp-shieldcore" — the
+	 * top-level page is "toplevel_page_wp-shieldcore", every cluster submenu
+	 * (registered by ShieldCore_Menu_Router against the "wp-shieldcore" parent) is
+	 * "wp-shieldcore_page_wp-shieldcore-<cluster>". Enqueued unconditionally across
 	 * all of them, one bundle covering every module's admin UI, rather than
 	 * detecting which of the tabs within a cluster page is active: none of
 	 * this CSS varies by request, and the combined size is trivial.
@@ -173,12 +249,12 @@ class WPOpsec_Module_Loader {
 	 * <head>, so a style enqueued any later would silently never appear.
 	 */
 	public static function enqueue_assets( $hook ) {
-		if ( false === strpos( (string) $hook, 'wp-opsec' ) ) {
+		if ( false === strpos( (string) $hook, 'wp-shieldcore' ) ) {
 			return;
 		}
-		wp_enqueue_style( 'wpopsec-admin', WPOPSEC_PLUGIN_URL . 'assets/admin.css', array(), WPOPSEC_VERSION );
-		wp_enqueue_style( 'wpopsec-dashboard', WPOPSEC_PLUGIN_URL . 'assets/dashboard.css', array( 'wpopsec-admin' ), WPOPSEC_VERSION );
-		wp_enqueue_style( 'wpopsec-geo-map', WPOPSEC_PLUGIN_URL . 'assets/geo-map.css', array(), WPOPSEC_VERSION );
+		wp_enqueue_style( 'shieldcore-admin', SHIELDCORE_PLUGIN_URL . 'assets/admin.css', array(), SHIELDCORE_VERSION );
+		wp_enqueue_style( 'shieldcore-dashboard', SHIELDCORE_PLUGIN_URL . 'assets/dashboard.css', array( 'shieldcore-admin' ), SHIELDCORE_VERSION );
+		wp_enqueue_style( 'shieldcore-geo-map', SHIELDCORE_PLUGIN_URL . 'assets/geo-map.css', array(), SHIELDCORE_VERSION );
 	}
 
 	/**
@@ -187,31 +263,31 @@ class WPOpsec_Module_Loader {
 	 * overall score is computed from.
 	 */
 	private static function status_cards() {
-		$ip_mode  = get_option( 'wpopsec_ip_blocklist_mode', 'log' );
-		$qg_mode  = get_option( 'wpopsec_query_guard_mode', 'log' );
-		$lg_on    = (bool) get_option( 'wpopsec_login_guard_enabled', true );
-		$headers  = class_exists( 'WPOpsec_Module_Headers' ) ? WPOpsec_Module_Headers::build() : array();
-		$ue_on    = (bool) get_option( 'wpopsec_user_enum_block_author_scan', true );
-		$fi_base  = (int) get_option( 'wpopsec_integrity_baseline_at', 0 );
-		$vuln     = get_option( 'wpopsec_vuln_last_result', array() );
-		$au_plug  = get_option( 'wpopsec_auto_update_plugins', 'flagged' );
-		$uw_alert = count( (array) get_option( 'wpopsec_user_watchdog_alerts', array() ) );
-		$hidden   = count( (array) ( get_option( 'wpopsec_hardening_hidden_result', array() )['hidden'] ?? array() ) );
+		$ip_mode  = get_option( 'shieldcore_ip_blocklist_mode', 'log' );
+		$qg_mode  = get_option( 'shieldcore_query_guard_mode', 'log' );
+		$lg_on    = (bool) get_option( 'shieldcore_login_guard_enabled', true );
+		$headers  = class_exists( 'ShieldCore_Module_Headers' ) ? ShieldCore_Module_Headers::build() : array();
+		$ue_on    = (bool) get_option( 'shieldcore_user_enum_block_author_scan', true );
+		$fi_base  = (int) get_option( 'shieldcore_integrity_baseline_at', 0 );
+		$vuln     = get_option( 'shieldcore_vuln_last_result', array() );
+		$au_plug  = get_option( 'shieldcore_auto_update_plugins', 'flagged' );
+		$uw_alert = count( (array) get_option( 'shieldcore_user_watchdog_alerts', array() ) );
+		$hidden   = count( (array) ( get_option( 'shieldcore_hardening_hidden_result', array() )['hidden'] ?? array() ) );
 		$editor   = defined( 'DISALLOW_FILE_EDIT' ) && DISALLOW_FILE_EDIT;
 
 		$vuln_findings = count( (array) ( $vuln['findings'] ?? array() ) );
 		$integrity     = self::integrity_issue_count();
 
-		$mal_last     = get_option( 'wpopsec_malware_last_result', array() );
+		$mal_last     = get_option( 'shieldcore_malware_last_result', array() );
 		$mal_findings = count( (array) ( $mal_last['findings'] ?? array() ) );
-		$geo_stats    = get_option( 'wpopsec_geo_stats', array() );
-		$geo_selected = count( (array) get_option( 'wpopsec_geo_countries', array() ) );
-		$geo_enforce  = get_option( 'wpopsec_geo_enforce_mode', 'log' );
-		$gl_selected  = count( (array) get_option( 'wpopsec_geo_login_countries', array() ) );
-		$gl_enforce   = get_option( 'wpopsec_geo_login_enforce_mode', 'log' );
-		$al_count     = count( (array) get_option( 'wpopsec_activity_categories', array( 'content', 'plugins_themes', 'settings' ) ) );
-		$rl_on        = (bool) get_option( 'wpopsec_ratelimit_enabled', true );
-		$rl_mode      = get_option( 'wpopsec_ratelimit_mode', 'log' );
+		$geo_stats    = get_option( 'shieldcore_geo_stats', array() );
+		$geo_selected = count( (array) get_option( 'shieldcore_geo_countries', array() ) );
+		$geo_enforce  = get_option( 'shieldcore_geo_enforce_mode', 'log' );
+		$gl_selected  = count( (array) get_option( 'shieldcore_geo_login_countries', array() ) );
+		$gl_enforce   = get_option( 'shieldcore_geo_login_enforce_mode', 'log' );
+		$al_count     = count( (array) get_option( 'shieldcore_activity_categories', array( 'content', 'plugins_themes', 'settings' ) ) );
+		$rl_on        = (bool) get_option( 'shieldcore_ratelimit_enabled', true );
+		$rl_mode      = get_option( 'shieldcore_ratelimit_mode', 'log' );
 
 		return array(
 			array(
@@ -222,7 +298,7 @@ class WPOpsec_Module_Loader {
 				'level' => 'block' === $ip_mode ? 'good' : 'warn',
 				'note'  => sprintf(
 					'%s ranges loaded',
-					number_format_i18n( (int) ( get_option( 'wpopsec_ip_blocklist_stats', array() )['count_merged'] ?? 0 ) )
+					number_format_i18n( (int) ( get_option( 'shieldcore_ip_blocklist_stats', array() )['count_merged'] ?? 0 ) )
 				),
 			),
 			array(
@@ -231,7 +307,7 @@ class WPOpsec_Module_Loader {
 				'icon'  => 'filter',
 				'state' => 'block' === $qg_mode ? 'Blocking' : 'Log only',
 				'level' => 'block' === $qg_mode ? 'good' : 'warn',
-				'note'  => get_option( 'wpopsec_query_guard_scan_post', true ) ? 'GET + POST scanning' : 'GET only',
+				'note'  => get_option( 'shieldcore_query_guard_scan_post', true ) ? 'GET + POST scanning' : 'GET only',
 			),
 			array(
 				'key'   => 'login-guard',
@@ -241,8 +317,8 @@ class WPOpsec_Module_Loader {
 				'level' => $lg_on ? 'good' : 'bad',
 				'note'  => sprintf(
 					'%d fails / %d min',
-					(int) get_option( 'wpopsec_login_guard_max_fails', 8 ),
-					(int) get_option( 'wpopsec_login_guard_window_min', 15 )
+					(int) get_option( 'shieldcore_login_guard_max_fails', 8 ),
+					(int) get_option( 'shieldcore_login_guard_window_min', 15 )
 				),
 			),
 			array(
@@ -259,7 +335,7 @@ class WPOpsec_Module_Loader {
 				'icon'  => 'hidden',
 				'state' => $ue_on ? 'Protected' : 'Open',
 				'level' => $ue_on ? 'good' : 'bad',
-				'note'  => get_option( 'wpopsec_user_enum_block_rest_users', true ) ? 'REST users locked' : 'REST users public',
+				'note'  => get_option( 'shieldcore_user_enum_block_rest_users', true ) ? 'REST users locked' : 'REST users public',
 			),
 			array(
 				'key'   => 'file-integrity',
@@ -283,7 +359,7 @@ class WPOpsec_Module_Loader {
 				'icon'  => 'update',
 				'state' => 'off' === $au_plug ? 'Plugins off' : ( 'all' === $au_plug ? 'All plugins' : 'Flagged only' ),
 				'level' => 'off' === $au_plug ? 'warn' : 'good',
-				'note'  => sprintf( 'core: %s', get_option( 'wpopsec_auto_update_core', 'minor' ) ),
+				'note'  => sprintf( 'core: %s', get_option( 'shieldcore_auto_update_core', 'minor' ) ),
 			),
 			array(
 				'key'   => 'user-watchdog',
@@ -293,7 +369,7 @@ class WPOpsec_Module_Loader {
 				'level' => $uw_alert ? 'bad' : 'good',
 				'note'  => sprintf(
 					'%d privileged account(s)',
-					count( (array) get_option( 'wpopsec_user_watchdog_snapshot', array() ) )
+					count( (array) get_option( 'shieldcore_user_watchdog_snapshot', array() ) )
 				),
 			),
 			array(
@@ -302,7 +378,7 @@ class WPOpsec_Module_Loader {
 				'icon'  => 'admin-tools',
 				'state' => $hidden ? sprintf( '%d hidden plugin(s)', $hidden ) : ( $editor ? 'Editor off' : 'Editor on' ),
 				'level' => $hidden ? 'bad' : ( $editor ? 'good' : 'warn' ),
-				'note'  => class_exists( 'WPOpsec_Module_Hardening' ) && WPOpsec_Module_Hardening::uploads_guard_active()
+				'note'  => class_exists( 'ShieldCore_Module_Hardening' ) && ShieldCore_Module_Hardening::uploads_guard_active()
 					? 'uploads guarded'
 					: 'uploads unguarded',
 			),
@@ -318,9 +394,9 @@ class WPOpsec_Module_Loader {
 				'key'   => 'ip-sharing',
 				'title' => 'IP Sharing',
 				'icon'  => 'shield-alt',
-				'state' => get_option( 'wpopsec_unwantedip_enabled', false ) ? 'Enabled' : 'Disabled',
-				'level' => get_option( 'wpopsec_unwantedip_enabled', false )
-					? ( get_option( 'wpopsec_unwantedip_api_key', '' ) ? 'good' : 'warn' )
+				'state' => get_option( 'shieldcore_unwantedip_enabled', false ) ? 'Enabled' : 'Disabled',
+				'level' => get_option( 'shieldcore_unwantedip_enabled', false )
+					? ( get_option( 'shieldcore_unwantedip_api_key', '' ) ? 'good' : 'warn' )
 					: 'warn',
 				'note'  => 'blocked IPs only',
 			),
@@ -362,13 +438,13 @@ class WPOpsec_Module_Loader {
 				'icon'  => 'clock',
 				'state' => ! $rl_on ? 'Disabled' : ( 'block' === $rl_mode ? 'Blocking' : 'Log only' ),
 				'level' => ! $rl_on ? 'warn' : ( 'block' === $rl_mode ? 'good' : 'warn' ),
-				'note'  => sprintf( '%s req/min per IP', number_format_i18n( (int) get_option( 'wpopsec_ratelimit_per_minute', 300 ) ) ),
+				'note'  => sprintf( '%s req/min per IP', number_format_i18n( (int) get_option( 'shieldcore_ratelimit_per_minute', 300 ) ) ),
 			),
 			array(
 				'key'   => 'geo-map',
 				'title' => 'Event Map',
 				'icon'  => 'admin-site-alt3',
-				'state' => class_exists( 'WPOpsec_Module_Geo_Map' ) ? sprintf( '%d countries · 7d', count( WPOpsec_Module_Geo_Map::counts_by_country( 7 ) ) ) : 'Unavailable',
+				'state' => class_exists( 'ShieldCore_Module_Geo_Map' ) ? sprintf( '%d countries · 7d', count( ShieldCore_Module_Geo_Map::counts_by_country( 7 ) ) ) : 'Unavailable',
 				'level' => 'good', // read-only visualization, nothing to misconfigure
 				'note'  => 'blocked + logged events, by country',
 			),
@@ -376,14 +452,14 @@ class WPOpsec_Module_Loader {
 	}
 
 	private static function alerts_tg_ready() {
-		return get_option( 'wpopsec_telegram_enabled', false )
-			&& get_option( 'wpopsec_telegram_bot_token', '' )
-			&& get_option( 'wpopsec_telegram_chat_id', '' );
+		return get_option( 'shieldcore_telegram_enabled', false )
+			&& get_option( 'shieldcore_telegram_bot_token', '' )
+			&& get_option( 'shieldcore_telegram_chat_id', '' );
 	}
 
 	private static function alerts_email_ready() {
-		return get_option( 'wpopsec_email_enabled', false )
-			&& ( get_option( 'wpopsec_email_address', '' ) || get_option( 'admin_email' ) );
+		return get_option( 'shieldcore_email_enabled', false )
+			&& ( get_option( 'shieldcore_email_address', '' ) || get_option( 'admin_email' ) );
 	}
 
 	private static function alerts_ready_count() {
@@ -391,21 +467,21 @@ class WPOpsec_Module_Loader {
 	}
 
 	private static function alerts_any_enabled() {
-		return get_option( 'wpopsec_telegram_enabled', false ) || get_option( 'wpopsec_email_enabled', false );
+		return get_option( 'shieldcore_telegram_enabled', false ) || get_option( 'shieldcore_email_enabled', false );
 	}
 
 	private static function alerts_channel_summary() {
 		$on = array_filter(
 			array(
-				get_option( 'wpopsec_telegram_enabled', false ) ? 'Telegram' : null,
-				get_option( 'wpopsec_email_enabled', false ) ? 'Email' : null,
+				get_option( 'shieldcore_telegram_enabled', false ) ? 'Telegram' : null,
+				get_option( 'shieldcore_email_enabled', false ) ? 'Email' : null,
 			)
 		);
 		return $on ? implode( ' + ', $on ) : 'no channel configured';
 	}
 
 	private static function integrity_issue_count() {
-		$last = get_option( 'wpopsec_integrity_last_result', array() );
+		$last = get_option( 'shieldcore_integrity_last_result', array() );
 		if ( empty( $last ) ) {
 			return 0;
 		}
@@ -419,10 +495,10 @@ class WPOpsec_Module_Loader {
 		global $wpdb;
 
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
-		// $table is always wpopsec_events_table() (built from $wpdb->prefix, no user input) -- identifiers can't be
+		// $table is always shieldcore_events_table() (built from $wpdb->prefix, no user input) -- identifiers can't be
 		// bound via $wpdb->prepare() placeholders anyway. This is a dashboard summary read over the whole events
 		// table (up to a 7-day window or a flat LIMIT 12), not a per-request lookup worth an object-cache group for.
-		$table     = wpopsec_events_table();
+		$table     = shieldcore_events_table();
 		$has_table = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) === $table;
 
 		$by_module = array();
@@ -540,37 +616,37 @@ class WPOpsec_Module_Loader {
 		// not printed here — by the time this callback runs, wp-admin's <head>
 		// has already been sent.
 		?>
-		<div class="wrap wpopsec wpopsec-dash">
-			<h1 class="wpopsec-title">
+		<div class="wrap shieldcore shieldcore-dash">
+			<h1 class="shieldcore-title">
 				<img src="<?php echo esc_attr( self::logo_data_uri() ); ?>" alt="" width="30" height="30">
 				ShieldCore Security
 			</h1>
 
-			<div class="wpopsec-hero">
-				<div class="wpopsec-score wpopsec-score--<?php echo esc_attr( $s_level ); ?>">
-					<div class="wpopsec-score__ring" style="--pct:<?php echo esc_attr( $score ); ?>">
-						<div class="wpopsec-score__num"><?php echo esc_html( $score ); ?><span>%</span></div>
+			<div class="shieldcore-hero">
+				<div class="shieldcore-score shieldcore-score--<?php echo esc_attr( $s_level ); ?>">
+					<div class="shieldcore-score__ring" style="--pct:<?php echo esc_attr( $score ); ?>">
+						<div class="shieldcore-score__num"><?php echo esc_html( $score ); ?><span>%</span></div>
 					</div>
-					<div class="wpopsec-score__label"><?php echo esc_html( $s_label ); ?></div>
+					<div class="shieldcore-score__label"><?php echo esc_html( $s_label ); ?></div>
 				</div>
 
-				<div class="wpopsec-hero__stats">
-					<div class="wpopsec-stat wpopsec-stat--bad">
+				<div class="shieldcore-hero__stats">
+					<div class="shieldcore-stat shieldcore-stat--bad">
 						<span class="dashicons dashicons-dismiss"></span>
 						<div>
 							<strong><?php echo esc_html( number_format_i18n( $totals['blocked'] ) ); ?></strong>
 							<span>blocked · 7 days</span>
 						</div>
 					</div>
-					<div class="wpopsec-stat wpopsec-stat--warn">
+					<div class="shieldcore-stat shieldcore-stat--warn">
 						<span class="dashicons dashicons-visibility"></span>
 						<div>
 							<strong><?php echo esc_html( number_format_i18n( $totals['logged'] ) ); ?></strong>
 							<span>would block (log only)</span>
 						</div>
 					</div>
-					<?php list( $w_label, $w_color ) = wpopsec_severity_meta( $worst ); ?>
-					<div class="wpopsec-stat">
+					<?php list( $w_label, $w_color ) = shieldcore_severity_meta( $worst ); ?>
+					<div class="shieldcore-stat">
 						<span class="dashicons dashicons-warning" style="color:<?php echo esc_attr( $worst ? $w_color : '#646970' ); ?>"></span>
 						<div>
 							<strong><?php echo $worst ? esc_html( $worst ) . '<span style="font-size:13px;font-weight:400;color:#646970">/20</span>' : '—'; ?></strong>
@@ -579,13 +655,13 @@ class WPOpsec_Module_Loader {
 					</div>
 
 					<?php if ( $daily ) : ?>
-						<div class="wpopsec-spark">
+						<div class="shieldcore-spark">
 							<?php
 							$max = max( 1, max( $daily ) );
 							foreach ( $daily as $day => $n ) :
 								$h = max( 3, (int) round( ( $n / $max ) * 46 ) );
 								?>
-								<span class="wpopsec-spark__bar"
+								<span class="shieldcore-spark__bar"
 									style="height:<?php echo esc_attr( $h ); ?>px"
 									title="<?php echo esc_attr( sprintf( '%s — %d event(s)', date_i18n( 'D j M', strtotime( $day ) ), $n ) ); ?>"></span>
 							<?php endforeach; ?>
@@ -595,18 +671,18 @@ class WPOpsec_Module_Loader {
 			</div>
 
 			<?php if ( $core_gaps ) : ?>
-				<div class="wpopsec-protect wpopsec-protect--bad">
-					<div class="wpopsec-protect__head">
+				<div class="shieldcore-protect shieldcore-protect--bad">
+					<div class="shieldcore-protect__head">
 						<span class="dashicons dashicons-shield-alt"></span>
 						<div>
 							<strong>You're not fully protected yet</strong>
 							<span><?php echo esc_html( sprintf( '%d of %d core module(s) still need attention.', count( $core_gaps ), count( $core_keys ) ) ); ?></span>
 						</div>
 					</div>
-					<ul class="wpopsec-protect__list">
+					<ul class="shieldcore-protect__list">
 						<?php foreach ( $core_gaps as $g ) : ?>
 							<li>
-								<a href="<?php echo esc_url( WPOpsec_Menu_Router::url( $g['key'] ) ); ?>">
+								<a href="<?php echo esc_url( ShieldCore_Menu_Router::url( $g['key'] ) ); ?>">
 									<span class="dashicons dashicons-arrow-right-alt2"></span>
 									<strong><?php echo esc_html( $g['title'] ); ?></strong>
 									<em><?php echo esc_html( $g['state'] ); ?></em>
@@ -616,8 +692,8 @@ class WPOpsec_Module_Loader {
 					</ul>
 				</div>
 			<?php else : ?>
-				<div class="wpopsec-protect wpopsec-protect--good">
-					<div class="wpopsec-protect__head">
+				<div class="shieldcore-protect shieldcore-protect--good">
+					<div class="shieldcore-protect__head">
 						<span class="dashicons dashicons-yes-alt"></span>
 						<div>
 							<strong>Core protection fully configured</strong>
@@ -628,7 +704,7 @@ class WPOpsec_Module_Loader {
 			<?php endif; ?>
 
 			<?php if ( $attention ) : ?>
-				<div class="wpopsec-attention">
+				<div class="shieldcore-attention">
 					<span class="dashicons dashicons-info"></span>
 					<div>
 						<strong>Optional, not yet set up:</strong>
@@ -637,7 +713,7 @@ class WPOpsec_Module_Loader {
 						foreach ( $attention as $a ) {
 							$links[] = sprintf(
 								'<a href="%s">%s <em>(%s)</em></a>',
-								esc_url( WPOpsec_Menu_Router::url( $a['key'] ) ),
+								esc_url( ShieldCore_Menu_Router::url( $a['key'] ) ),
 								esc_html( $a['title'] ),
 								esc_html( strtolower( $a['state'] ) )
 							);
@@ -648,8 +724,8 @@ class WPOpsec_Module_Loader {
 				</div>
 			<?php endif; ?>
 
-			<h2 class="wpopsec-h2">Modules</h2>
-			<div class="wpopsec-grid">
+			<h2 class="shieldcore-h2">Modules</h2>
+			<div class="shieldcore-grid">
 				<?php foreach ( $cards as $card ) : ?>
 					<?php
 					$blocked = $by_module[ $card['key'] ]['blocked'] ?? 0;
@@ -657,51 +733,51 @@ class WPOpsec_Module_Loader {
 					$noted   = $by_module[ $card['key'] ]['noted'] ?? 0;
 					$total   = $blocked + $logged + $noted;
 					?>
-					<a class="wpopsec-card wpopsec-card--<?php echo esc_attr( $card['level'] ); ?>"
-						href="<?php echo esc_url( WPOpsec_Menu_Router::url( $card['key'] ) ); ?>">
-						<div class="wpopsec-card__top">
-							<span class="wpopsec-card__icon dashicons dashicons-<?php echo esc_attr( $card['icon'] ); ?>"></span>
-							<span class="wpopsec-card__title"><?php echo esc_html( $card['title'] ); ?></span>
+					<a class="shieldcore-card shieldcore-card--<?php echo esc_attr( $card['level'] ); ?>"
+						href="<?php echo esc_url( ShieldCore_Menu_Router::url( $card['key'] ) ); ?>">
+						<div class="shieldcore-card__top">
+							<span class="shieldcore-card__icon dashicons dashicons-<?php echo esc_attr( $card['icon'] ); ?>"></span>
+							<span class="shieldcore-card__title"><?php echo esc_html( $card['title'] ); ?></span>
 							<?php if ( ! empty( $sev_module[ $card['key'] ] ) ) : ?>
-								<?php list( $cs_label, $cs_color ) = wpopsec_severity_meta( $sev_module[ $card['key'] ] ); ?>
-								<span class="wpopsec-sevdot"
+								<?php list( $cs_label, $cs_color ) = shieldcore_severity_meta( $sev_module[ $card['key'] ] ); ?>
+								<span class="shieldcore-sevdot"
 									style="background:<?php echo esc_attr( $cs_color ); ?>"
 									title="<?php echo esc_attr( sprintf( 'Worst severity in 7 days: %d (%s)', $sev_module[ $card['key'] ], $cs_label ) ); ?>"><?php echo esc_html( $sev_module[ $card['key'] ] ); ?></span>
 							<?php endif; ?>
 						</div>
-						<div class="wpopsec-pill"><?php echo esc_html( $card['state'] ); ?></div>
-						<div class="wpopsec-card__note"><?php echo esc_html( $card['note'] ); ?></div>
-						<div class="wpopsec-card__foot">
+						<div class="shieldcore-pill"><?php echo esc_html( $card['state'] ); ?></div>
+						<div class="shieldcore-card__note"><?php echo esc_html( $card['note'] ); ?></div>
+						<div class="shieldcore-card__foot">
 							<?php if ( $total ) : ?>
 								<?php if ( $blocked ) : ?>
-									<span class="wpopsec-chip wpopsec-chip--bad"><?php echo esc_html( number_format_i18n( $blocked ) ); ?> blocked</span>
+									<span class="shieldcore-chip shieldcore-chip--bad"><?php echo esc_html( number_format_i18n( $blocked ) ); ?> blocked</span>
 								<?php endif; ?>
 								<?php if ( $logged ) : ?>
-									<span class="wpopsec-chip wpopsec-chip--warn"><?php echo esc_html( number_format_i18n( $logged ) ); ?> logged</span>
+									<span class="shieldcore-chip shieldcore-chip--warn"><?php echo esc_html( number_format_i18n( $logged ) ); ?> logged</span>
 								<?php endif; ?>
 								<?php if ( $noted && ! $blocked && ! $logged ) : ?>
-									<span class="wpopsec-chip"><?php echo esc_html( number_format_i18n( $noted ) ); ?> events</span>
+									<span class="shieldcore-chip"><?php echo esc_html( number_format_i18n( $noted ) ); ?> events</span>
 								<?php endif; ?>
 							<?php else : ?>
-								<span class="wpopsec-chip wpopsec-chip--quiet">no activity</span>
+								<span class="shieldcore-chip shieldcore-chip--quiet">no activity</span>
 							<?php endif; ?>
 						</div>
 					</a>
 				<?php endforeach; ?>
 			</div>
 
-			<h2 class="wpopsec-h2">
+			<h2 class="shieldcore-h2">
 				Recent activity
-				<a class="wpopsec-h2__link" href="<?php echo esc_url( WPOpsec_Menu_Router::url( 'event-log' ) ); ?>">View full log →</a>
+				<a class="shieldcore-h2__link" href="<?php echo esc_url( ShieldCore_Menu_Router::url( 'event-log' ) ); ?>">View full log →</a>
 			</h2>
 
 			<?php if ( empty( $recent ) ) : ?>
-				<div class="wpopsec-empty">
+				<div class="shieldcore-empty">
 					<span class="dashicons dashicons-yes-alt"></span>
 					<p>No events recorded yet. Modules in log-only mode will record here as traffic arrives.</p>
 				</div>
 			<?php else : ?>
-				<table class="wpopsec-table">
+				<table class="shieldcore-table">
 					<thead>
 						<tr>
 							<th style="width:56px">Sev</th>
@@ -715,26 +791,26 @@ class WPOpsec_Module_Loader {
 					</thead>
 					<tbody>
 					<?php foreach ( $recent as $row ) : ?>
-						<?php list( $rs_label, $rs_color ) = wpopsec_severity_meta( $row->severity ); ?>
+						<?php list( $rs_label, $rs_color ) = shieldcore_severity_meta( $row->severity ); ?>
 						<tr>
 							<td>
-								<span class="wpopsec-sevdot" style="background:<?php echo esc_attr( $rs_color ); ?>"
+								<span class="shieldcore-sevdot" style="background:<?php echo esc_attr( $rs_color ); ?>"
 									title="<?php echo esc_attr( $rs_label ); ?>"><?php echo esc_html( (int) $row->severity ); ?></span>
 							</td>
-							<td class="wpopsec-nowrap"><?php echo esc_html( mysql2date( 'M j, H:i', $row->created_at ) ); ?></td>
-							<td><span class="wpopsec-mod"><?php echo esc_html( $row->module ); ?></span></td>
+							<td class="shieldcore-nowrap"><?php echo esc_html( mysql2date( 'M j, H:i', $row->created_at ) ); ?></td>
+							<td><span class="shieldcore-mod"><?php echo esc_html( $row->module ); ?></span></td>
 							<td><code><?php echo esc_html( $row->event ); ?></code></td>
 							<td>
 								<?php if ( 'blocked' === $row->action ) : ?>
-									<span class="wpopsec-chip wpopsec-chip--bad">blocked</span>
+									<span class="shieldcore-chip shieldcore-chip--bad">blocked</span>
 								<?php elseif ( 'logged' === $row->action ) : ?>
-									<span class="wpopsec-chip wpopsec-chip--warn">logged</span>
+									<span class="shieldcore-chip shieldcore-chip--warn">logged</span>
 								<?php else : ?>
-									<span class="wpopsec-chip wpopsec-chip--quiet">noted</span>
+									<span class="shieldcore-chip shieldcore-chip--quiet">noted</span>
 								<?php endif; ?>
 							</td>
-							<td class="wpopsec-nowrap"><code><?php echo esc_html( $row->ip ); ?></code></td>
-							<td class="wpopsec-detail"><?php echo esc_html( $row->detail ); ?></td>
+							<td class="shieldcore-nowrap"><code><?php echo esc_html( $row->ip ); ?></code></td>
+							<td class="shieldcore-detail"><?php echo esc_html( $row->detail ); ?></td>
 						</tr>
 					<?php endforeach; ?>
 					</tbody>
@@ -746,7 +822,7 @@ class WPOpsec_Module_Loader {
 
 
 	private static function load_module( $module ) {
-		$file = WPOPSEC_PLUGIN_DIR . "includes/modules/{$module}/module.php";
+		$file = SHIELDCORE_PLUGIN_DIR . "includes/modules/{$module}/module.php";
 		if ( file_exists( $file ) ) {
 			require_once $file;
 		}
@@ -756,7 +832,7 @@ class WPOpsec_Module_Loader {
 		if ( ! file_exists( WPMU_PLUGIN_DIR ) ) {
 			wp_mkdir_p( WPMU_PLUGIN_DIR );
 		}
-		copy( WPOPSEC_MU_SOURCE, WPOPSEC_MU_DEST );
+		copy( SHIELDCORE_MU_SOURCE, SHIELDCORE_MU_DEST );
 
 		// Every other rewritten data file in this plugin does this; the
 		// mu-loader itself — by far the most consequential one, since it
@@ -769,13 +845,13 @@ class WPOpsec_Module_Loader {
 		// live, not hypothetical: hit a real admin session's own
 		// admin-ajax request during this exact deploy window.
 		if ( function_exists( 'opcache_invalidate' ) ) {
-			opcache_invalidate( WPOPSEC_MU_DEST, true );
+			opcache_invalidate( SHIELDCORE_MU_DEST, true );
 		}
 	}
 
 	private static function remove_mu_loader() {
-		if ( file_exists( WPOPSEC_MU_DEST ) ) {
-			self::filesystem()->delete( WPOPSEC_MU_DEST );
+		if ( file_exists( SHIELDCORE_MU_DEST ) ) {
+			self::filesystem()->delete( SHIELDCORE_MU_DEST );
 		}
 	}
 
@@ -784,8 +860,8 @@ class WPOpsec_Module_Loader {
 	 * this plugin (e.g. after a plugin update), without requiring reactivation.
 	 */
 	private static function ensure_mu_loader_current() {
-		if ( ! file_exists( WPOPSEC_MU_DEST )
-			|| md5_file( WPOPSEC_MU_DEST ) !== md5_file( WPOPSEC_MU_SOURCE ) ) {
+		if ( ! file_exists( SHIELDCORE_MU_DEST )
+			|| md5_file( SHIELDCORE_MU_DEST ) !== md5_file( SHIELDCORE_MU_SOURCE ) ) {
 			self::copy_mu_loader();
 		}
 	}

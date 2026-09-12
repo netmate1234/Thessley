@@ -10,7 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * User Watchdog's alert list), and an import can apply only a subset of
  * what a file contains even if it carries more.
  *
- * Deliberately narrower than "every wpopsec_ option": runtime state (scan
+ * Deliberately narrower than "every shieldcore_ option": runtime state (scan
  * results, snapshots, compiled country/CIDR caches, db-schema versions,
  * "last triggered" timestamps) is excluded everywhere it's identifiable,
  * since re-importing a stale scan result or overwriting a schema-version
@@ -18,17 +18,17 @@ if ( ! defined( 'ABSPATH' ) ) {
  * the values a module's own settings page actually lets an admin edit are
  * in scope.
  */
-class WPOpsec_Module_Config_IO {
+class ShieldCore_Module_Config_IO {
 
-	const EXPORT_ACTION = 'wpopsec_cio_export';
-	const IMPORT_ACTION  = 'wpopsec_cio_import';
+	const EXPORT_ACTION = 'shieldcore_cio_export';
+	const IMPORT_ACTION  = 'shieldcore_cio_import';
 
 	public static function activate() {}
 	public static function deactivate() {}
 
 	public static function register() {
-		add_action( 'admin_post_wpopsec_cio_export', array( __CLASS__, 'handle_export' ) );
-		add_action( 'admin_post_wpopsec_cio_import', array( __CLASS__, 'handle_import' ) );
+		add_action( 'admin_post_shieldcore_cio_export', array( __CLASS__, 'handle_export' ) );
+		add_action( 'admin_post_shieldcore_cio_import', array( __CLASS__, 'handle_import' ) );
 		return __CLASS__;
 	}
 
@@ -39,32 +39,32 @@ class WPOpsec_Module_Config_IO {
 	 */
 	private static function registry() {
 		return array(
-			'activity-log'    => array( 'wpopsec_activity_categories' ),
-			'alerts'          => array( 'wpopsec_email_address', 'wpopsec_email_enabled', 'wpopsec_email_threshold', 'wpopsec_telegram_bot_token', 'wpopsec_telegram_chat_id', 'wpopsec_telegram_chat_name', 'wpopsec_telegram_enabled', 'wpopsec_telegram_threshold' ),
-			'auto-update'     => array( 'wpopsec_auto_update_core', 'wpopsec_auto_update_exclude', 'wpopsec_auto_update_plugins', 'wpopsec_auto_update_themes' ),
-			'bot-log'         => array( 'wpopsec_bot_log_retain_days' ),
-			'event-log'       => array( 'wpopsec_event_log_retain_days' ),
-			'file-integrity'  => array( 'wpopsec_integrity_check_baseline', 'wpopsec_integrity_check_core' ),
-			'geo-blocker'     => array( 'wpopsec_geo_countries', 'wpopsec_geo_enforce_mode', 'wpopsec_geo_mode' ),
-			'geo-login'       => array( 'wpopsec_geo_login_countries', 'wpopsec_geo_login_enforce_mode' ),
-			'hardening'       => array( 'wpopsec_hardening_disable_file_edit', 'wpopsec_hardening_uploads_guard' ),
-			'headers'         => array( 'wpopsec_headers_behind_proxy', 'wpopsec_headers_csp_policy', 'wpopsec_headers_csp_report_only', 'wpopsec_headers_enabled', 'wpopsec_headers_hsts_max_age', 'wpopsec_headers_hsts_preload', 'wpopsec_headers_hsts_subdomains' ),
-			'ip-blocklist'    => array( 'wpopsec_ip_blocklist_mode', 'wpopsec_ip_blocklist_sources' ),
-			'ip-sharing'      => array( 'wpopsec_unwantedip_api_key', 'wpopsec_unwantedip_enabled' ),
-			'login-guard'     => array( 'wpopsec_login_guard_enabled', 'wpopsec_login_guard_escalate', 'wpopsec_login_guard_generic_errors', 'wpopsec_login_guard_lockout_min', 'wpopsec_login_guard_max_fails', 'wpopsec_login_guard_window_min' ),
-			'malware-scanner' => array( 'wpopsec_malware_categories', 'wpopsec_malware_ignore_paths' ),
-			'query-guard'     => array( 'wpopsec_qg_allow_jetpack', 'wpopsec_query_guard_block_xmlrpc', 'wpopsec_query_guard_categories', 'wpopsec_query_guard_mode', 'wpopsec_query_guard_post_scope', 'wpopsec_query_guard_scan_post' ),
-			'rate-limiter'    => array( 'wpopsec_ratelimit_enabled', 'wpopsec_ratelimit_escalate', 'wpopsec_ratelimit_escalate_after', 'wpopsec_ratelimit_escalate_minutes', 'wpopsec_ratelimit_mode', 'wpopsec_ratelimit_per_minute' ),
-			'user-enum'       => array( 'wpopsec_user_enum_block_author_scan', 'wpopsec_user_enum_block_rest_users', 'wpopsec_user_enum_disable_oembed_author', 'wpopsec_user_enum_hide_user_sitemap' ),
-			'user-watchdog'   => array( 'wpopsec_user_watchdog_alerts', 'wpopsec_user_watchdog_email', 'wpopsec_user_watchdog_enabled' ),
-			'vuln-scanner'    => array( 'wpopsec_vuln_check_directory', 'wpopsec_vuln_wpscan_token' ),
-			'whitelist'       => array( 'wpopsec_ip_allowlist', 'wpopsec_trusted_networks_url' ),
+			'activity-log'    => array( 'shieldcore_activity_categories' ),
+			'alerts'          => array( 'shieldcore_email_address', 'shieldcore_email_enabled', 'shieldcore_email_threshold', 'shieldcore_telegram_bot_token', 'shieldcore_telegram_chat_id', 'shieldcore_telegram_chat_name', 'shieldcore_telegram_enabled', 'shieldcore_telegram_threshold' ),
+			'auto-update'     => array( 'shieldcore_auto_update_core', 'shieldcore_auto_update_exclude', 'shieldcore_auto_update_plugins', 'shieldcore_auto_update_themes' ),
+			'bot-log'         => array( 'shieldcore_bot_log_retain_days' ),
+			'event-log'       => array( 'shieldcore_event_log_retain_days' ),
+			'file-integrity'  => array( 'shieldcore_integrity_check_baseline', 'shieldcore_integrity_check_core' ),
+			'geo-blocker'     => array( 'shieldcore_geo_countries', 'shieldcore_geo_enforce_mode', 'shieldcore_geo_mode' ),
+			'geo-login'       => array( 'shieldcore_geo_login_countries', 'shieldcore_geo_login_enforce_mode' ),
+			'hardening'       => array( 'shieldcore_hardening_disable_file_edit', 'shieldcore_hardening_uploads_guard' ),
+			'headers'         => array( 'shieldcore_headers_behind_proxy', 'shieldcore_headers_csp_policy', 'shieldcore_headers_csp_report_only', 'shieldcore_headers_enabled', 'shieldcore_headers_hsts_max_age', 'shieldcore_headers_hsts_preload', 'shieldcore_headers_hsts_subdomains' ),
+			'ip-blocklist'    => array( 'shieldcore_ip_blocklist_mode', 'shieldcore_ip_blocklist_sources' ),
+			'ip-sharing'      => array( 'shieldcore_unwantedip_api_key', 'shieldcore_unwantedip_enabled' ),
+			'login-guard'     => array( 'shieldcore_login_guard_enabled', 'shieldcore_login_guard_escalate', 'shieldcore_login_guard_generic_errors', 'shieldcore_login_guard_lockout_min', 'shieldcore_login_guard_max_fails', 'shieldcore_login_guard_window_min' ),
+			'malware-scanner' => array( 'shieldcore_malware_categories', 'shieldcore_malware_ignore_paths' ),
+			'query-guard'     => array( 'shieldcore_qg_allow_jetpack', 'shieldcore_query_guard_block_xmlrpc', 'shieldcore_query_guard_categories', 'shieldcore_query_guard_mode', 'shieldcore_query_guard_post_scope', 'shieldcore_query_guard_scan_post' ),
+			'rate-limiter'    => array( 'shieldcore_ratelimit_enabled', 'shieldcore_ratelimit_escalate', 'shieldcore_ratelimit_escalate_after', 'shieldcore_ratelimit_escalate_minutes', 'shieldcore_ratelimit_mode', 'shieldcore_ratelimit_per_minute' ),
+			'user-enum'       => array( 'shieldcore_user_enum_block_author_scan', 'shieldcore_user_enum_block_rest_users', 'shieldcore_user_enum_disable_oembed_author', 'shieldcore_user_enum_hide_user_sitemap' ),
+			'user-watchdog'   => array( 'shieldcore_user_watchdog_alerts', 'shieldcore_user_watchdog_email', 'shieldcore_user_watchdog_enabled' ),
+			'vuln-scanner'    => array( 'shieldcore_vuln_check_directory', 'shieldcore_vuln_wpscan_token' ),
+			'whitelist'       => array( 'shieldcore_ip_allowlist', 'shieldcore_trusted_networks_url' ),
 		);
 	}
 
 	/** Real credentials — left out of an export unless explicitly opted in. */
 	private static function secret_keys() {
-		return array( 'wpopsec_telegram_bot_token', 'wpopsec_unwantedip_api_key', 'wpopsec_vuln_wpscan_token' );
+		return array( 'shieldcore_telegram_bot_token', 'shieldcore_unwantedip_api_key', 'shieldcore_vuln_wpscan_token' );
 	}
 
 	public static function handle_export() {
@@ -95,8 +95,8 @@ class WPOpsec_Module_Config_IO {
 		}
 
 		$payload = array(
-			'plugin'      => 'opsec',
-			'version'     => WPOPSEC_VERSION,
+			'plugin'      => 'shieldcore-security',
+			'version'     => SHIELDCORE_VERSION,
 			'site'        => home_url(),
 			'exported_at' => gmdate( 'c' ),
 			'modules'     => $data,
@@ -104,7 +104,7 @@ class WPOpsec_Module_Config_IO {
 
 		nocache_headers();
 		header( 'Content-Type: application/json; charset=utf-8' );
-		header( 'Content-Disposition: attachment; filename="opsec-config-' . gmdate( 'Y-m-d-His' ) . '.json"' );
+		header( 'Content-Disposition: attachment; filename="shieldcore-security-config-' . gmdate( 'Y-m-d-His' ) . '.json"' );
 		echo wp_json_encode( $payload, JSON_PRETTY_PRINT );
 		exit;
 	}
@@ -196,12 +196,12 @@ class WPOpsec_Module_Config_IO {
 	}
 
 	private static function redirect_back( array $args ) {
-		wp_safe_redirect( add_query_arg( $args, wp_get_referer() ?: WPOpsec_Menu_Router::url( 'config-io' ) ) );
+		wp_safe_redirect( add_query_arg( $args, wp_get_referer() ?: ShieldCore_Menu_Router::url( 'config-io' ) ) );
 		exit;
 	}
 
 	public static function render_page() {
-		WPOpsec_UI::open( 'config-io' );
+		ShieldCore_UI::open( 'config-io' );
 
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only result flags set only by this module's own admin-post redirects, which already check_admin_referer() before redirecting.
 		if ( isset( $_GET['cio_error'] ) ) {
@@ -211,11 +211,11 @@ class WPOpsec_Module_Config_IO {
 				'invalid_file' => "That file doesn't look like an Opsec configuration export.",
 			);
 			$cio_error = sanitize_key( wp_unslash( $_GET['cio_error'] ) );
-			WPOpsec_UI::notice( 'error', $messages[ $cio_error ] ?? 'Import failed.' );
+			ShieldCore_UI::notice( 'error', $messages[ $cio_error ] ?? 'Import failed.' );
 		}
 		if ( isset( $_GET['cio_imported'] ) ) {
 			$n = (int) $_GET['cio_imported'];
-			WPOpsec_UI::notice(
+			ShieldCore_UI::notice(
 				$n ? 'success' : 'warning',
 				$n ? sprintf( '%d setting(s) imported.', $n ) : 'Nothing was imported — no matching modules were selected.'
 			);
@@ -225,20 +225,20 @@ class WPOpsec_Module_Config_IO {
 		$registry = self::registry();
 		?>
 
-		<?php WPOpsec_UI::section( 'Export configuration', 'download' ); ?>
+		<?php ShieldCore_UI::section( 'Export configuration', 'download' ); ?>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 				<?php wp_nonce_field( self::EXPORT_ACTION ); ?>
-				<input type="hidden" name="action" value="wpopsec_cio_export">
+				<input type="hidden" name="action" value="shieldcore_cio_export">
 
 				<?php
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Modules to include',
 					function () use ( $registry ) {
 						self::module_checkboxes( $registry );
 					},
 					'Unchecked modules are left out of the file entirely.'
 				);
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'API keys / tokens',
 					function () {
 						?>
@@ -251,15 +251,15 @@ class WPOpsec_Module_Config_IO {
 
 				<?php submit_button( 'Download export' ); ?>
 			</form>
-		<?php WPOpsec_UI::section_end(); ?>
+		<?php ShieldCore_UI::section_end(); ?>
 
-		<?php WPOpsec_UI::section( 'Import configuration', 'upload' ); ?>
+		<?php ShieldCore_UI::section( 'Import configuration', 'upload' ); ?>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" enctype="multipart/form-data">
 				<?php wp_nonce_field( self::IMPORT_ACTION ); ?>
-				<input type="hidden" name="action" value="wpopsec_cio_import">
+				<input type="hidden" name="action" value="shieldcore_cio_import">
 
 				<?php
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'File',
 					function () {
 						?>
@@ -267,7 +267,7 @@ class WPOpsec_Module_Config_IO {
 						<?php
 					}
 				);
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Modules to apply',
 					function () use ( $registry ) {
 						self::module_checkboxes( $registry );
@@ -278,16 +278,16 @@ class WPOpsec_Module_Config_IO {
 
 				<?php submit_button( 'Upload and import', 'secondary' ); ?>
 			</form>
-		<?php WPOpsec_UI::section_end(); ?>
+		<?php ShieldCore_UI::section_end(); ?>
 
 		<?php
-		WPOpsec_UI::close();
+		ShieldCore_UI::close();
 	}
 
 	private static function module_checkboxes( array $registry ) {
-		echo '<div class="wpopsec-scroll">';
+		echo '<div class="shieldcore-scroll">';
 		foreach ( $registry as $slug => $keys ) {
-			list( , $title ) = WPOpsec_UI::meta( $slug );
+			list( , $title ) = ShieldCore_UI::meta( $slug );
 			printf(
 				'<label><input type="checkbox" name="modules[]" value="%s" checked> %s</label>',
 				esc_attr( $slug ),

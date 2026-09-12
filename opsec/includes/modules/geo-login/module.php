@@ -16,10 +16,10 @@ if ( ! defined( 'ABSPATH' ) ) {
  * no cron, no refresh, no data file of its own. If Geo Blocker has never
  * been active, the check simply has nothing to look up against yet.
  */
-class WPOpsec_Module_Geo_Login {
+class ShieldCore_Module_Geo_Login {
 
 	public static function check_dest() {
-		return WPOPSEC_CHECKS_DIR . '/geo-login.php';
+		return SHIELDCORE_CHECKS_DIR . '/geo-login.php';
 	}
 
 	public static function activate() {
@@ -28,13 +28,13 @@ class WPOpsec_Module_Geo_Login {
 
 	public static function deactivate() {
 		if ( file_exists( self::check_dest() ) ) {
-			WPOpsec_Module_Loader::filesystem()->delete( self::check_dest() );
+			ShieldCore_Module_Loader::filesystem()->delete( self::check_dest() );
 		}
 	}
 
 	public static function register() {
 		self::deploy_check_file();
-		add_action( 'admin_post_wpopsec_gl_save_settings', array( __CLASS__, 'handle_save_settings' ) );
+		add_action( 'admin_post_shieldcore_gl_save_settings', array( __CLASS__, 'handle_save_settings' ) );
 		return __CLASS__;
 	}
 
@@ -58,54 +58,54 @@ class WPOpsec_Module_Geo_Login {
 	}
 
 	public static function handle_save_settings() {
-		check_admin_referer( 'wpopsec_gl_save_settings' );
+		check_admin_referer( 'shieldcore_gl_save_settings' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
 
-		update_option( 'wpopsec_geo_login_enforce_mode', ( isset( $_POST['enforce'] ) && 'block' === $_POST['enforce'] ) ? 'block' : 'log' );
+		update_option( 'shieldcore_geo_login_enforce_mode', ( isset( $_POST['enforce'] ) && 'block' === $_POST['enforce'] ) ? 'block' : 'log' );
 
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- already unslashed, and array_intersect() against the real country-code list below discards anything not in it; nothing unvalidated ever reaches update_option().
 		$posted = isset( $_POST['countries'] ) ? (array) wp_unslash( $_POST['countries'] ) : array();
-		$codes  = class_exists( 'WPOpsec_Geo_Country_Codes' )
-			? array_values( array_intersect( $posted, array_keys( WPOpsec_Geo_Country_Codes::all() ) ) )
+		$codes  = class_exists( 'ShieldCore_Geo_Country_Codes' )
+			? array_values( array_intersect( $posted, array_keys( ShieldCore_Geo_Country_Codes::all() ) ) )
 			: array();
-		update_option( 'wpopsec_geo_login_countries', $codes );
+		update_option( 'shieldcore_geo_login_countries', $codes );
 
 		$indices = array();
-		if ( class_exists( 'WPOpsec_Geo_Country_Codes' ) ) {
+		if ( class_exists( 'ShieldCore_Geo_Country_Codes' ) ) {
 			foreach ( $codes as $code ) {
-				$i = WPOpsec_Geo_Country_Codes::index_of( $code );
+				$i = ShieldCore_Geo_Country_Codes::index_of( $code );
 				if ( null !== $i ) {
 					$indices[] = $i;
 				}
 			}
 		}
-		update_option( 'wpopsec_geo_login_country_indices', $indices, false );
+		update_option( 'shieldcore_geo_login_country_indices', $indices, false );
 
 		wp_safe_redirect( add_query_arg( 'saved', '1', wp_get_referer() ) );
 		exit;
 	}
 
 	public static function render_page() {
-		$enforce  = get_option( 'wpopsec_geo_login_enforce_mode', 'log' );
-		$selected = (array) get_option( 'wpopsec_geo_login_countries', array() );
-		$ready    = class_exists( 'WPOpsec_Geo_Country_Codes' );
+		$enforce  = get_option( 'shieldcore_geo_login_enforce_mode', 'log' );
+		$selected = (array) get_option( 'shieldcore_geo_login_countries', array() );
+		$ready    = class_exists( 'ShieldCore_Geo_Country_Codes' );
 
-		WPOpsec_UI::open( 'geo-login' );
+		ShieldCore_UI::open( 'geo-login' );
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only result flag set only by this module's own admin-post redirect, which already check_admin_referer()'d before redirecting.
 		if ( isset( $_GET['saved'] ) ) {
-			WPOpsec_UI::notice( 'success', 'Settings saved.' );
+			ShieldCore_UI::notice( 'success', 'Settings saved.' );
 		}
 
 		if ( ! $ready ) {
-			WPOpsec_UI::notice( 'warning', 'Geo Blocker must be active at least once — this module reuses its country dataset rather than keeping a separate copy.' );
-			WPOpsec_UI::close();
+			ShieldCore_UI::notice( 'warning', 'Geo Blocker must be active at least once — this module reuses its country dataset rather than keeping a separate copy.' );
+			ShieldCore_UI::close();
 			return;
 		}
 
-		WPOpsec_UI::tiles(
+		ShieldCore_UI::tiles(
 			array(
 				array(
 					'icon'  => empty( $selected ) ? 'warning' : ( 'block' === $enforce ? 'shield-alt' : 'visibility' ),
@@ -119,12 +119,12 @@ class WPOpsec_Module_Geo_Login {
 
 		?>
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-			<?php wp_nonce_field( 'wpopsec_gl_save_settings' ); ?>
-			<input type="hidden" name="action" value="wpopsec_gl_save_settings">
+			<?php wp_nonce_field( 'shieldcore_gl_save_settings' ); ?>
+			<input type="hidden" name="action" value="shieldcore_gl_save_settings">
 
-			<?php WPOpsec_UI::section( 'Enforcement', 'lock' ); ?>
+			<?php ShieldCore_UI::section( 'Enforcement', 'lock' ); ?>
 				<?php
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Mode',
 					function () use ( $enforce ) {
 						?>
@@ -135,27 +135,27 @@ class WPOpsec_Module_Geo_Login {
 					'Start in log-only mode and check the Event Log for a few days before switching to block — IP-to-country data is approximate (VPNs, mobile carriers, satellite links routinely resolve to the wrong country), and this gates the login form itself. Your LAN, reserved IP space, and anything in the trusted-networks file are always exempt, regardless of country — the same rule every other blocking module follows, so this can never lock out your own network.'
 				);
 				?>
-			<?php WPOpsec_UI::section_end(); ?>
+			<?php ShieldCore_UI::section_end(); ?>
 
-			<?php WPOpsec_UI::section( 'Allowed countries', 'admin-site' ); ?>
+			<?php ShieldCore_UI::section( 'Allowed countries', 'admin-site' ); ?>
 				<?php if ( empty( $selected ) ) : ?>
-					<p class="wpopsec-help" style="margin-top:0">No countries selected — nothing is restricted yet. Pick at least one below and save before switching Enforcement to Block.</p>
+					<p class="shieldcore-help" style="margin-top:0">No countries selected — nothing is restricted yet. Pick at least one below and save before switching Enforcement to Block.</p>
 				<?php endif; ?>
-				<div class="wpopsec-scroll" style="max-height:320px">
-					<?php foreach ( WPOpsec_Geo_Country_Codes::all() as $code => $name ) : ?>
+				<div class="shieldcore-scroll" style="max-height:320px">
+					<?php foreach ( ShieldCore_Geo_Country_Codes::all() as $code => $name ) : ?>
 						<?php if ( 'ZZ' === $code ) { continue; } /* reserved space, not a real country to pick */ ?>
 						<label style="display:inline-block;width:47%">
 							<input type="checkbox" name="countries[]" value="<?php echo esc_attr( $code ); ?>" <?php checked( in_array( $code, $selected, true ) ); ?>>
-							<?php echo esc_html( $name ); ?> <span class="wpopsec-muted">(<?php echo esc_html( $code ); ?>)</span>
+							<?php echo esc_html( $name ); ?> <span class="shieldcore-muted">(<?php echo esc_html( $code ); ?>)</span>
 						</label>
 					<?php endforeach; ?>
 				</div>
-				<p class="wpopsec-help">IP geolocation data: <a href="https://db-ip.com" target="_blank" rel="noopener">DB-IP.com</a> Country Lite, used under CC BY 4.0 — same dataset as Geo Blocker, refreshed by that module's weekly cron.</p>
-			<?php WPOpsec_UI::section_end(); ?>
+				<p class="shieldcore-help">IP geolocation data: <a href="https://db-ip.com" target="_blank" rel="noopener">DB-IP.com</a> Country Lite, used under CC BY 4.0 — same dataset as Geo Blocker, refreshed by that module's weekly cron.</p>
+			<?php ShieldCore_UI::section_end(); ?>
 
 			<?php submit_button( 'Save settings' ); ?>
 		</form>
 		<?php
-		WPOpsec_UI::close();
+		ShieldCore_UI::close();
 	}
 }

@@ -9,13 +9,13 @@ if ( ! defined( 'ABSPATH' ) ) {
  * an embedded world map accordingly.
  *
  * Country resolution reuses geo-blocker's compiled binary index and
- * names map (wpopsec_geo_lookup() / wpopsec_geo_country_label(), both
+ * names map (shieldcore_geo_lookup() / shieldcore_geo_country_label(), both
  * defined by geo-blocker's check.php once that module has been active at
  * least once) rather than adding a third geo dataset. If geo-blocker has
  * never run, this page just has nothing to color — it degrades to an
  * empty map, not an error.
  */
-class WPOpsec_Module_Geo_Map {
+class ShieldCore_Module_Geo_Map {
 
 	/** 5-step red intensity scale — light for a handful of hits, deep red for the worst offenders. */
 	const BUCKET_COLORS = array( '#ffe3e0', '#ffab9e', '#f96f5c', '#dc2f2f', '#7a0c14' );
@@ -34,7 +34,7 @@ class WPOpsec_Module_Geo_Map {
 	public static function counts_by_country( $days ) {
 		global $wpdb;
 
-		$table = wpopsec_events_table();
+		$table = shieldcore_events_table();
 
 		// Aggregate by IP first — far fewer unique IPs than raw events, so
 		// country resolution (a binary search per IP) stays cheap even on a
@@ -54,22 +54,22 @@ class WPOpsec_Module_Geo_Map {
 		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
 
 		$by_country = array();
-		$geo_ready  = function_exists( 'wpopsec_geo_lookup' ) && function_exists( 'wpopsec_geo_country_label' );
-		$file       = WPMU_PLUGIN_DIR . '/wp-opsec-checks/data/geo-country-index.bin';
+		$geo_ready  = function_exists( 'shieldcore_geo_lookup' ) && function_exists( 'shieldcore_geo_country_label' );
+		$file       = WPMU_PLUGIN_DIR . '/wp-shieldcore-checks/data/geo-country-index.bin';
 
 		foreach ( $rows as $row ) {
-			if ( ! $geo_ready || wpopsec_ip_is_reserved( $row['ip'] ) ) {
+			if ( ! $geo_ready || shieldcore_ip_is_reserved( $row['ip'] ) ) {
 				continue;
 			}
 			$long = ip2long( $row['ip'] );
 			if ( false === $long ) {
 				continue;
 			}
-			$idx = wpopsec_geo_lookup( $file, $long );
+			$idx = shieldcore_geo_lookup( $file, $long );
 			if ( null === $idx ) {
 				continue;
 			}
-			$label = wpopsec_geo_country_label( $idx );
+			$label = shieldcore_geo_country_label( $idx );
 			if ( ! preg_match( '/\(([A-Z]{2})\)$/', $label, $m ) ) {
 				continue; // "index N" fallback — dataset missing, nothing to plot
 			}
@@ -88,7 +88,7 @@ class WPOpsec_Module_Geo_Map {
 
 		$max     = max( $by_country );
 		$log_max = log( $max + 1 );
-		$codes   = WPOpsec_Geo_Country_Codes::all();
+		$codes   = ShieldCore_Geo_Country_Codes::all();
 
 		foreach ( $by_country as $code => $count ) {
 			$name   = $codes[ $code ] ?? $code;
@@ -96,7 +96,7 @@ class WPOpsec_Module_Geo_Map {
 			$id     = strtolower( $code );
 
 			$replacement = sprintf(
-				'id="%s" class="wpopsec-geo-hit wpopsec-geo-b%d" data-country="%s" data-count="%d"',
+				'id="%s" class="shieldcore-geo-hit shieldcore-geo-b%d" data-country="%s" data-count="%d"',
 				esc_attr( $id ),
 				$bucket,
 				esc_attr( $name ),
@@ -123,11 +123,11 @@ class WPOpsec_Module_Geo_Map {
 		$svg        = self::tint_svg( $svg, $by_country );
 
 		arsort( $by_country );
-		$codes = WPOpsec_Geo_Country_Codes::all();
+		$codes = ShieldCore_Geo_Country_Codes::all();
 
-		WPOpsec_UI::open( 'geo-map' );
+		ShieldCore_UI::open( 'geo-map' );
 
-		WPOpsec_UI::tiles(
+		ShieldCore_UI::tiles(
 			array(
 				array( 'icon' => 'admin-site-alt3', 'tone' => 'quiet', 'value' => number_format_i18n( count( $by_country ) ), 'label' => 'countries seen' ),
 				array( 'icon' => 'clock', 'tone' => 'quiet', 'value' => sprintf( 'last %d day(s)', $days ), 'label' => 'window' ),
@@ -136,7 +136,7 @@ class WPOpsec_Module_Geo_Map {
 
 		?>
 		<form method="get" style="margin-bottom:14px">
-			<?php wp_parse_str( WPOpsec_Menu_Router::query( 'geo-map' ), $route ); ?>
+			<?php wp_parse_str( ShieldCore_Menu_Router::query( 'geo-map' ), $route ); ?>
 			<?php foreach ( $route as $k => $v ) : ?>
 				<input type="hidden" name="<?php echo esc_attr( $k ); ?>" value="<?php echo esc_attr( $v ); ?>">
 			<?php endforeach; ?>
@@ -149,21 +149,21 @@ class WPOpsec_Module_Geo_Map {
 			</label>
 		</form>
 
-		<?php WPOpsec_UI::section( 'Activity by country', 'admin-site-alt3' ); ?>
+		<?php ShieldCore_UI::section( 'Activity by country', 'admin-site-alt3' ); ?>
 			<?php if ( empty( $by_country ) ) : ?>
-				<div class="wpopsec-empty"><span class="dashicons dashicons-info-outline"></span><p>No blocked or logged events with a resolvable country in this window.</p></div>
+				<div class="shieldcore-empty"><span class="dashicons dashicons-info-outline"></span><p>No blocked or logged events with a resolvable country in this window.</p></div>
 			<?php else : ?>
-				<div class="wpopsec-geo-map-wrap"><?php
+				<div class="shieldcore-geo-map-wrap"><?php
 				// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $svg is this plugin's own bundled, static asset file (assets/world-map.svg); the only dynamic pieces spliced in (tint_svg() above) are esc_attr()'d, and the country codes/counts driving them come from the compiled GeoIP dataset, never from request input.
 				echo $svg;
 				?></div>
-				<div id="wpopsec-geo-tip" class="wpopsec-geo-tip"></div>
+				<div id="shieldcore-geo-tip" class="shieldcore-geo-tip"></div>
 			<?php endif; ?>
-		<?php WPOpsec_UI::section_end(); ?>
+		<?php ShieldCore_UI::section_end(); ?>
 
 		<?php if ( ! empty( $by_country ) ) : ?>
-			<?php WPOpsec_UI::section( 'Top countries', 'list-view' ); ?>
-				<table class="wpopsec-table">
+			<?php ShieldCore_UI::section( 'Top countries', 'list-view' ); ?>
+				<table class="shieldcore-table">
 					<thead><tr><th>Country</th><th style="width:120px">Events</th><th>Share</th></tr></thead>
 					<tbody>
 					<?php $top = array_slice( $by_country, 0, 15, true ); ?>
@@ -181,25 +181,25 @@ class WPOpsec_Module_Geo_Map {
 					<?php endforeach; ?>
 					</tbody>
 				</table>
-			<?php WPOpsec_UI::section_end(); ?>
+			<?php ShieldCore_UI::section_end(); ?>
 		<?php endif; ?>
 
-		<p class="wpopsec-help">Country resolution reuses the Geo Blocker module's dataset (DB-IP Country Lite, CC BY 4.0) — enable that module at least once for this map to have data. Map graphic: <a href="https://github.com/flekschas/simple-world-map" target="_blank" rel="noopener">flekschas/simple-world-map</a>, CC BY-SA 3.0.</p>
+		<p class="shieldcore-help">Country resolution reuses the Geo Blocker module's dataset (DB-IP Country Lite, CC BY 4.0) — enable that module at least once for this map to have data. Map graphic: <a href="https://github.com/flekschas/simple-world-map" target="_blank" rel="noopener">flekschas/simple-world-map</a>, CC BY-SA 3.0.</p>
 
 		<?php
-		// Styling (assets/geo-map.css, enqueued by WPOpsec_Module_Loader::
+		// Styling (assets/geo-map.css, enqueued by ShieldCore_Module_Loader::
 		// enqueue_assets()) hardcodes BUCKET_COLORS' 5 values directly —
 		// keep the two in sync if BUCKET_COLORS above is ever changed.
-		wp_register_script( 'wpopsec-geo-map', false, array(), WPOPSEC_VERSION, true );
-		wp_enqueue_script( 'wpopsec-geo-map' );
+		wp_register_script( 'shieldcore-geo-map', false, array(), SHIELDCORE_VERSION, true );
+		wp_enqueue_script( 'shieldcore-geo-map' );
 		wp_add_inline_script(
-			'wpopsec-geo-map',
+			'shieldcore-geo-map',
 			"(function () {
-				var wrap = document.querySelector( '.wpopsec-geo-map-wrap' );
-				var tip  = document.getElementById( 'wpopsec-geo-tip' );
+				var wrap = document.querySelector( '.shieldcore-geo-map-wrap' );
+				var tip  = document.getElementById( 'shieldcore-geo-tip' );
 				if ( ! wrap || ! tip ) { return; }
 				wrap.addEventListener( 'mousemove', function ( e ) {
-					var el = e.target.closest ? e.target.closest( '.wpopsec-geo-hit' ) : null;
+					var el = e.target.closest ? e.target.closest( '.shieldcore-geo-hit' ) : null;
 					if ( ! el ) { tip.style.display = 'none'; return; }
 					tip.textContent = el.getAttribute( 'data-country' ) + ': ' + el.getAttribute( 'data-count' ) + ' event(s)';
 					tip.style.left = ( e.clientX + 14 ) + 'px';
@@ -209,6 +209,6 @@ class WPOpsec_Module_Geo_Map {
 				wrap.addEventListener( 'mouseleave', function () { tip.style.display = 'none'; } );
 			})();"
 		);
-		WPOpsec_UI::close();
+		ShieldCore_UI::close();
 	}
 }

@@ -11,9 +11,9 @@ if ( ! defined( 'ABSPATH' ) ) {
  * happens early, because a lockout escalates the IP into the shared local
  * blocklist, which the early gate reads on the next request.
  */
-class WPOpsec_Module_Login_Guard {
+class ShieldCore_Module_Login_Guard {
 
-	const CRON_HOOK = 'wpopsec_login_guard_prune';
+	const CRON_HOOK = 'shieldcore_login_guard_prune';
 
 	const DEFAULT_MAX_FAILS   = 8;
 	const DEFAULT_WINDOW_MIN  = 15;
@@ -30,15 +30,15 @@ class WPOpsec_Module_Login_Guard {
 	}
 
 	public static function register() {
-		add_action( 'admin_post_wpopsec_lg_save_settings', array( __CLASS__, 'handle_save_settings' ) );
+		add_action( 'admin_post_shieldcore_lg_save_settings', array( __CLASS__, 'handle_save_settings' ) );
 		add_action( self::CRON_HOOK, array( __CLASS__, 'prune' ) );
 
-		if ( get_option( 'wpopsec_login_guard_enabled', true ) ) {
+		if ( get_option( 'shieldcore_login_guard_enabled', true ) ) {
 			add_action( 'wp_login_failed', array( __CLASS__, 'on_login_failed' ) );
 			add_action( 'wp_login', array( __CLASS__, 'on_login_success' ), 10, 2 );
 			add_filter( 'authenticate', array( __CLASS__, 'maybe_block_login' ), 30, 3 );
 
-			if ( get_option( 'wpopsec_login_guard_generic_errors', true ) ) {
+			if ( get_option( 'shieldcore_login_guard_generic_errors', true ) ) {
 				add_filter( 'login_errors', array( __CLASS__, 'genericize_errors' ) );
 			}
 		}
@@ -56,7 +56,7 @@ class WPOpsec_Module_Login_Guard {
 	 * on their own, so lockouts release without depending on cron.
 	 */
 	private static function entry_key( $ip ) {
-		return 'wpopsec_lg_' . md5( $ip );
+		return 'shieldcore_lg_' . md5( $ip );
 	}
 
 	private static function get_entry( $ip ) {
@@ -65,7 +65,7 @@ class WPOpsec_Module_Login_Guard {
 	}
 
 	private static function save_entry( $ip, $entry ) {
-		$window  = max( 1, (int) get_option( 'wpopsec_login_guard_window_min', self::DEFAULT_WINDOW_MIN ) ) * MINUTE_IN_SECONDS;
+		$window  = max( 1, (int) get_option( 'shieldcore_login_guard_window_min', self::DEFAULT_WINDOW_MIN ) ) * MINUTE_IN_SECONDS;
 		$expires = max( $window, (int) ( $entry['locked_until'] ?? 0 ) - time() );
 
 		set_transient( self::entry_key( $ip ), $entry, $expires );
@@ -88,7 +88,7 @@ class WPOpsec_Module_Login_Guard {
 			return;
 		}
 
-		$index = (array) get_option( 'wpopsec_login_guard_locked', array() );
+		$index = (array) get_option( 'shieldcore_login_guard_locked', array() );
 		$index[ $ip ] = (int) $entry['locked_until'];
 
 		// Hard cap: under a very wide attack this list is for display only,
@@ -98,20 +98,20 @@ class WPOpsec_Module_Login_Guard {
 			$index = array_slice( $index, -500, null, true );
 		}
 
-		update_option( 'wpopsec_login_guard_locked', $index, false );
+		update_option( 'shieldcore_login_guard_locked', $index, false );
 	}
 
 	private static function forget_ip( $ip ) {
-		$index = (array) get_option( 'wpopsec_login_guard_locked', array() );
+		$index = (array) get_option( 'shieldcore_login_guard_locked', array() );
 		if ( isset( $index[ $ip ] ) ) {
 			unset( $index[ $ip ] );
-			update_option( 'wpopsec_login_guard_locked', $index, false );
+			update_option( 'shieldcore_login_guard_locked', $index, false );
 		}
 	}
 
 	/** @return array<string,int> ip => locked_until, expired entries dropped */
 	private static function locked_ips() {
-		$index   = (array) get_option( 'wpopsec_login_guard_locked', array() );
+		$index   = (array) get_option( 'shieldcore_login_guard_locked', array() );
 		$now     = time();
 		$active  = array_filter(
 			$index,
@@ -121,14 +121,14 @@ class WPOpsec_Module_Login_Guard {
 		);
 
 		if ( count( $active ) !== count( $index ) ) {
-			update_option( 'wpopsec_login_guard_locked', $active, false );
+			update_option( 'shieldcore_login_guard_locked', $active, false );
 		}
 
 		return $active;
 	}
 
 	public static function on_login_failed( $username ) {
-		$ip = wpopsec_client_ip();
+		$ip = shieldcore_client_ip();
 		if ( '' === $ip ) {
 			return;
 		}
@@ -136,12 +136,12 @@ class WPOpsec_Module_Login_Guard {
 		// Exempt IPs are never enforced against, so don't accumulate state
 		// for them — it would show up as a phantom "locked out" row that
 		// never actually blocks anything.
-		if ( wpopsec_ip_is_exempt( $ip ) ) {
+		if ( shieldcore_ip_is_exempt( $ip ) ) {
 			return;
 		}
 
-		$window = max( 1, (int) get_option( 'wpopsec_login_guard_window_min', self::DEFAULT_WINDOW_MIN ) ) * MINUTE_IN_SECONDS;
-		$max    = max( 1, (int) get_option( 'wpopsec_login_guard_max_fails', self::DEFAULT_MAX_FAILS ) );
+		$window = max( 1, (int) get_option( 'shieldcore_login_guard_window_min', self::DEFAULT_WINDOW_MIN ) ) * MINUTE_IN_SECONDS;
+		$max    = max( 1, (int) get_option( 'shieldcore_login_guard_max_fails', self::DEFAULT_MAX_FAILS ) );
 		$now    = time();
 
 		$entry = self::get_entry( $ip );
@@ -160,34 +160,34 @@ class WPOpsec_Module_Login_Guard {
 		$count = count( $entry['fails'] );
 
 		if ( $count >= $max ) {
-			$lockout = max( 1, (int) get_option( 'wpopsec_login_guard_lockout_min', self::DEFAULT_LOCKOUT_MIN ) );
+			$lockout = max( 1, (int) get_option( 'shieldcore_login_guard_lockout_min', self::DEFAULT_LOCKOUT_MIN ) );
 			$entry['locked_until'] = $now + ( $lockout * MINUTE_IN_SECONDS );
 			$entry['fails']        = array();
 
 			self::save_entry( $ip, $entry );
 
-			wpopsec_log_event(
+			shieldcore_log_event(
 				'login-guard',
 				'lockout',
 				'blocked',
-				sprintf( '%d failed logins in %d min; locked %d min; last user "%s"', $count, (int) get_option( 'wpopsec_login_guard_window_min', self::DEFAULT_WINDOW_MIN ), $lockout, $username )
+				sprintf( '%d failed logins in %d min; locked %d min; last user "%s"', $count, (int) get_option( 'shieldcore_login_guard_window_min', self::DEFAULT_WINDOW_MIN ), $lockout, $username )
 			);
 
 			// Escalate to the shared local blocklist so the early gate stops
 			// this IP before WP even bootstraps on subsequent requests.
-			if ( get_option( 'wpopsec_login_guard_escalate', true ) ) {
-				wpopsec_local_blocklist_add( $ip, 'login-guard: brute force', $lockout * MINUTE_IN_SECONDS );
+			if ( get_option( 'shieldcore_login_guard_escalate', true ) ) {
+				shieldcore_local_blocklist_add( $ip, 'login-guard: brute force', $lockout * MINUTE_IN_SECONDS );
 			}
 			return;
 		}
 
 		self::save_entry( $ip, $entry );
 
-		wpopsec_log_event( 'login-guard', 'login_failed', 'noted', sprintf( 'attempt %d/%d for user "%s"', $count, $max, $username ) );
+		shieldcore_log_event( 'login-guard', 'login_failed', 'noted', sprintf( 'attempt %d/%d for user "%s"', $count, $max, $username ) );
 	}
 
 	public static function on_login_success( $user_login, $user = null ) {
-		$ip = wpopsec_client_ip();
+		$ip = shieldcore_client_ip();
 		if ( '' === $ip ) {
 			return;
 		}
@@ -197,7 +197,7 @@ class WPOpsec_Module_Login_Guard {
 		// stays one typo away from a lockout for the rest of the window.
 		self::clear_entry( $ip );
 
-		wpopsec_log_event( 'login-guard', 'login_success', 'noted', sprintf( 'user "%s"', $user_login ) );
+		shieldcore_log_event( 'login-guard', 'login_success', 'noted', sprintf( 'user "%s"', $user_login ) );
 	}
 
 	/**
@@ -210,8 +210,8 @@ class WPOpsec_Module_Login_Guard {
 			return $user;
 		}
 
-		$ip = wpopsec_client_ip();
-		if ( '' === $ip || wpopsec_ip_is_exempt( $ip ) ) {
+		$ip = shieldcore_client_ip();
+		if ( '' === $ip || shieldcore_ip_is_exempt( $ip ) ) {
 			return $user; // LAN/dev/trusted crawler ranges are never locked out
 		}
 
@@ -221,10 +221,10 @@ class WPOpsec_Module_Login_Guard {
 		if ( $until > time() ) {
 			$minutes = max( 1, (int) ceil( ( $until - time() ) / MINUTE_IN_SECONDS ) );
 
-			wpopsec_log_event( 'login-guard', 'locked_attempt', 'blocked', sprintf( 'attempt while locked; %d min remaining', $minutes ) );
+			shieldcore_log_event( 'login-guard', 'locked_attempt', 'blocked', sprintf( 'attempt while locked; %d min remaining', $minutes ) );
 
 			return new WP_Error(
-				'wpopsec_locked_out',
+				'shieldcore_locked_out',
 				sprintf(
 					/* translators: %d: minutes remaining */
 					__( '<strong>Too many failed login attempts.</strong> Try again in %d minutes.', 'shieldcore-security' ),
@@ -263,25 +263,25 @@ class WPOpsec_Module_Login_Guard {
 		foreach ( array_keys( self::locked_ips() ) as $ip ) {
 			delete_transient( self::entry_key( $ip ) );
 		}
-		update_option( 'wpopsec_login_guard_locked', array(), false );
+		update_option( 'shieldcore_login_guard_locked', array(), false );
 	}
 
 
 	public static function handle_save_settings() {
-		check_admin_referer( 'wpopsec_lg_save_settings' );
+		check_admin_referer( 'shieldcore_lg_save_settings' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
 
-		update_option( 'wpopsec_login_guard_enabled', isset( $_POST['enabled'] ) );
-		update_option( 'wpopsec_login_guard_escalate', isset( $_POST['escalate'] ) );
-		update_option( 'wpopsec_login_guard_generic_errors', isset( $_POST['generic_errors'] ) );
+		update_option( 'shieldcore_login_guard_enabled', isset( $_POST['enabled'] ) );
+		update_option( 'shieldcore_login_guard_escalate', isset( $_POST['escalate'] ) );
+		update_option( 'shieldcore_login_guard_generic_errors', isset( $_POST['generic_errors'] ) );
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- (int) cast is itself the sanitizer; wp_unslash() would be a no-op on values about to be cast to int.
-		update_option( 'wpopsec_login_guard_max_fails', max( 1, (int) ( $_POST['max_fails'] ?? self::DEFAULT_MAX_FAILS ) ) );
+		update_option( 'shieldcore_login_guard_max_fails', max( 1, (int) ( $_POST['max_fails'] ?? self::DEFAULT_MAX_FAILS ) ) );
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- same as max_fails above.
-		update_option( 'wpopsec_login_guard_window_min', max( 1, (int) ( $_POST['window_min'] ?? self::DEFAULT_WINDOW_MIN ) ) );
+		update_option( 'shieldcore_login_guard_window_min', max( 1, (int) ( $_POST['window_min'] ?? self::DEFAULT_WINDOW_MIN ) ) );
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- same as max_fails above.
-		update_option( 'wpopsec_login_guard_lockout_min', max( 1, (int) ( $_POST['lockout_min'] ?? self::DEFAULT_LOCKOUT_MIN ) ) );
+		update_option( 'shieldcore_login_guard_lockout_min', max( 1, (int) ( $_POST['lockout_min'] ?? self::DEFAULT_LOCKOUT_MIN ) ) );
 
 		if ( isset( $_POST['clear_lockouts'] ) ) {
 			self::clear_all_lockouts();
@@ -292,52 +292,52 @@ class WPOpsec_Module_Login_Guard {
 	}
 
 	public static function render_settings_page() {
-		$enabled     = get_option( 'wpopsec_login_guard_enabled', true );
-		$escalate    = get_option( 'wpopsec_login_guard_escalate', true );
-		$generic     = get_option( 'wpopsec_login_guard_generic_errors', true );
-		$max_fails   = (int) get_option( 'wpopsec_login_guard_max_fails', self::DEFAULT_MAX_FAILS );
-		$window_min  = (int) get_option( 'wpopsec_login_guard_window_min', self::DEFAULT_WINDOW_MIN );
-		$lockout_min = (int) get_option( 'wpopsec_login_guard_lockout_min', self::DEFAULT_LOCKOUT_MIN );
+		$enabled     = get_option( 'shieldcore_login_guard_enabled', true );
+		$escalate    = get_option( 'shieldcore_login_guard_escalate', true );
+		$generic     = get_option( 'shieldcore_login_guard_generic_errors', true );
+		$max_fails   = (int) get_option( 'shieldcore_login_guard_max_fails', self::DEFAULT_MAX_FAILS );
+		$window_min  = (int) get_option( 'shieldcore_login_guard_window_min', self::DEFAULT_WINDOW_MIN );
+		$lockout_min = (int) get_option( 'shieldcore_login_guard_lockout_min', self::DEFAULT_LOCKOUT_MIN );
 
 		$locked = self::locked_ips();
 		arsort( $locked );
 
-		WPOpsec_UI::open( 'login-guard' );
+		ShieldCore_UI::open( 'login-guard' );
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only result flag set only by this module's own admin-post redirect, which already check_admin_referer()'d before redirecting.
 		if ( isset( $_GET['saved'] ) ) {
-			WPOpsec_UI::notice( 'success', 'Settings saved.' );
+			ShieldCore_UI::notice( 'success', 'Settings saved.' );
 		}
 
-		WPOpsec_UI::section( 'Currently locked out', 'lock', sprintf( '%d active', count( $locked ) ) );
+		ShieldCore_UI::section( 'Currently locked out', 'lock', sprintf( '%d active', count( $locked ) ) );
 		if ( empty( $locked ) ) {
-			echo '<div class="wpopsec-empty"><span class="dashicons dashicons-yes-alt"></span><p>No IPs are locked out.</p></div>';
+			echo '<div class="shieldcore-empty"><span class="dashicons dashicons-yes-alt"></span><p>No IPs are locked out.</p></div>';
 		} else {
 			?>
-			<table class="wpopsec-table">
+			<table class="shieldcore-table">
 				<thead><tr><th style="width:180px">IP</th><th>Locked until</th></tr></thead>
 				<tbody>
 				<?php foreach ( $locked as $ip => $until ) : ?>
 					<tr>
 						<td><code><?php echo esc_html( $ip ); ?></code></td>
-						<td class="wpopsec-nowrap"><?php echo esc_html( date_i18n( 'Y-m-d H:i', (int) $until ) ); ?></td>
+						<td class="shieldcore-nowrap"><?php echo esc_html( date_i18n( 'Y-m-d H:i', (int) $until ) ); ?></td>
 					</tr>
 				<?php endforeach; ?>
 				</tbody>
 			</table>
 			<?php
 		}
-		WPOpsec_UI::section_end();
+		ShieldCore_UI::section_end();
 		?>
 
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-			<?php wp_nonce_field( 'wpopsec_lg_save_settings' ); ?>
-			<input type="hidden" name="action" value="wpopsec_lg_save_settings">
+			<?php wp_nonce_field( 'shieldcore_lg_save_settings' ); ?>
+			<input type="hidden" name="action" value="shieldcore_lg_save_settings">
 
-			<?php WPOpsec_UI::section( 'Settings', 'admin-generic' ); ?>
+			<?php ShieldCore_UI::section( 'Settings', 'admin-generic' ); ?>
 
 				<?php
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Enabled',
 					function () use ( $enabled ) {
 						?>
@@ -346,7 +346,7 @@ class WPOpsec_Module_Login_Guard {
 					}
 				);
 
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Threshold',
 					function () use ( $max_fails, $window_min ) {
 						?>
@@ -359,7 +359,7 @@ class WPOpsec_Module_Login_Guard {
 					'A successful login clears the counter for that IP, so a few typos before getting in do not leave someone one mistake from a lockout.'
 				);
 
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Lockout length',
 					function () use ( $lockout_min ) {
 						?>
@@ -368,7 +368,7 @@ class WPOpsec_Module_Login_Guard {
 					}
 				);
 
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'On lockout',
 					function () use ( $escalate ) {
 						?>
@@ -378,7 +378,7 @@ class WPOpsec_Module_Login_Guard {
 					'Blocks them at the early gate for the lockout duration, before WordPress loads — cheaper than serving the login page to a bot.'
 				);
 
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Login errors',
 					function () use ( $generic ) {
 						?>
@@ -388,7 +388,7 @@ class WPOpsec_Module_Login_Guard {
 					'WordPress by default says whether the <em>username</em> exists, which confirms valid accounts to an attacker for free.'
 				);
 
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Maintenance',
 					function () {
 						?>
@@ -398,11 +398,11 @@ class WPOpsec_Module_Login_Guard {
 				);
 				?>
 
-			<?php WPOpsec_UI::section_end(); ?>
+			<?php ShieldCore_UI::section_end(); ?>
 
 			<?php submit_button( 'Save settings' ); ?>
 		</form>
 		<?php
-		WPOpsec_UI::close();
+		ShieldCore_UI::close();
 	}
 }

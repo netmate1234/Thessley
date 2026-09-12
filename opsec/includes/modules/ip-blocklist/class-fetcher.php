@@ -7,7 +7,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Pulls known-bad IP ranges from public reputation lists and normalizes
  * them to a flat list of [start, end] IPv4 integer ranges.
  */
-class WPOpsec_IP_Blocklist_Fetcher {
+class ShieldCore_IP_Blocklist_Fetcher {
 
 	/**
 	 * Source registry. 'type' selects the parser:
@@ -74,7 +74,7 @@ class WPOpsec_IP_Blocklist_Fetcher {
 
 			$headers = array();
 			if ( 'unwantedip_key' === ( $source['auth'] ?? '' ) ) {
-				$key = trim( (string) get_option( 'wpopsec_unwantedip_api_key', '' ) );
+				$key = trim( (string) get_option( 'shieldcore_unwantedip_api_key', '' ) );
 				if ( '' === $key ) {
 					continue; // not set up yet — not a fetch failure, just nothing to fetch with
 				}
@@ -114,7 +114,7 @@ class WPOpsec_IP_Blocklist_Fetcher {
 			$url,
 			array(
 				'timeout'    => 30,
-				'user-agent' => 'wp-opsec/' . WPOPSEC_VERSION,
+				'user-agent' => 'wp-shieldcore/' . SHIELDCORE_VERSION,
 				'headers'    => $headers,
 			)
 		);

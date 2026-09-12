@@ -16,9 +16,9 @@ if ( ! defined( 'ABSPATH' ) ) {
  * separate from blanket auto-updates: some sites can't take unattended
  * feature updates, but almost every site wants the security ones.
  */
-class WPOpsec_Module_Auto_Update {
+class ShieldCore_Module_Auto_Update {
 
-	const CRON_HOOK = 'wpopsec_auto_update_sweep';
+	const CRON_HOOK = 'shieldcore_auto_update_sweep';
 
 	public static function activate() {
 		if ( ! wp_next_scheduled( self::CRON_HOOK ) ) {
@@ -31,7 +31,7 @@ class WPOpsec_Module_Auto_Update {
 	}
 
 	public static function register() {
-		add_action( 'admin_post_wpopsec_au_save_settings', array( __CLASS__, 'handle_save_settings' ) );
+		add_action( 'admin_post_shieldcore_au_save_settings', array( __CLASS__, 'handle_save_settings' ) );
 		add_action( self::CRON_HOOK, array( __CLASS__, 'sweep' ) );
 
 		add_filter( 'allow_major_auto_core_updates', array( __CLASS__, 'allow_major_core' ), 20 );
@@ -47,12 +47,12 @@ class WPOpsec_Module_Auto_Update {
 	}
 
 	public static function allow_minor_core( $enabled ) {
-		$mode = get_option( 'wpopsec_auto_update_core', 'minor' );
+		$mode = get_option( 'shieldcore_auto_update_core', 'minor' );
 		return in_array( $mode, array( 'minor', 'major' ), true ) ? true : $enabled;
 	}
 
 	public static function allow_major_core( $enabled ) {
-		$mode = get_option( 'wpopsec_auto_update_core', 'minor' );
+		$mode = get_option( 'shieldcore_auto_update_core', 'minor' );
 		if ( 'major' === $mode ) {
 			return true;
 		}
@@ -67,7 +67,7 @@ class WPOpsec_Module_Auto_Update {
 	 * @param object    $item
 	 */
 	public static function filter_plugin( $update, $item ) {
-		$mode = get_option( 'wpopsec_auto_update_plugins', 'flagged' );
+		$mode = get_option( 'shieldcore_auto_update_plugins', 'flagged' );
 		$file = $item->plugin ?? '';
 
 		// An explicit exclusion is the one case where overriding WordPress
@@ -91,7 +91,7 @@ class WPOpsec_Module_Auto_Update {
 	}
 
 	public static function filter_theme( $update, $item ) {
-		$mode = get_option( 'wpopsec_auto_update_themes', 'off' );
+		$mode = get_option( 'shieldcore_auto_update_themes', 'off' );
 		if ( 'all' === $mode ) {
 			return true;
 		}
@@ -99,7 +99,7 @@ class WPOpsec_Module_Auto_Update {
 	}
 
 	private static function is_excluded( $plugin_file ) {
-		$excluded = (array) get_option( 'wpopsec_auto_update_exclude', array() );
+		$excluded = (array) get_option( 'shieldcore_auto_update_exclude', array() );
 		return in_array( $plugin_file, $excluded, true );
 	}
 
@@ -109,7 +109,7 @@ class WPOpsec_Module_Auto_Update {
 	 * there's no newer release to install, so it can't be auto-resolved.
 	 */
 	private static function is_flagged_by_scanner( $plugin_file ) {
-		$last = get_option( 'wpopsec_vuln_last_result', array() );
+		$last = get_option( 'shieldcore_vuln_last_result', array() );
 		if ( empty( $last['findings'] ) ) {
 			return false;
 		}
@@ -134,14 +134,14 @@ class WPOpsec_Module_Auto_Update {
 	 * current information rather than a stale scan.
 	 */
 	public static function sweep() {
-		if ( 'off' === get_option( 'wpopsec_auto_update_plugins', 'flagged' )
-			&& 'off' === get_option( 'wpopsec_auto_update_core', 'minor' )
-			&& 'off' === get_option( 'wpopsec_auto_update_themes', 'off' ) ) {
+		if ( 'off' === get_option( 'shieldcore_auto_update_plugins', 'flagged' )
+			&& 'off' === get_option( 'shieldcore_auto_update_core', 'minor' )
+			&& 'off' === get_option( 'shieldcore_auto_update_themes', 'off' ) ) {
 			return;
 		}
 
-		if ( class_exists( 'WPOpsec_Module_Vuln_Scanner' ) && 'flagged' === get_option( 'wpopsec_auto_update_plugins', 'flagged' ) ) {
-			WPOpsec_Module_Vuln_Scanner::run_scan();
+		if ( class_exists( 'ShieldCore_Module_Vuln_Scanner' ) && 'flagged' === get_option( 'shieldcore_auto_update_plugins', 'flagged' ) ) {
+			ShieldCore_Module_Vuln_Scanner::run_scan();
 		}
 
 		require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
@@ -152,7 +152,7 @@ class WPOpsec_Module_Auto_Update {
 
 		$upgrader = new WP_Automatic_Updater();
 		if ( $upgrader->is_disabled() ) {
-			wpopsec_log_event( 'auto-update', 'updater_disabled', 'noted', 'AUTOMATIC_UPDATER_DISABLED or DISALLOW_FILE_MODS is set' );
+			shieldcore_log_event( 'auto-update', 'updater_disabled', 'noted', 'AUTOMATIC_UPDATER_DISABLED or DISALLOW_FILE_MODS is set' );
 			return;
 		}
 
@@ -168,7 +168,7 @@ class WPOpsec_Module_Auto_Update {
 				$name    = $item->name ?? ( $item->item->slug ?? 'unknown' );
 				$success = ! empty( $item->result ) && ! is_wp_error( $item->result );
 
-				wpopsec_log_event(
+				shieldcore_log_event(
 					'auto-update',
 					$success ? 'updated' : 'update_failed',
 					'noted',
@@ -180,23 +180,23 @@ class WPOpsec_Module_Auto_Update {
 
 
 	public static function handle_save_settings() {
-		check_admin_referer( 'wpopsec_au_save_settings' );
+		check_admin_referer( 'shieldcore_au_save_settings' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
 
 		$core = sanitize_text_field( wp_unslash( $_POST['core'] ?? 'minor' ) );
-		update_option( 'wpopsec_auto_update_core', in_array( $core, array( 'off', 'minor', 'major' ), true ) ? $core : 'minor' );
+		update_option( 'shieldcore_auto_update_core', in_array( $core, array( 'off', 'minor', 'major' ), true ) ? $core : 'minor' );
 
 		$plugins = sanitize_text_field( wp_unslash( $_POST['plugins'] ?? 'flagged' ) );
-		update_option( 'wpopsec_auto_update_plugins', in_array( $plugins, array( 'off', 'flagged', 'all' ), true ) ? $plugins : 'flagged' );
+		update_option( 'shieldcore_auto_update_plugins', in_array( $plugins, array( 'off', 'flagged', 'all' ), true ) ? $plugins : 'flagged' );
 
 		$themes = sanitize_text_field( wp_unslash( $_POST['themes'] ?? 'off' ) );
-		update_option( 'wpopsec_auto_update_themes', in_array( $themes, array( 'off', 'all' ), true ) ? $themes : 'off' );
+		update_option( 'shieldcore_auto_update_themes', in_array( $themes, array( 'off', 'all' ), true ) ? $themes : 'off' );
 
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized on the very next line via array_map( 'sanitize_text_field', ... ) before it's ever stored.
 		$exclude = isset( $_POST['exclude'] ) ? (array) wp_unslash( $_POST['exclude'] ) : array();
-		update_option( 'wpopsec_auto_update_exclude', array_map( 'sanitize_text_field', $exclude ) );
+		update_option( 'shieldcore_auto_update_exclude', array_map( 'sanitize_text_field', $exclude ) );
 
 		wp_safe_redirect( add_query_arg( 'saved', '1', wp_get_referer() ) );
 		exit;
@@ -207,12 +207,12 @@ class WPOpsec_Module_Auto_Update {
 			require_once ABSPATH . 'wp-admin/includes/plugin.php';
 		}
 
-		$core    = get_option( 'wpopsec_auto_update_core', 'minor' );
-		$plugins = get_option( 'wpopsec_auto_update_plugins', 'flagged' );
-		$themes  = get_option( 'wpopsec_auto_update_themes', 'off' );
-		$exclude = (array) get_option( 'wpopsec_auto_update_exclude', array() );
+		$core    = get_option( 'shieldcore_auto_update_core', 'minor' );
+		$plugins = get_option( 'shieldcore_auto_update_plugins', 'flagged' );
+		$themes  = get_option( 'shieldcore_auto_update_themes', 'off' );
+		$exclude = (array) get_option( 'shieldcore_auto_update_exclude', array() );
 
-		$scan       = get_option( 'wpopsec_vuln_last_result', array() );
+		$scan       = get_option( 'shieldcore_vuln_last_result', array() );
 		$flagged_ct = 0;
 		foreach ( (array) ( $scan['findings'] ?? array() ) as $f ) {
 			foreach ( $f['issues'] as $i ) {
@@ -226,15 +226,15 @@ class WPOpsec_Module_Auto_Update {
 		$blocked = defined( 'AUTOMATIC_UPDATER_DISABLED' ) && AUTOMATIC_UPDATER_DISABLED;
 		$no_mods = defined( 'DISALLOW_FILE_MODS' ) && DISALLOW_FILE_MODS;
 
-		WPOpsec_UI::open( 'auto-update' );
+		ShieldCore_UI::open( 'auto-update' );
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only "settings saved" notice flag, not a state-changing action.
 		if ( isset( $_GET['saved'] ) ) {
-			WPOpsec_UI::notice( 'success', 'Settings saved.' );
+			ShieldCore_UI::notice( 'success', 'Settings saved.' );
 		}
 
 		if ( $blocked || $no_mods ) {
-			WPOpsec_UI::notice(
+			ShieldCore_UI::notice(
 				'error',
 				'<p><strong>Automatic updates are disabled at the wp-config level</strong> ('
 					. esc_html( $blocked ? 'AUTOMATIC_UPDATER_DISABLED' : 'DISALLOW_FILE_MODS' )
@@ -243,7 +243,7 @@ class WPOpsec_Module_Auto_Update {
 			);
 		}
 
-		WPOpsec_UI::tiles(
+		ShieldCore_UI::tiles(
 			array(
 				array(
 					'icon'  => 'update',
@@ -268,16 +268,16 @@ class WPOpsec_Module_Auto_Update {
 		?>
 
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-			<?php wp_nonce_field( 'wpopsec_au_save_settings' ); ?>
-			<input type="hidden" name="action" value="wpopsec_au_save_settings">
+			<?php wp_nonce_field( 'shieldcore_au_save_settings' ); ?>
+			<input type="hidden" name="action" value="shieldcore_au_save_settings">
 
-			<?php WPOpsec_UI::section( 'What to update automatically', 'update' ); ?>
+			<?php ShieldCore_UI::section( 'What to update automatically', 'update' ); ?>
 				<?php
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'WordPress core',
 					function () use ( $core ) {
 						?>
-						<label><input type="radio" name="core" value="minor" <?php checked( $core, 'minor' ); ?>> Security &amp; maintenance releases only <?php WPOpsec_UI::badge( 'recommended', 'good' ); ?></label>
+						<label><input type="radio" name="core" value="minor" <?php checked( $core, 'minor' ); ?>> Security &amp; maintenance releases only <?php ShieldCore_UI::badge( 'recommended', 'good' ); ?></label>
 						<label><input type="radio" name="core" value="major" <?php checked( $core, 'major' ); ?>> All releases, including major versions</label>
 						<label><input type="radio" name="core" value="off" <?php checked( $core, 'off' ); ?>> Off</label>
 						<?php
@@ -285,15 +285,15 @@ class WPOpsec_Module_Auto_Update {
 					'Minor releases are where core security fixes ship, and they are deliberately low-risk. Major releases can change editor behaviour.'
 				);
 
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Plugins',
 					function () use ( $plugins, $scan, $flagged_ct ) {
 						?>
 						<label>
 							<input type="radio" name="plugins" value="flagged" <?php checked( $plugins, 'flagged' ); ?>>
-							Only plugins the vulnerability scan flagged <?php WPOpsec_UI::badge( 'recommended', 'good' ); ?>
+							Only plugins the vulnerability scan flagged <?php ShieldCore_UI::badge( 'recommended', 'good' ); ?>
 							<?php if ( $scan ) : ?>
-								<span class="wpopsec-muted">— currently <?php echo esc_html( $flagged_ct ); ?></span>
+								<span class="shieldcore-muted">— currently <?php echo esc_html( $flagged_ct ); ?></span>
 							<?php endif; ?>
 						</label>
 						<label><input type="radio" name="plugins" value="all" <?php checked( $plugins, 'all' ); ?>> All plugins</label>
@@ -303,7 +303,7 @@ class WPOpsec_Module_Auto_Update {
 					'91% of WordPress vulnerabilities are in plugins, so this is the setting that matters most. "Flagged" re-runs the scan before each sweep so it acts on current data. These settings only ever <em>add</em> to what you have already enabled per-plugin on the Plugins screen — the exclusion list below is the only thing that turns an auto-update off.'
 				);
 
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Themes',
 					function () use ( $themes ) {
 						?>
@@ -314,24 +314,24 @@ class WPOpsec_Module_Auto_Update {
 					'Leave off if you have customised a theme directly instead of using a child theme — an update would overwrite your changes.'
 				);
 				?>
-			<?php WPOpsec_UI::section_end(); ?>
+			<?php ShieldCore_UI::section_end(); ?>
 
-			<?php WPOpsec_UI::section( 'Never auto-update', 'dismiss', sprintf( '%d excluded', count( $exclude ) ) ); ?>
-				<div class="wpopsec-scroll">
+			<?php ShieldCore_UI::section( 'Never auto-update', 'dismiss', sprintf( '%d excluded', count( $exclude ) ) ); ?>
+				<div class="shieldcore-scroll">
 					<?php foreach ( get_plugins() as $file => $data ) : ?>
 						<label>
 							<input type="checkbox" name="exclude[]" value="<?php echo esc_attr( $file ); ?>" <?php checked( in_array( $file, $exclude, true ) ); ?>>
 							<?php echo esc_html( $data['Name'] ); ?>
-							<span class="wpopsec-muted">v<?php echo esc_html( $data['Version'] ); ?></span>
+							<span class="shieldcore-muted">v<?php echo esc_html( $data['Version'] ); ?></span>
 						</label>
 					<?php endforeach; ?>
 				</div>
-				<p class="wpopsec-help">For plugins that are customised, licence-locked, or that you update by hand.</p>
-			<?php WPOpsec_UI::section_end(); ?>
+				<p class="shieldcore-help">For plugins that are customised, licence-locked, or that you update by hand.</p>
+			<?php ShieldCore_UI::section_end(); ?>
 
 			<?php submit_button( 'Save settings' ); ?>
 		</form>
 		<?php
-		WPOpsec_UI::close();
+		ShieldCore_UI::close();
 	}
 }

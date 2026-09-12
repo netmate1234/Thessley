@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Read-only log of verified good-bot visits — a separate table from the
  * main Event Log by design, not a filtered view of it: every row here is
- * written directly from wpopsec_ip_is_trusted() itself (mu-loader), at
+ * written directly from shieldcore_ip_is_trusted() itself (mu-loader), at
  * the exact moment a request's IP matches a crawler-nets.conf section, not
  * from any check.php gating a request. It never blocks anything and has
  * no enforcement mode — this module only owns the table and the admin view.
@@ -18,9 +18,9 @@ if ( ! defined( 'ABSPATH' ) ) {
  * IP spoofing the same bot's user-agent — is answered by cross-checking
  * the main Event Log at render time, not by anything tracked here.
  */
-class WPOpsec_Module_Bot_Log {
+class ShieldCore_Module_Bot_Log {
 
-	const CRON_HOOK      = 'wpopsec_bot_log_prune';
+	const CRON_HOOK      = 'shieldcore_bot_log_prune';
 	const DB_VERSION     = 1;
 	const PER_PAGE       = 50;
 	const DEFAULT_RETAIN = 14; // days — shorter than the main Event Log's 30, since a single crawler can generate far more rows per day than actual security events do
@@ -42,8 +42,8 @@ class WPOpsec_Module_Bot_Log {
 		self::maybe_upgrade_table();
 
 		add_action( self::CRON_HOOK, array( __CLASS__, 'prune' ) );
-		add_action( 'admin_post_wpopsec_bl_save_settings', array( __CLASS__, 'handle_save_settings' ) );
-		add_action( 'admin_post_wpopsec_bl_clear', array( __CLASS__, 'handle_clear' ) );
+		add_action( 'admin_post_shieldcore_bl_save_settings', array( __CLASS__, 'handle_save_settings' ) );
+		add_action( 'admin_post_shieldcore_bl_clear', array( __CLASS__, 'handle_clear' ) );
 
 		return __CLASS__;
 	}
@@ -51,7 +51,7 @@ class WPOpsec_Module_Bot_Log {
 	public static function install_table() {
 		global $wpdb;
 
-		$table   = wpopsec_bot_log_table();
+		$table   = shieldcore_bot_log_table();
 		$collate = $wpdb->get_charset_collate();
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
@@ -70,11 +70,11 @@ class WPOpsec_Module_Bot_Log {
 			) {$collate};"
 		);
 
-		update_option( 'wpopsec_bot_log_db_version', self::DB_VERSION, false );
+		update_option( 'shieldcore_bot_log_db_version', self::DB_VERSION, false );
 	}
 
 	private static function maybe_upgrade_table() {
-		if ( (int) get_option( 'wpopsec_bot_log_db_version', 0 ) !== self::DB_VERSION ) {
+		if ( (int) get_option( 'shieldcore_bot_log_db_version', 0 ) !== self::DB_VERSION ) {
 			self::install_table();
 		}
 	}
@@ -82,8 +82,8 @@ class WPOpsec_Module_Bot_Log {
 	public static function prune() {
 		global $wpdb;
 
-		$days  = max( 1, (int) get_option( 'wpopsec_bot_log_retain_days', self::DEFAULT_RETAIN ) );
-		$table = wpopsec_bot_log_table();
+		$days  = max( 1, (int) get_option( 'shieldcore_bot_log_retain_days', self::DEFAULT_RETAIN ) );
+		$table = shieldcore_bot_log_table();
 
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- table name only, built from $wpdb->prefix, no user input; the actual value ($days) is bound via the %d placeholder above.
 		$wpdb->query(
@@ -96,27 +96,27 @@ class WPOpsec_Module_Bot_Log {
 	}
 
 	public static function handle_save_settings() {
-		check_admin_referer( 'wpopsec_bl_save_settings' );
+		check_admin_referer( 'shieldcore_bl_save_settings' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
 
 		$days = isset( $_POST['retain_days'] ) ? max( 1, (int) $_POST['retain_days'] ) : self::DEFAULT_RETAIN;
-		update_option( 'wpopsec_bot_log_retain_days', $days );
+		update_option( 'shieldcore_bot_log_retain_days', $days );
 
 		wp_safe_redirect( add_query_arg( 'saved', '1', wp_get_referer() ) );
 		exit;
 	}
 
 	public static function handle_clear() {
-		check_admin_referer( 'wpopsec_bl_clear' );
+		check_admin_referer( 'shieldcore_bl_clear' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
 
 		global $wpdb;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- table name only, built from $wpdb->prefix, no user input; identifiers can't be bound via $wpdb->prepare() placeholders.
-		$wpdb->query( 'TRUNCATE TABLE ' . wpopsec_bot_log_table() );
+		$wpdb->query( 'TRUNCATE TABLE ' . shieldcore_bot_log_table() );
 
 		wp_safe_redirect( add_query_arg( 'cleared', '1', wp_get_referer() ) );
 		exit;
@@ -126,7 +126,7 @@ class WPOpsec_Module_Bot_Log {
 	private static function query_sightings( $filters, $page ) {
 		global $wpdb;
 
-		$table  = wpopsec_bot_log_table();
+		$table  = shieldcore_bot_log_table();
 		$where  = array( '1=1' );
 		$params = array();
 
@@ -171,7 +171,7 @@ class WPOpsec_Module_Bot_Log {
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- table name has no user input; {$in} is a string of bare %s placeholders (one per IP), never actual IP data -- the real values are bound below via $ips, the standard way to build a dynamic IN() clause with $wpdb->prepare().
 		$rows = $wpdb->get_col(
 			$wpdb->prepare(
-				"SELECT DISTINCT ip FROM " . wpopsec_events_table() . " WHERE action = 'blocked' AND ip IN ({$in})",
+				"SELECT DISTINCT ip FROM " . shieldcore_events_table() . " WHERE action = 'blocked' AND ip IN ({$in})",
 				$ips
 			)
 		);
@@ -192,11 +192,11 @@ class WPOpsec_Module_Bot_Log {
 		$page = isset( $_GET['paged'] ) ? max( 1, (int) $_GET['paged'] ) : 1;
 
 		$result = self::query_sightings( $filters, $page );
-		$table  = wpopsec_bot_log_table();
+		$table  = shieldcore_bot_log_table();
 
-		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $table is wpopsec_bot_log_table() (no user input, identifiers can't use $wpdb->prepare() placeholders); these are fixed summary tiles, not worth an object-cache group for.
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $table is shieldcore_bot_log_table() (no user input, identifiers can't use $wpdb->prepare() placeholders); these are fixed summary tiles, not worth an object-cache group for.
 		$bot_names = $wpdb->get_col( "SELECT DISTINCT bot_name FROM {$table} ORDER BY bot_name" ) ?: array();
-		$retain    = (int) get_option( 'wpopsec_bot_log_retain_days', self::DEFAULT_RETAIN );
+		$retain    = (int) get_option( 'shieldcore_bot_log_retain_days', self::DEFAULT_RETAIN );
 
 		$last24    = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE created_at > DATE_SUB(NOW(), INTERVAL 1 DAY)" );
 		$distinct24 = (int) $wpdb->get_var( "SELECT COUNT(DISTINCT bot_name) FROM {$table} WHERE created_at > DATE_SUB(NOW(), INTERVAL 1 DAY)" );
@@ -206,18 +206,18 @@ class WPOpsec_Module_Bot_Log {
 		$row_ips        = wp_list_pluck( $result['rows'], 'ip' );
 		$blocked_ip_set = self::blocked_elsewhere( $row_ips );
 
-		WPOpsec_UI::open( 'bot-log' );
+		ShieldCore_UI::open( 'bot-log' );
 
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only result flags set only by this module's own admin-post redirects, which already check_admin_referer() before redirecting.
 		if ( isset( $_GET['saved'] ) ) {
-			WPOpsec_UI::notice( 'success', 'Settings saved.' );
+			ShieldCore_UI::notice( 'success', 'Settings saved.' );
 		}
 		if ( isset( $_GET['cleared'] ) ) {
-			WPOpsec_UI::notice( 'success', 'Bot log cleared.' );
+			ShieldCore_UI::notice( 'success', 'Bot log cleared.' );
 		}
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
-		WPOpsec_UI::tiles(
+		ShieldCore_UI::tiles(
 			array(
 				array( 'icon' => 'networking', 'tone' => 'quiet', 'value' => number_format_i18n( $result['total'] ), 'label' => 'sightings stored' ),
 				array( 'icon' => 'clock', 'tone' => 'quiet', 'value' => number_format_i18n( $last24 ), 'label' => 'in the last 24h' ),
@@ -231,10 +231,10 @@ class WPOpsec_Module_Bot_Log {
 			)
 		);
 
-		WPOpsec_UI::section( 'Sightings', 'networking', sprintf( '%s matching', number_format_i18n( $result['total'] ) ) );
+		ShieldCore_UI::section( 'Sightings', 'networking', sprintf( '%s matching', number_format_i18n( $result['total'] ) ) );
 		?>
-		<form method="get" class="wpopsec-actions" style="margin-bottom:14px">
-			<?php wp_parse_str( WPOpsec_Menu_Router::query( 'bot-log' ), $route ); ?>
+		<form method="get" class="shieldcore-actions" style="margin-bottom:14px">
+			<?php wp_parse_str( ShieldCore_Menu_Router::query( 'bot-log' ), $route ); ?>
 			<?php foreach ( $route as $k => $v ) : ?>
 				<input type="hidden" name="<?php echo esc_attr( $k ); ?>" value="<?php echo esc_attr( $v ); ?>">
 			<?php endforeach; ?>
@@ -248,7 +248,7 @@ class WPOpsec_Module_Bot_Log {
 			<?php submit_button( 'Filter', 'secondary', 'submit', false ); ?>
 		</form>
 
-		<table class="wpopsec-table">
+		<table class="shieldcore-table">
 			<thead>
 				<tr>
 					<th style="width:130px">Time</th>
@@ -260,23 +260,23 @@ class WPOpsec_Module_Bot_Log {
 			</thead>
 			<tbody>
 			<?php if ( empty( $result['rows'] ) ) : ?>
-				<tr><td colspan="5"><div class="wpopsec-empty"><span class="dashicons dashicons-networking"></span><p>No bot visits recorded yet.</p></div></td></tr>
+				<tr><td colspan="5"><div class="shieldcore-empty"><span class="dashicons dashicons-networking"></span><p>No bot visits recorded yet.</p></div></td></tr>
 			<?php else : ?>
 				<?php foreach ( $result['rows'] as $row ) : ?>
 					<tr>
-						<td class="wpopsec-nowrap"><?php echo esc_html( mysql2date( 'M j, H:i', $row->created_at ) ); ?></td>
+						<td class="shieldcore-nowrap"><?php echo esc_html( mysql2date( 'M j, H:i', $row->created_at ) ); ?></td>
 						<td><?php echo esc_html( $row->bot_name ); ?></td>
-						<td><code class="wpopsec-nowrap"><?php echo esc_html( $row->ip ); ?></code></td>
+						<td><code class="shieldcore-nowrap"><?php echo esc_html( $row->ip ); ?></code></td>
 						<td>
 							<?php if ( isset( $blocked_ip_set[ $row->ip ] ) ) : ?>
-								<a href="<?php echo esc_url( WPOpsec_Menu_Router::url( 'event-log', array( 'f_ip' => $row->ip ) ) ); ?>">
-									<?php WPOpsec_UI::badge( 'yes, elsewhere', 'bad' ); ?>
+								<a href="<?php echo esc_url( ShieldCore_Menu_Router::url( 'event-log', array( 'f_ip' => $row->ip ) ) ); ?>">
+									<?php ShieldCore_UI::badge( 'yes, elsewhere', 'bad' ); ?>
 								</a>
 							<?php else : ?>
-								<?php WPOpsec_UI::badge( 'no', 'good' ); ?>
+								<?php ShieldCore_UI::badge( 'no', 'good' ); ?>
 							<?php endif; ?>
 						</td>
-						<td class="wpopsec-muted"><code style="font-size:11px"><?php echo esc_html( $row->uri ); ?></code></td>
+						<td class="shieldcore-muted"><code style="font-size:11px"><?php echo esc_html( $row->uri ); ?></code></td>
 					</tr>
 				<?php endforeach; ?>
 			<?php endif; ?>
@@ -300,16 +300,16 @@ class WPOpsec_Module_Bot_Log {
 			echo '</div></div>';
 		}
 
-		WPOpsec_UI::section_end();
+		ShieldCore_UI::section_end();
 		?>
 
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-			<?php wp_nonce_field( 'wpopsec_bl_save_settings' ); ?>
-			<input type="hidden" name="action" value="wpopsec_bl_save_settings">
+			<?php wp_nonce_field( 'shieldcore_bl_save_settings' ); ?>
+			<input type="hidden" name="action" value="shieldcore_bl_save_settings">
 
-			<?php WPOpsec_UI::section( 'Settings', 'admin-generic' ); ?>
+			<?php ShieldCore_UI::section( 'Settings', 'admin-generic' ); ?>
 				<?php
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Retention',
 					function () use ( $retain ) {
 						?>
@@ -319,20 +319,20 @@ class WPOpsec_Module_Bot_Log {
 					'A single crawler can generate far more rows per day than actual security events do, so this defaults shorter than the Event Log.'
 				);
 				?>
-			<?php WPOpsec_UI::section_end(); ?>
+			<?php ShieldCore_UI::section_end(); ?>
 
 			<?php submit_button( 'Save settings' ); ?>
 		</form>
 
-		<div class="wpopsec-actions" style="margin-top:14px">
+		<div class="shieldcore-actions" style="margin-top:14px">
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"
 				onsubmit="return confirm('Delete all recorded bot sightings? This cannot be undone.');">
-				<?php wp_nonce_field( 'wpopsec_bl_clear' ); ?>
-				<input type="hidden" name="action" value="wpopsec_bl_clear">
+				<?php wp_nonce_field( 'shieldcore_bl_clear' ); ?>
+				<input type="hidden" name="action" value="shieldcore_bl_clear">
 				<?php submit_button( 'Clear bot log', 'delete', 'submit', false ); ?>
 			</form>
 		</div>
 		<?php
-		WPOpsec_UI::close();
+		ShieldCore_UI::close();
 	}
 }

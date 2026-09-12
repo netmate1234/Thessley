@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * translated to the same indices at save time — the early-gate check never
  * has to convert a byte back into a string, it just compares integers.
  */
-class WPOpsec_Geo_Country_Codes {
+class ShieldCore_Geo_Country_Codes {
 
 	public static function all() {
 		static $codes = null;

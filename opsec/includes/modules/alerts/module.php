@@ -6,14 +6,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Real-time notification (Telegram and/or email) for high-severity events.
  *
- * The actual send calls (wpopsec_maybe_telegram_alert(),
- * wpopsec_maybe_email_alert()) live in the mu-loader, not here — they have
- * to run inline inside wpopsec_log_event() itself, because a real block
+ * The actual send calls (shieldcore_maybe_telegram_alert(),
+ * shieldcore_maybe_email_alert()) live in the mu-loader, not here — they have
+ * to run inline inside shieldcore_log_event() itself, because a real block
  * calls wp_die() immediately afterwards at mu-plugin time, before regular
  * plugins (this module included) have even loaded. This module is just the
  * admin UI and settings around that.
  */
-class WPOpsec_Module_Alerts {
+class ShieldCore_Module_Alerts {
 
 	const API = 'https://api.telegram.org/bot';
 
@@ -21,10 +21,10 @@ class WPOpsec_Module_Alerts {
 	public static function deactivate() {}
 
 	public static function register() {
-		add_action( 'admin_post_wpopsec_alerts_save_settings', array( __CLASS__, 'handle_save_settings' ) );
-		add_action( 'admin_post_wpopsec_tg_test', array( __CLASS__, 'handle_tg_test' ) );
-		add_action( 'admin_post_wpopsec_tg_detect_chat', array( __CLASS__, 'handle_detect_chat' ) );
-		add_action( 'admin_post_wpopsec_email_test', array( __CLASS__, 'handle_email_test' ) );
+		add_action( 'admin_post_shieldcore_alerts_save_settings', array( __CLASS__, 'handle_save_settings' ) );
+		add_action( 'admin_post_shieldcore_tg_test', array( __CLASS__, 'handle_tg_test' ) );
+		add_action( 'admin_post_shieldcore_tg_detect_chat', array( __CLASS__, 'handle_detect_chat' ) );
+		add_action( 'admin_post_shieldcore_email_test', array( __CLASS__, 'handle_email_test' ) );
 
 		return __CLASS__;
 	}
@@ -48,42 +48,42 @@ class WPOpsec_Module_Alerts {
 	}
 
 	public static function handle_save_settings() {
-		check_admin_referer( 'wpopsec_alerts_save_settings' );
+		check_admin_referer( 'shieldcore_alerts_save_settings' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
 
-		update_option( 'wpopsec_telegram_enabled', isset( $_POST['tg_enabled'] ) );
+		update_option( 'shieldcore_telegram_enabled', isset( $_POST['tg_enabled'] ) );
 
 		$token = isset( $_POST['bot_token'] ) ? sanitize_text_field( wp_unslash( $_POST['bot_token'] ) ) : '';
-		update_option( 'wpopsec_telegram_bot_token', $token );
+		update_option( 'shieldcore_telegram_bot_token', $token );
 
 		$chat_id = isset( $_POST['chat_id'] ) ? sanitize_text_field( wp_unslash( $_POST['chat_id'] ) ) : '';
-		update_option( 'wpopsec_telegram_chat_id', $chat_id );
+		update_option( 'shieldcore_telegram_chat_id', $chat_id );
 
 		$tg_threshold = isset( $_POST['tg_threshold'] ) ? max( 1, min( 20, (int) $_POST['tg_threshold'] ) ) : 15;
-		update_option( 'wpopsec_telegram_threshold', $tg_threshold );
+		update_option( 'shieldcore_telegram_threshold', $tg_threshold );
 
-		update_option( 'wpopsec_email_enabled', isset( $_POST['email_enabled'] ) );
+		update_option( 'shieldcore_email_enabled', isset( $_POST['email_enabled'] ) );
 
 		$address = isset( $_POST['email_address'] ) ? sanitize_email( wp_unslash( $_POST['email_address'] ) ) : '';
-		update_option( 'wpopsec_email_address', ( '' !== $address && is_email( $address ) ) ? $address : '' );
+		update_option( 'shieldcore_email_address', ( '' !== $address && is_email( $address ) ) ? $address : '' );
 
 		$email_threshold = isset( $_POST['email_threshold'] ) ? max( 1, min( 20, (int) $_POST['email_threshold'] ) ) : 15;
-		update_option( 'wpopsec_email_threshold', $email_threshold );
+		update_option( 'shieldcore_email_threshold', $email_threshold );
 
 		wp_safe_redirect( add_query_arg( 'saved', '1', wp_get_referer() ) );
 		exit;
 	}
 
 	public static function handle_tg_test() {
-		check_admin_referer( 'wpopsec_tg_test' );
+		check_admin_referer( 'shieldcore_tg_test' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
 
-		$token   = trim( (string) get_option( 'wpopsec_telegram_bot_token', '' ) );
-		$chat_id = trim( (string) get_option( 'wpopsec_telegram_chat_id', '' ) );
+		$token   = trim( (string) get_option( 'shieldcore_telegram_bot_token', '' ) );
+		$chat_id = trim( (string) get_option( 'shieldcore_telegram_chat_id', '' ) );
 
 		if ( '' === $token || '' === $chat_id ) {
 			wp_safe_redirect( add_query_arg( 'tg_test', 'missing', wp_get_referer() ) );
@@ -116,12 +116,12 @@ class WPOpsec_Module_Alerts {
 	 * numeric Telegram chat id by hand.
 	 */
 	public static function handle_detect_chat() {
-		check_admin_referer( 'wpopsec_tg_detect_chat' );
+		check_admin_referer( 'shieldcore_tg_detect_chat' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
 
-		$token = trim( (string) get_option( 'wpopsec_telegram_bot_token', '' ) );
+		$token = trim( (string) get_option( 'shieldcore_telegram_bot_token', '' ) );
 		if ( '' === $token ) {
 			wp_safe_redirect( add_query_arg( 'detect', 'missing', wp_get_referer() ) );
 			exit;
@@ -141,20 +141,20 @@ class WPOpsec_Module_Alerts {
 			exit;
 		}
 
-		update_option( 'wpopsec_telegram_chat_id', (string) $chat['id'] );
-		update_option( 'wpopsec_telegram_chat_name', $chat['username'] ?? $chat['first_name'] ?? '', false );
+		update_option( 'shieldcore_telegram_chat_id', (string) $chat['id'] );
+		update_option( 'shieldcore_telegram_chat_name', $chat['username'] ?? $chat['first_name'] ?? '', false );
 
 		wp_safe_redirect( add_query_arg( 'detect', 'ok', wp_get_referer() ) );
 		exit;
 	}
 
 	public static function handle_email_test() {
-		check_admin_referer( 'wpopsec_email_test' );
+		check_admin_referer( 'shieldcore_email_test' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
 
-		$address = trim( (string) get_option( 'wpopsec_email_address', '' ) ) ?: get_option( 'admin_email' );
+		$address = trim( (string) get_option( 'shieldcore_email_address', '' ) ) ?: get_option( 'admin_email' );
 		if ( '' === $address ) {
 			wp_safe_redirect( add_query_arg( 'email_test', 'missing', wp_get_referer() ) );
 			exit;
@@ -173,17 +173,17 @@ class WPOpsec_Module_Alerts {
 	}
 
 	public static function render_page() {
-		$tg_enabled = get_option( 'wpopsec_telegram_enabled', false );
-		$tg_token   = (string) get_option( 'wpopsec_telegram_bot_token', '' );
-		$chat_id    = (string) get_option( 'wpopsec_telegram_chat_id', '' );
-		$chat_name  = (string) get_option( 'wpopsec_telegram_chat_name', '' );
-		$tg_thresh  = (int) get_option( 'wpopsec_telegram_threshold', 15 );
+		$tg_enabled = get_option( 'shieldcore_telegram_enabled', false );
+		$tg_token   = (string) get_option( 'shieldcore_telegram_bot_token', '' );
+		$chat_id    = (string) get_option( 'shieldcore_telegram_chat_id', '' );
+		$chat_name  = (string) get_option( 'shieldcore_telegram_chat_name', '' );
+		$tg_thresh  = (int) get_option( 'shieldcore_telegram_threshold', 15 );
 
-		$em_enabled = get_option( 'wpopsec_email_enabled', false );
-		$em_address = (string) get_option( 'wpopsec_email_address', '' );
-		$em_thresh  = (int) get_option( 'wpopsec_email_threshold', 15 );
+		$em_enabled = get_option( 'shieldcore_email_enabled', false );
+		$em_address = (string) get_option( 'shieldcore_email_address', '' );
+		$em_thresh  = (int) get_option( 'shieldcore_email_threshold', 15 );
 
-		WPOpsec_UI::open( 'alerts' );
+		ShieldCore_UI::open( 'alerts' );
 
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only result flags set only by this module's own admin-post redirects (handle_save_settings/handle_tg_test/handle_detect_chat/handle_email_test), which already check_admin_referer() before redirecting; there is no state change here to protect.
 		$saved      = isset( $_GET['saved'] );
@@ -193,37 +193,37 @@ class WPOpsec_Module_Alerts {
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
 		if ( $saved ) {
-			WPOpsec_UI::notice( 'success', 'Settings saved.' );
+			ShieldCore_UI::notice( 'success', 'Settings saved.' );
 		}
 		if ( '' !== $tg_test ) {
 			if ( 'ok' === $tg_test ) {
-				WPOpsec_UI::notice( 'success', 'Test message sent — check Telegram.' );
+				ShieldCore_UI::notice( 'success', 'Test message sent — check Telegram.' );
 			} elseif ( 'missing' === $tg_test ) {
-				WPOpsec_UI::notice( 'warning', 'Set a bot token and chat ID first.' );
+				ShieldCore_UI::notice( 'warning', 'Set a bot token and chat ID first.' );
 			} else {
-				WPOpsec_UI::notice( 'error', 'Telegram rejected the test message: ' . esc_html( str_replace( 'fail:', '', $tg_test ) ) );
+				ShieldCore_UI::notice( 'error', 'Telegram rejected the test message: ' . esc_html( str_replace( 'fail:', '', $tg_test ) ) );
 			}
 		}
 		if ( '' !== $detect ) {
 			if ( 'ok' === $detect ) {
-				WPOpsec_UI::notice( 'success', 'Chat ID detected and saved.' );
+				ShieldCore_UI::notice( 'success', 'Chat ID detected and saved.' );
 			} elseif ( 'missing' === $detect ) {
-				WPOpsec_UI::notice( 'warning', 'Set a bot token first.' );
+				ShieldCore_UI::notice( 'warning', 'Set a bot token first.' );
 			} else {
-				WPOpsec_UI::notice( 'warning', 'No messages found. Send anything to your bot on Telegram, then try again.' );
+				ShieldCore_UI::notice( 'warning', 'No messages found. Send anything to your bot on Telegram, then try again.' );
 			}
 		}
 		if ( '' !== $email_test ) {
 			if ( 'ok' === $email_test ) {
-				WPOpsec_UI::notice( 'success', 'Test email sent — check your inbox.' );
+				ShieldCore_UI::notice( 'success', 'Test email sent — check your inbox.' );
 			} elseif ( 'missing' === $email_test ) {
-				WPOpsec_UI::notice( 'warning', 'Set a recipient address first (or set a WordPress admin email).' );
+				ShieldCore_UI::notice( 'warning', 'Set a recipient address first (or set a WordPress admin email).' );
 			} else {
-				WPOpsec_UI::notice( 'error', 'WordPress could not send the test email — check the site\'s mail configuration.' );
+				ShieldCore_UI::notice( 'error', 'WordPress could not send the test email — check the site\'s mail configuration.' );
 			}
 		}
 
-		WPOpsec_UI::tiles(
+		ShieldCore_UI::tiles(
 			array(
 				array(
 					'icon'  => $tg_enabled ? 'yes-alt' : 'warning',
@@ -248,12 +248,12 @@ class WPOpsec_Module_Alerts {
 
 		?>
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-			<?php wp_nonce_field( 'wpopsec_alerts_save_settings' ); ?>
-			<input type="hidden" name="action" value="wpopsec_alerts_save_settings">
+			<?php wp_nonce_field( 'shieldcore_alerts_save_settings' ); ?>
+			<input type="hidden" name="action" value="shieldcore_alerts_save_settings">
 
-			<?php WPOpsec_UI::section( 'Telegram', 'testimonial' ); ?>
+			<?php ShieldCore_UI::section( 'Telegram', 'testimonial' ); ?>
 				<?php
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Enabled',
 					function () use ( $tg_enabled ) {
 						?>
@@ -262,7 +262,7 @@ class WPOpsec_Module_Alerts {
 					}
 				);
 
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Bot token',
 					function () use ( $tg_token ) {
 						?>
@@ -272,7 +272,7 @@ class WPOpsec_Module_Alerts {
 					'From <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a> on Telegram — message it <code>/newbot</code> to create one.'
 				);
 
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Chat ID',
 					function () use ( $chat_id ) {
 						?>
@@ -282,7 +282,7 @@ class WPOpsec_Module_Alerts {
 					'Send any message to your bot on Telegram first, then use "Detect chat ID" below rather than finding this number by hand.'
 				);
 
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Threshold',
 					function () use ( $tg_thresh ) {
 						?>
@@ -292,11 +292,11 @@ class WPOpsec_Module_Alerts {
 					'18+ means something already happened (a core file changed, a rogue admin account); 14&ndash;17 is a serious exploitation attempt that was stopped. The Event Log records everything regardless of this setting — this only controls what interrupts you in real time.'
 				);
 				?>
-			<?php WPOpsec_UI::section_end(); ?>
+			<?php ShieldCore_UI::section_end(); ?>
 
-			<?php WPOpsec_UI::section( 'Email', 'email-alt' ); ?>
+			<?php ShieldCore_UI::section( 'Email', 'email-alt' ); ?>
 				<?php
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Enabled',
 					function () use ( $em_enabled ) {
 						?>
@@ -305,7 +305,7 @@ class WPOpsec_Module_Alerts {
 					}
 				);
 
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Recipient',
 					function () use ( $em_address ) {
 						?>
@@ -315,7 +315,7 @@ class WPOpsec_Module_Alerts {
 					'Leave blank to use this site\'s WordPress admin email. Sent via WordPress\'s own mail function — deliverability depends on the site\'s mail setup, same as any other WordPress notification.'
 				);
 
-				WPOpsec_UI::row(
+				ShieldCore_UI::row(
 					'Threshold',
 					function () use ( $em_thresh ) {
 						?>
@@ -325,29 +325,29 @@ class WPOpsec_Module_Alerts {
 					'Independent from the Telegram threshold above — email is often the noisier channel to have around, so many sites set this higher and keep Telegram for everything.'
 				);
 				?>
-			<?php WPOpsec_UI::section_end(); ?>
+			<?php ShieldCore_UI::section_end(); ?>
 
 			<?php submit_button( 'Save settings' ); ?>
 		</form>
 
-		<div class="wpopsec-actions" style="margin-top:14px">
+		<div class="shieldcore-actions" style="margin-top:14px">
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( 'wpopsec_tg_detect_chat' ); ?>
-				<input type="hidden" name="action" value="wpopsec_tg_detect_chat">
+				<?php wp_nonce_field( 'shieldcore_tg_detect_chat' ); ?>
+				<input type="hidden" name="action" value="shieldcore_tg_detect_chat">
 				<?php submit_button( 'Detect chat ID', 'secondary', 'submit', false ); ?>
 			</form>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( 'wpopsec_tg_test' ); ?>
-				<input type="hidden" name="action" value="wpopsec_tg_test">
+				<?php wp_nonce_field( 'shieldcore_tg_test' ); ?>
+				<input type="hidden" name="action" value="shieldcore_tg_test">
 				<?php submit_button( 'Send test message', 'secondary', 'submit', false ); ?>
 			</form>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( 'wpopsec_email_test' ); ?>
-				<input type="hidden" name="action" value="wpopsec_email_test">
+				<?php wp_nonce_field( 'shieldcore_email_test' ); ?>
+				<input type="hidden" name="action" value="shieldcore_email_test">
 				<?php submit_button( 'Send test email', 'secondary', 'submit', false ); ?>
 			</form>
 		</div>
 		<?php
-		WPOpsec_UI::close();
+		ShieldCore_UI::close();
 	}
 }
