@@ -150,8 +150,8 @@ class WPOpsec_Module_Loader {
 
 	public static function admin_menu() {
 		add_menu_page(
-			'EagleEye Opsec',
-			'EagleEye Opsec',
+			'ShieldCore Security',
+			'ShieldCore Security',
 			'manage_options',
 			'wp-opsec',
 			array( __CLASS__, 'render_dashboard' ),
@@ -543,7 +543,7 @@ class WPOpsec_Module_Loader {
 		<div class="wrap wpopsec wpopsec-dash">
 			<h1 class="wpopsec-title">
 				<img src="<?php echo esc_attr( self::logo_data_uri() ); ?>" alt="" width="30" height="30">
-				EagleEye Opsec
+				ShieldCore Security
 			</h1>
 
 			<div class="wpopsec-hero">

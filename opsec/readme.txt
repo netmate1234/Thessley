@@ -1,10 +1,10 @@
-=== EagleEye Opsec ===
+=== ShieldCore Security ===
 Contributors: martinlundstrom, opseceagleeye
 Tags: security, firewall, malware, geo-blocking, brute-force
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.5
+Stable tag: 1.0.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -98,6 +98,9 @@ This plugin can connect to several third-party services to power its blocking, g
 **unwantedip.eagleeye-intelligence.com (IP Sharing module, opt-in — requires an API key you request)** — a self-hosted IP-reputation tracker run by this plugin's author, shared across sites that opt in. Sends: the blocked IP address, an event category, and a severity label, only when this site actually blocks a request (rate-limited to at most once per IP per hour). The same service can optionally be read back as an additional IP-reputation feed in IP Blocklist (`https://unwantedip.eagleeye-intelligence.com/api/v1/feed/wordpress`), which sends nothing — it's a read-only fetch. A dedicated Terms/Privacy page for this service is in progress.
 
 == Changelog ==
+
+= 1.0.6 =
+* Renamed from EagleEye Opsec to ShieldCore Security at WordPress.org's request — "EagleEye" and "Opsec" both conflict with existing registered/in-use security-industry marks. No functional changes.
 
 = 1.0.5 =
 * Query Guard: added signatures for SQLi numeric-context comment bypass, stacked destructive queries, MSSQL/xp_cmdshell probes, PHP object-injection payloads, CRLF/header-splitting injection, cloud-metadata SSRF probes, and data:text/html XSS; expanded the remote-wrapper signature to cover phar://, zip://, glob:// and file:// alongside expect:// and data://.

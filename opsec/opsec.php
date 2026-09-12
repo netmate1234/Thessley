@@ -1,10 +1,10 @@
 <?php
 /**
- * Plugin Name: EagleEye Opsec
+ * Plugin Name: ShieldCore Security
  * Description: General security hardening plugin. Modular — each feature lives under includes/modules.
- * Version: 1.0.5
+ * Version: 1.0.6
  * Author: Martin Lundstrom
- * Text Domain: eagleeye-opsec
+ * Text Domain: shieldcore-security
  * License: GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  */

@@ -227,7 +227,7 @@ class WPOpsec_Module_Login_Guard {
 				'wpopsec_locked_out',
 				sprintf(
 					/* translators: %d: minutes remaining */
-					__( '<strong>Too many failed login attempts.</strong> Try again in %d minutes.', 'eagleeye-opsec' ),
+					__( '<strong>Too many failed login attempts.</strong> Try again in %d minutes.', 'shieldcore-security' ),
 					$minutes
 				)
 			);
@@ -246,7 +246,7 @@ class WPOpsec_Module_Login_Guard {
 		if ( is_string( $error ) && false !== strpos( $error, 'Too many failed login attempts' ) ) {
 			return $error;
 		}
-		return __( '<strong>Error:</strong> Invalid username, email address or password.', 'eagleeye-opsec' );
+		return __( '<strong>Error:</strong> Invalid username, email address or password.', 'shieldcore-security' );
 	}
 
 	/**
