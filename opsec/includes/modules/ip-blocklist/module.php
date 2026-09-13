@@ -275,7 +275,7 @@ class ShieldCore_Module_IP_Blocklist {
 				<tbody>
 				<?php foreach ( $local_page as $ip => $entry ) : ?>
 					<tr>
-						<td><code><?php echo esc_html( $ip ); ?></code></td>
+						<td class="shieldcore-nowrap"><code><?php echo esc_html( $ip ); ?></code></td>
 						<td class="shieldcore-muted"><?php echo esc_html( $entry['reason'] ?? '' ); ?></td>
 						<td class="shieldcore-nowrap shieldcore-muted"><?php echo esc_html( date_i18n( 'M j, H:i', $entry['added_at'] ?? 0 ) ); ?></td>
 						<td class="shieldcore-nowrap shieldcore-muted"><?php echo esc_html( date_i18n( 'M j, H:i', $entry['expires_at'] ?? 0 ) ); ?></td>

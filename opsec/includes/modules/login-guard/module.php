@@ -320,7 +320,7 @@ class ShieldCore_Module_Login_Guard {
 				<tbody>
 				<?php foreach ( $locked as $ip => $until ) : ?>
 					<tr>
-						<td><code><?php echo esc_html( $ip ); ?></code></td>
+						<td class="shieldcore-nowrap"><code><?php echo esc_html( $ip ); ?></code></td>
 						<td class="shieldcore-nowrap"><?php echo esc_html( date_i18n( 'Y-m-d H:i', (int) $until ) ); ?></td>
 					</tr>
 				<?php endforeach; ?>
