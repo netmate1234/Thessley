@@ -355,6 +355,7 @@ class ShieldCore_Module_Event_Log {
 		);
 		?>
 
+		<div class="shieldcore-table-scroll">
 		<table class="shieldcore-table">
 			<thead>
 				<tr>
@@ -411,6 +412,7 @@ class ShieldCore_Module_Event_Log {
 			<?php endif; ?>
 			</tbody>
 		</table>
+		</div>
 
 		<?php
 		$total_pages = (int) ceil( $result['total'] / self::PER_PAGE );

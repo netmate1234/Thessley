@@ -71,6 +71,7 @@
 .shieldcore-sev__label { font-size:11px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); }
 
 /* Tables */
+.shieldcore-table-scroll { width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; }
 .shieldcore-table { width:100%; border-collapse:separate; border-spacing:0; }
 .shieldcore-table th { text-align:left; font-size:11px; text-transform:uppercase;
 	letter-spacing:.5px; color:var(--muted); padding:8px 10px;
