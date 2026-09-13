@@ -197,7 +197,7 @@ class ShieldCore_Module_IP_Blocklist {
 		if ( empty( $stats ) ) {
 			echo '<div class="shieldcore-empty"><span class="dashicons dashicons-marker" style="color:#646970"></span><p>No data yet.</p></div>';
 		} else {
-			echo '<table class="shieldcore-table"><thead><tr><th>Source</th><th style="width:130px">Entries</th></tr></thead><tbody>';
+			echo '<div class="shieldcore-table-scroll"><table class="shieldcore-table"><thead><tr><th>Source</th><th style="width:130px">Entries</th></tr></thead><tbody>';
 			foreach ( $stats['by_source'] as $src => $count ) {
 				$label = ShieldCore_IP_Blocklist_Fetcher::SOURCES[ $src ]['label'] ?? ucfirst( $src );
 				printf(
@@ -210,7 +210,7 @@ class ShieldCore_Module_IP_Blocklist {
 				'<tr><td><strong>Merged, after removing reserved and trusted ranges</strong></td><td><strong>%s</strong></td></tr>',
 				esc_html( number_format_i18n( $stats['count_merged'] ) )
 			);
-			echo '</tbody></table>';
+			echo '</tbody></table></div>';
 		}
 		?>
 		<div class="shieldcore-actions" style="margin-top:14px">
@@ -269,6 +269,7 @@ class ShieldCore_Module_IP_Blocklist {
 			echo '<div class="shieldcore-empty"><span class="dashicons dashicons-yes-alt"></span><p>' . ( '' !== $lb_q ? 'No matches.' : 'No local entries.' ) . '</p></div>';
 		} else {
 			?>
+			<div class="shieldcore-table-scroll">
 			<table class="shieldcore-table">
 				<thead><tr><th style="width:140px">IP</th><th>Reason</th><th style="width:130px">Added</th><th style="width:130px">Expires</th><th style="width:90px"></th></tr></thead>
 				<tbody>
@@ -290,6 +291,7 @@ class ShieldCore_Module_IP_Blocklist {
 				<?php endforeach; ?>
 				</tbody>
 			</table>
+			</div>
 			<?php if ( $lb_pages > 1 ) : ?>
 				<div class="shieldcore-actions" style="margin-top:10px;justify-content:flex-start;gap:10px;align-items:center">
 					<?php if ( $lb_page > 1 ) : ?>

@@ -163,6 +163,7 @@ class ShieldCore_Module_Geo_Map {
 
 		<?php if ( ! empty( $by_country ) ) : ?>
 			<?php ShieldCore_UI::section( 'Top countries', 'list-view' ); ?>
+				<div class="shieldcore-table-scroll">
 				<table class="shieldcore-table">
 					<thead><tr><th>Country</th><th style="width:120px">Events</th><th>Share</th></tr></thead>
 					<tbody>
@@ -181,6 +182,7 @@ class ShieldCore_Module_Geo_Map {
 					<?php endforeach; ?>
 					</tbody>
 				</table>
+				</div>
 			<?php ShieldCore_UI::section_end(); ?>
 		<?php endif; ?>
 

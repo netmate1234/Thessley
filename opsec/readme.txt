@@ -4,7 +4,7 @@ Tags: security, firewall, malware, geo-blocking, brute-force
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.8
+Stable tag: 1.0.9
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -98,6 +98,9 @@ This plugin can connect to several third-party services to power its blocking, g
 **unwantedip.eagleeye-intelligence.com (IP Sharing module, opt-in — requires an API key you request)** — a self-hosted IP-reputation tracker run by this plugin's author, shared across sites that opt in. Sends: the blocked IP address, an event category, and a severity label, only when this site actually blocks a request (rate-limited to at most once per IP per hour). The same service can optionally be read back as an additional IP-reputation feed in IP Blocklist (`https://unwantedip.eagleeye-intelligence.com/api/v1/feed/wordpress`), which sends nothing — it's a read-only fetch. A dedicated Terms/Privacy page for this service is in progress.
 
 == Changelog ==
+
+= 1.0.9 =
+* Every module's data table (Dashboard recent-events, Geo Map, Vulnerability Scan, Login Guard, Activity Log, Scan All, User Watchdog, Bot Log, Malware Scanner, IP Blocklist, Security Headers) now scrolls horizontally on narrow screens instead of overflowing off-screen — 1.0.8 only fixed this for Event Log specifically.
 
 = 1.0.8 =
 * Fixed Event Log table overflowing off-screen on narrow/mobile viewports — now scrolls horizontally inside its own container instead of clipping.

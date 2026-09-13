@@ -426,6 +426,7 @@ class ShieldCore_Module_User_Watchdog {
 			echo '<div class="shieldcore-empty"><span class="dashicons dashicons-yes-alt"></span><p>No outstanding alerts.</p></div>';
 		} else {
 			?>
+			<div class="shieldcore-table-scroll">
 			<table class="shieldcore-table">
 				<thead><tr><th style="width:140px">When</th><th style="width:210px">Type</th><th>Detail</th></tr></thead>
 				<tbody>
@@ -438,6 +439,7 @@ class ShieldCore_Module_User_Watchdog {
 				<?php endforeach; ?>
 				</tbody>
 			</table>
+			</div>
 			<div class="shieldcore-actions" style="margin-top:14px">
 				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 					<?php wp_nonce_field( 'shieldcore_uw_acknowledge' ); ?>
@@ -451,6 +453,7 @@ class ShieldCore_Module_User_Watchdog {
 
 		ShieldCore_UI::section( 'Privileged accounts', 'admin-users', sprintf( '%d account(s)', count( $snapshot ) ) );
 		?>
+		<div class="shieldcore-table-scroll">
 		<table class="shieldcore-table">
 			<thead><tr><th style="width:60px">ID</th><th style="width:180px">Login</th><th style="width:240px">Email</th><th>Roles</th></tr></thead>
 			<tbody>
@@ -464,6 +467,7 @@ class ShieldCore_Module_User_Watchdog {
 			<?php endforeach; ?>
 			</tbody>
 		</table>
+		</div>
 		<div class="shieldcore-actions" style="margin-top:14px">
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 				<?php wp_nonce_field( 'shieldcore_uw_scan_now' ); ?>

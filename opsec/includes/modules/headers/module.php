@@ -218,7 +218,7 @@ class ShieldCore_Module_Headers {
 		if ( empty( $current ) ) {
 			echo '<div class="shieldcore-empty"><span class="dashicons dashicons-warning" style="color:#b26e00"></span><p>No security headers are being sent.</p></div>';
 		} else {
-			echo '<table class="shieldcore-table"><tbody>';
+			echo '<div class="shieldcore-table-scroll"><table class="shieldcore-table"><tbody>';
 			foreach ( $current as $name => $value ) {
 				printf(
 					'<tr><td style="width:270px"><strong>%s</strong></td><td><code>%s</code></td></tr>',
@@ -226,7 +226,7 @@ class ShieldCore_Module_Headers {
 					esc_html( $value )
 				);
 			}
-			echo '</tbody></table>';
+			echo '</tbody></table></div>';
 		}
 		ShieldCore_UI::section_end();
 		?>

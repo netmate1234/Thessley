@@ -248,6 +248,7 @@ class ShieldCore_Module_Bot_Log {
 			<?php submit_button( 'Filter', 'secondary', 'submit', false ); ?>
 		</form>
 
+		<div class="shieldcore-table-scroll">
 		<table class="shieldcore-table">
 			<thead>
 				<tr>
@@ -282,6 +283,7 @@ class ShieldCore_Module_Bot_Log {
 			<?php endif; ?>
 			</tbody>
 		</table>
+		</div>
 
 		<?php
 		$total_pages = (int) ceil( $result['total'] / self::PER_PAGE );

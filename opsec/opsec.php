@@ -2,7 +2,7 @@
 /**
  * Plugin Name: ShieldCore Security
  * Description: General security hardening plugin. Modular — each feature lives under includes/modules.
- * Version: 1.0.8
+ * Version: 1.0.9
  * Author: Martin Lundstrom
  * Text Domain: shieldcore-security
  * License: GPLv2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SHIELDCORE_VERSION', '1.0.8' );
+define( 'SHIELDCORE_VERSION', '1.0.9' );
 define( 'SHIELDCORE_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SHIELDCORE_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'SHIELDCORE_MU_SOURCE', SHIELDCORE_PLUGIN_DIR . 'mu-loader/wp-shieldcore-early.php' );

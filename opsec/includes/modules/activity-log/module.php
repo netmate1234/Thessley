@@ -224,6 +224,7 @@ class ShieldCore_Module_Activity_Log {
 			echo '<div class="shieldcore-empty"><span class="dashicons dashicons-info-outline"></span><p>No activity recorded yet.</p></div>';
 		} else {
 			?>
+			<div class="shieldcore-table-scroll">
 			<table class="shieldcore-table">
 				<thead><tr><th style="width:130px">Time</th><th style="width:170px">Event</th><th>Detail</th></tr></thead>
 				<tbody>
@@ -236,6 +237,7 @@ class ShieldCore_Module_Activity_Log {
 				<?php endforeach; ?>
 				</tbody>
 			</table>
+			</div>
 			<?php
 		}
 		ShieldCore_UI::section_end();

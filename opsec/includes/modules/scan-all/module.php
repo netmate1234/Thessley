@@ -203,6 +203,7 @@ class ShieldCore_Module_Scan_All {
 		</div>
 
 		<?php ShieldCore_UI::section( 'Included scans', 'list-view' ); ?>
+			<div class="shieldcore-table-scroll">
 			<table class="shieldcore-table">
 				<thead><tr><th>Scan</th><th style="width:130px">Last ran</th><th style="width:150px">Result</th><th style="width:110px"></th></tr></thead>
 				<tbody>
@@ -225,6 +226,7 @@ class ShieldCore_Module_Scan_All {
 				<?php endforeach; ?>
 				</tbody>
 			</table>
+			</div>
 		<?php ShieldCore_UI::section_end(); ?>
 
 		<?php

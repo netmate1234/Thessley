@@ -314,6 +314,7 @@ class ShieldCore_Module_Login_Guard {
 			echo '<div class="shieldcore-empty"><span class="dashicons dashicons-yes-alt"></span><p>No IPs are locked out.</p></div>';
 		} else {
 			?>
+			<div class="shieldcore-table-scroll">
 			<table class="shieldcore-table">
 				<thead><tr><th style="width:180px">IP</th><th>Locked until</th></tr></thead>
 				<tbody>
@@ -325,6 +326,7 @@ class ShieldCore_Module_Login_Guard {
 				<?php endforeach; ?>
 				</tbody>
 			</table>
+			</div>
 			<?php
 		}
 		ShieldCore_UI::section_end();

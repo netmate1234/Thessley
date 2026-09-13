@@ -438,6 +438,7 @@ class ShieldCore_Module_Vuln_Scanner {
 				echo '<div class="shieldcore-empty"><span class="dashicons dashicons-yes-alt"></span><p>Nothing flagged.</p></div>';
 			} else {
 				?>
+				<div class="shieldcore-table-scroll">
 				<table class="shieldcore-table">
 					<thead>
 						<tr>
@@ -477,6 +478,7 @@ class ShieldCore_Module_Vuln_Scanner {
 					<?php endforeach; ?>
 					</tbody>
 				</table>
+				</div>
 				<p class="shieldcore-help">An inactive plugin still has files on disk that can be reached directly — uninstall what you do not use rather than just deactivating it.</p>
 				<?php
 			}

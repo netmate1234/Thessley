@@ -789,6 +789,7 @@ class ShieldCore_Module_Loader {
 					<p>No events recorded yet. Modules in log-only mode will record here as traffic arrives.</p>
 				</div>
 			<?php else : ?>
+				<div class="shieldcore-table-scroll">
 				<table class="shieldcore-table">
 					<thead>
 						<tr>
@@ -827,6 +828,7 @@ class ShieldCore_Module_Loader {
 					<?php endforeach; ?>
 					</tbody>
 				</table>
+				</div>
 			<?php endif; ?>
 		</div>
 		<?php
