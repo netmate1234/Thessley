@@ -252,9 +252,21 @@ class ShieldCore_Module_Loader {
 		if ( false === strpos( (string) $hook, 'wp-shieldcore' ) ) {
 			return;
 		}
-		wp_enqueue_style( 'shieldcore-admin', SHIELDCORE_PLUGIN_URL . 'assets/admin.css', array(), SHIELDCORE_VERSION );
-		wp_enqueue_style( 'shieldcore-dashboard', SHIELDCORE_PLUGIN_URL . 'assets/dashboard.css', array( 'shieldcore-admin' ), SHIELDCORE_VERSION );
-		wp_enqueue_style( 'shieldcore-geo-map', SHIELDCORE_PLUGIN_URL . 'assets/geo-map.css', array(), SHIELDCORE_VERSION );
+		wp_enqueue_style( 'shieldcore-admin', SHIELDCORE_PLUGIN_URL . 'assets/admin.css', array(), self::asset_version( 'admin.css' ) );
+		wp_enqueue_style( 'shieldcore-dashboard', SHIELDCORE_PLUGIN_URL . 'assets/dashboard.css', array( 'shieldcore-admin' ), self::asset_version( 'dashboard.css' ) );
+		wp_enqueue_style( 'shieldcore-geo-map', SHIELDCORE_PLUGIN_URL . 'assets/geo-map.css', array(), self::asset_version( 'geo-map.css' ) );
+	}
+
+	/**
+	 * Cache-busts a static asset by its own file-modified time rather than
+	 * the plugin version: editing a single CSS file previously required
+	 * also bumping SHIELDCORE_VERSION or browsers kept serving the old
+	 * cached copy under the unchanged `?ver=` query string.
+	 */
+	private static function asset_version( $relative_path ) {
+		$path = SHIELDCORE_PLUGIN_DIR . 'assets/' . $relative_path;
+		$mtime = file_exists( $path ) ? filemtime( $path ) : false;
+		return $mtime ? (string) $mtime : SHIELDCORE_VERSION;
 	}
 
 	/**
