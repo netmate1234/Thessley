@@ -4,7 +4,7 @@ Tags: security, firewall, malware, geo-blocking, brute-force
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.10
+Stable tag: 1.0.11
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -98,6 +98,9 @@ This plugin can connect to several third-party services to power its blocking, g
 **unwantedip.eagleeye-intelligence.com (IP Sharing module, opt-in — requires an API key you request)** — a self-hosted IP-reputation tracker run by this plugin's author, shared across sites that opt in. Sends: the blocked IP address, an event category, and a severity label, only when this site actually blocks a request (rate-limited to at most once per IP per hour). The same service can optionally be read back as an additional IP-reputation feed in IP Blocklist (`https://unwantedip.eagleeye-intelligence.com/api/v1/feed/wordpress`), which sends nothing — it's a read-only fetch. A dedicated Terms/Privacy page for this service is in progress.
 
 == Changelog ==
+
+= 1.0.11 =
+* Purged remaining "Opsec" strings from plugin/infra code (test messages, alert text, uploads-guard marker, outbound email From header) and fixed a bug where Config Import/Export's own file-format check rejected every file it had just exported. Renamed the plugin's directory and main file (opsec/opsec.php -> shieldcore-security/shieldcore-security.php) to match.
 
 = 1.0.10 =
 * Local Blocklist and Login Guard's IP columns no longer wrap/shrink to near-nothing on narrow screens — missing `white-space:nowrap` let the browser squeeze that column instead of letting the table scroll horizontally as intended.
