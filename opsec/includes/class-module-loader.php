@@ -119,7 +119,7 @@ class ShieldCore_Module_Loader {
 			$old_exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $old_table ) ) === $old_table;
 			$new_exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $new_table ) ) === $new_table;
 			if ( $old_exists && ! $new_exists ) {
-				$wpdb->query( "RENAME TABLE `{$old_table}` TO `{$new_table}`" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- identifiers built from $wpdb->prefix plus fixed literals, not user input; RENAME TABLE can't use placeholders.
+				$wpdb->query( "RENAME TABLE `{$old_table}` TO `{$new_table}`" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- identifiers built from $wpdb->prefix plus fixed literals, not user input; RENAME TABLE can't use placeholders for identifiers.
 			}
 		}
 
@@ -140,30 +140,20 @@ class ShieldCore_Module_Loader {
 		// name, so both get loaded by WordPress every request until this runs.
 		// The old file's own gate logic then executes a second time and
 		// queries the just-renamed tables under their old names, which no
-		// longer exist. Raw fopen-family calls, not WP_Filesystem: this must
-		// also run from init() on a plain front-end request, same reasoning
-		// as copy_mu_loader()/ensure_mu_loader_current() above.
+		// longer exist. self::filesystem() is fine to use here (unlike the
+		// early-gate check.php files it explicitly excludes): this runs on
+		// plugins_loaded, well after WordPress itself has fully bootstrapped,
+		// not pre-bootstrap on every front-end request.
 		$legacy_mu_file = WPMU_PLUGIN_DIR . '/wp-opsec-early.php';
 		if ( file_exists( $legacy_mu_file ) ) {
-			unlink( $legacy_mu_file );
+			self::filesystem()->delete( $legacy_mu_file );
 		}
 		$legacy_checks_dir = WPMU_PLUGIN_DIR . '/wp-opsec-checks';
 		if ( is_dir( $legacy_checks_dir ) ) {
-			self::rrmdir( $legacy_checks_dir );
+			self::filesystem()->delete( $legacy_checks_dir, true );
 		}
 
 		update_option( 'shieldcore_legacy_migrated', 1 );
-	}
-
-	private static function rrmdir( $dir ) {
-		foreach ( scandir( $dir ) ?: array() as $item ) {
-			if ( '.' === $item || '..' === $item ) {
-				continue;
-			}
-			$path = $dir . '/' . $item;
-			is_dir( $path ) ? self::rrmdir( $path ) : unlink( $path );
-		}
-		rmdir( $dir );
 	}
 
 	public static function init() {
