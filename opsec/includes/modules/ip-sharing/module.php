@@ -122,7 +122,7 @@ class ShieldCore_Module_IP_Sharing {
 						// No site name/domain here, matching the real report path —
 						// this is public data, not a private alert.
 						'ip'          => '203.0.113.1',
-						'title'       => 'Opsec test report',
+						'title'       => 'ShieldCore Security test report',
 						'severity'    => 'low',
 						'description' => 'Test report — if this appears, reporting is wired up correctly.',
 					)

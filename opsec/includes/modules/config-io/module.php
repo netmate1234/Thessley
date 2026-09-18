@@ -130,7 +130,7 @@ class ShieldCore_Module_Config_IO {
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- a server-generated temp file path from PHP's own upload handling, not user-controlled string content.
 		$json = json_decode( (string) file_get_contents( $_FILES['config_file']['tmp_name'] ), true );
 
-		if ( ! is_array( $json ) || 'opsec' !== ( $json['plugin'] ?? '' ) || ! is_array( $json['modules'] ?? null ) ) {
+		if ( ! is_array( $json ) || 'shieldcore-security' !== ( $json['plugin'] ?? '' ) || ! is_array( $json['modules'] ?? null ) ) {
 			self::redirect_back( array( 'cio_error' => 'invalid_file' ) );
 		}
 
@@ -208,7 +208,7 @@ class ShieldCore_Module_Config_IO {
 			$messages = array(
 				'no_file'      => 'Choose a file to import.',
 				'too_large'    => 'File is too large (2MB max).',
-				'invalid_file' => "That file doesn't look like an Opsec configuration export.",
+				'invalid_file' => "That file doesn't look like a ShieldCore Security configuration export.",
 			);
 			$cio_error = sanitize_key( wp_unslash( $_GET['cio_error'] ) );
 			ShieldCore_UI::notice( 'error', $messages[ $cio_error ] ?? 'Import failed.' );

@@ -226,7 +226,7 @@ class ShieldCore_Module_Loader {
 	}
 
 	/**
-	 * Every Opsec admin page's hook suffix contains "wp-shieldcore" — the
+	 * Every ShieldCore Security admin page's hook suffix contains "wp-shieldcore" — the
 	 * top-level page is "toplevel_page_wp-shieldcore", every cluster submenu
 	 * (registered by ShieldCore_Menu_Router against the "wp-shieldcore" parent) is
 	 * "wp-shieldcore_page_wp-shieldcore-<cluster>". Enqueued unconditionally across

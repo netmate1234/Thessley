@@ -44,7 +44,7 @@ class ShieldCore_Module_Hardening {
 		return trailingslashit( $uploads['basedir'] ) . '.htaccess';
 	}
 
-	const UPLOADS_GUARD_MARKER = '# BEGIN WP Opsec uploads guard';
+	const UPLOADS_GUARD_MARKER = '# BEGIN ShieldCore Security uploads guard';
 
 	/**
 	 * Blocks PHP execution inside wp-content/uploads. Any attacker who gets
@@ -62,7 +62,7 @@ class ShieldCore_Module_Hardening {
 			. "<FilesMatch \"\\.(?i:php|phtml|phps|phar|php[0-9]?)$\">\n"
 			. "\tRequire all denied\n"
 			. "</FilesMatch>\n"
-			. "# END WP Opsec uploads guard\n";
+			. "# END ShieldCore Security uploads guard\n";
 
 		$existing = file_exists( $path ) ? (string) file_get_contents( $path ) : '';
 
@@ -81,7 +81,7 @@ class ShieldCore_Module_Hardening {
 
 		$content = (string) file_get_contents( $path );
 		$cleaned = preg_replace(
-			'/' . preg_quote( self::UPLOADS_GUARD_MARKER, '/' ) . '.*?# END WP Opsec uploads guard\s*/s',
+			'/' . preg_quote( self::UPLOADS_GUARD_MARKER, '/' ) . '.*?# END ShieldCore Security uploads guard\s*/s',
 			'',
 			$content
 		);

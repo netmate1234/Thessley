@@ -4,7 +4,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Opsec — early request gate.
+ * ShieldCore Security — early request gate.
  *
  * Deployed as a must-use plugin so it runs before the rest of WordPress
  * bootstraps. Self-contained: does not depend on the main wp-shieldcore plugin
@@ -378,7 +378,7 @@ if ( ! function_exists( 'shieldcore_maybe_email_alert' ) ) {
 		// The body itself is fine as raw UTF-8 (unlike the Subject, it isn't
 		// a header) as long as Content-Type declares the charset.
 		$from_domain = $host ?: 'localhost';
-		$headers     = "From: Opsec <wordpress@{$from_domain}>\r\n"
+		$headers     = "From: ShieldCore Security <wordpress@{$from_domain}>\r\n"
 			. "MIME-Version: 1.0\r\n"
 			. 'Content-Type: text/plain; charset=UTF-8';
 
@@ -488,7 +488,7 @@ if ( ! function_exists( 'shieldcore_maybe_unwantedip_report' ) ) {
 						// requires it and the read endpoint does return it, but
 						// the category alone (not this install's specific reason
 						// or its 1-20 severity score, which mean nothing without
-						// Opsec's own scale) is what belongs on a shared record.
+						// ShieldCore Security's own scale) is what belongs on a shared record.
 						'description' => $title,
 					)
 				),

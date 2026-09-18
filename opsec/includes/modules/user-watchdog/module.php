@@ -166,7 +166,7 @@ class ShieldCore_Module_User_Watchdog {
 			implode(
 				"\n",
 				array(
-					'Opsec detected a change to a privileged account.',
+					'ShieldCore Security detected a change to a privileged account.',
 					'',
 					'Type:   ' . $type,
 					'Detail: ' . $message,

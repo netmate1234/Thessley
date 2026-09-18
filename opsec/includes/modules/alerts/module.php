@@ -99,7 +99,7 @@ class ShieldCore_Module_Alerts {
 				'chat_id'    => $chat_id,
 				'parse_mode' => 'HTML',
 				'text'       => sprintf(
-					"<b>%s</b>%s\nOpsec test message — if you can read this, Telegram alerts are wired up correctly.",
+					"<b>%s</b>%s\nShieldCore Security test message — if you can read this, Telegram alerts are wired up correctly.",
 					esc_html( $site ),
 					$host ? ' (' . esc_html( $host ) . ')' : ''
 				),
@@ -164,8 +164,8 @@ class ShieldCore_Module_Alerts {
 		$host = wp_parse_url( get_option( 'siteurl' ), PHP_URL_HOST ) ?: '';
 		$sent = wp_mail(
 			$address,
-			sprintf( '[%s] Opsec test alert', $site ),
-			sprintf( "%s%s\n\nOpsec test message — if you can read this, email alerts are wired up correctly.", $site, $host ? " ({$host})" : '' )
+			sprintf( '[%s] ShieldCore Security test alert', $site ),
+			sprintf( "%s%s\n\nShieldCore Security test message — if you can read this, email alerts are wired up correctly.", $site, $host ? " ({$host})" : '' )
 		);
 
 		wp_safe_redirect( add_query_arg( 'email_test', $sent ? 'ok' : 'fail', wp_get_referer() ) );
