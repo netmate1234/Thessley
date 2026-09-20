@@ -80,7 +80,7 @@ class ShieldCore_Module_IP_Blocklist {
 
 		$source = __DIR__ . '/check.php';
 		if ( ! file_exists( self::check_dest() ) || md5_file( self::check_dest() ) !== md5_file( $source ) ) {
-			copy( $source, self::check_dest() );
+			ShieldCore_Module_Loader::filesystem()->copy( $source, self::check_dest(), true );
 			// Without this, a worker process that already opcache-compiled the
 			// old bytecode can keep serving stale check logic across multiple
 			// requests until that cache entry's own revalidation timer fires —
