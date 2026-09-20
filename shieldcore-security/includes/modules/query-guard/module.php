@@ -26,7 +26,10 @@ class ShieldCore_Module_Query_Guard {
 		if ( ! wp_next_scheduled( self::XMLRPC_CRON_HOOK ) ) {
 			wp_schedule_event( time(), 'daily', self::XMLRPC_CRON_HOOK );
 		}
-		self::refresh_xmlrpc_allowlist();
+		// No Jetpack IP fetch here: refresh_xmlrpc_allowlist() (below)
+		// already no-ops while xmlrpc blocking is off (the default) — the
+		// fetched list only ever matters once the admin turns that on, and
+		// activating the plugin must never by itself contact a third party.
 	}
 
 	public static function deactivate() {
@@ -253,6 +256,13 @@ class ShieldCore_Module_Query_Guard {
 	 * file instead of us guessing at more hardcoded IP data.
 	 */
 	public static function refresh_xmlrpc_allowlist() {
+		// This list only ever matters once xmlrpc.php blocking is actually
+		// on — pointless (and an unwanted third-party contact) to fetch it
+		// while block_xmlrpc is still off, the default.
+		if ( ! get_option( 'shieldcore_query_guard_block_xmlrpc', false ) ) {
+			return;
+		}
+
 		$response = wp_remote_get( self::JETPACK_IP_SOURCE, array( 'timeout' => 15, 'user-agent' => 'wp-shieldcore/' . SHIELDCORE_VERSION ) );
 		if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
 			return false;
@@ -319,8 +329,17 @@ class ShieldCore_Module_Query_Guard {
 		$categories = array_values( array_intersect( $posted, array_keys( self::CATEGORIES ) ) );
 		update_option( 'shieldcore_query_guard_categories', $categories );
 
-		update_option( 'shieldcore_query_guard_block_xmlrpc', isset( $_POST['block_xmlrpc'] ) );
+		$block_xmlrpc = isset( $_POST['block_xmlrpc'] );
+		update_option( 'shieldcore_query_guard_block_xmlrpc', $block_xmlrpc );
 		update_option( 'shieldcore_qg_allow_jetpack', isset( $_POST['allow_jetpack'] ) );
+
+		if ( $block_xmlrpc ) {
+			// This save is what just turned xmlrpc blocking on — the
+			// admin's own action, and exactly when the Jetpack allowlist
+			// actually starts mattering. Fetch it now rather than waiting
+			// for tomorrow's cron.
+			self::refresh_xmlrpc_allowlist();
+		}
 
 		update_option( 'shieldcore_query_guard_scan_post', isset( $_POST['scan_post'] ) );
 		$scope = sanitize_text_field( wp_unslash( $_POST['post_scope'] ?? 'anon' ) );

@@ -27,17 +27,15 @@ class ShieldCore_Module_Whitelist {
 	const DEFAULT_URL    = 'https://wp-opsec.eagleeye-intelligence.com/wp-content/uploads/wp-opsec/crawler-nets.conf';
 
 	public static function activate() {
-		// add_option() is a no-op if the option already exists, so this only
-		// ever sets the default on a fresh install — it won't override a
-		// site that's pointed elsewhere, or clobber an intentional clear.
-		add_option( 'shieldcore_trusted_networks_url', self::DEFAULT_URL );
-
 		if ( ! wp_next_scheduled( self::CRON_HOOK ) ) {
 			wp_schedule_event( time(), 'daily', self::CRON_HOOK );
 		}
-		// Populate immediately so a configured URL is live right away, not
-		// just after tomorrow's cron run.
-		self::refresh();
+		// No URL is stored and nothing is fetched here: refresh() (below)
+		// already no-ops on an empty shieldcore_trusted_networks_url, and
+		// the settings page pre-fills the field with self::DEFAULT_URL as
+		// a suggestion — activating the plugin must never by itself start
+		// pulling from a third-party URL before the admin has saved this
+		// page (even just accepting that suggestion) at least once.
 	}
 
 	public static function deactivate() {
@@ -197,7 +195,11 @@ class ShieldCore_Module_Whitelist {
 	}
 
 	public static function render_page() {
-		$trusted_url          = get_option( 'shieldcore_trusted_networks_url', '' );
+		// self::DEFAULT_URL as the fallback here (not '') pre-fills the
+		// field with a real suggestion on a fresh install — accepting it
+		// and clicking Save is what actually triggers the first fetch, in
+		// handle_save_settings() below.
+		$trusted_url          = get_option( 'shieldcore_trusted_networks_url', self::DEFAULT_URL );
 		$trusted_remote_stats = get_option( 'shieldcore_trusted_networks_remote_stats', array() );
 		$allowlist            = get_option( 'shieldcore_ip_allowlist', array() );
 

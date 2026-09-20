@@ -836,7 +836,7 @@ class ShieldCore_Module_Loader {
 		if ( ! file_exists( WPMU_PLUGIN_DIR ) ) {
 			wp_mkdir_p( WPMU_PLUGIN_DIR );
 		}
-		copy( SHIELDCORE_MU_SOURCE, SHIELDCORE_MU_DEST );
+		self::filesystem()->copy( SHIELDCORE_MU_SOURCE, SHIELDCORE_MU_DEST, true );
 
 		// Every other rewritten data file in this plugin does this; the
 		// mu-loader itself — by far the most consequential one, since it

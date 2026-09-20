@@ -38,7 +38,11 @@ class ShieldCore_Module_Geo_Blocker {
 			wp_schedule_event( time() + ( 50 * MINUTE_IN_SECONDS ), 'weekly', self::CRON_HOOK );
 		}
 		self::deploy_check_file();
-		self::refresh();
+		// No DB-IP download here — refresh() (below) won't actually fetch
+		// anything, cron-triggered or otherwise, until the admin has saved
+		// this module's settings or clicked "Refresh Now" at least once.
+		// Activating the plugin must never by itself start pulling a ~15MB
+		// dataset from a third party.
 	}
 
 	public static function deactivate() {
@@ -113,6 +117,14 @@ class ShieldCore_Module_Geo_Blocker {
 	 * size by roughly an order of magnitude.
 	 */
 	public static function refresh() {
+		// Set only by handle_save_settings()/handle_refresh_now() — both
+		// direct admin actions. Blocks the cron-triggered call (and any
+		// stray call from elsewhere) from ever fetching DB-IP's dataset
+		// before the admin has done something with this module themselves.
+		if ( ! get_option( 'shieldcore_geo_blocker_initialized', false ) ) {
+			return false;
+		}
+
 		$gz_path = self::download_csv_gz();
 		if ( false === $gz_path ) {
 			shieldcore_log_event( 'geo-blocker', 'refresh_failed', 'noted', 'could not download the DB-IP country dataset', 6 );
@@ -258,6 +270,8 @@ class ShieldCore_Module_Geo_Blocker {
 		}
 		update_option( 'shieldcore_geo_country_indices', $indices, false );
 
+		update_option( 'shieldcore_geo_blocker_initialized', true );
+
 		wp_safe_redirect( add_query_arg( 'saved', '1', wp_get_referer() ) );
 		exit;
 	}
@@ -267,6 +281,7 @@ class ShieldCore_Module_Geo_Blocker {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Forbidden', 403 );
 		}
+		update_option( 'shieldcore_geo_blocker_initialized', true );
 		self::refresh();
 		wp_safe_redirect( add_query_arg( 'refreshed', '1', wp_get_referer() ) );
 		exit;

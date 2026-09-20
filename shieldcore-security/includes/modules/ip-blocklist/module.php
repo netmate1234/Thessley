@@ -21,9 +21,12 @@ class ShieldCore_Module_IP_Blocklist {
 			wp_schedule_event( time(), 'daily', self::CRON_HOOK );
 		}
 
-		// Populate the blocklist immediately so protection is live right away,
-		// not just after tomorrow's cron run.
-		self::refresh();
+		// No sources fetched here, or by the cron just scheduled above, until
+		// the admin actually saves this module's settings — activating the
+		// plugin must never by itself start pulling data from CINS/DShield/
+		// etc. add_option() only sets this the first time; a later plugin
+		// update re-running activate() never clobbers a real saved choice.
+		add_option( 'shieldcore_ip_blocklist_sources', array() );
 	}
 
 	public static function deactivate() {
@@ -47,7 +50,14 @@ class ShieldCore_Module_IP_Blocklist {
 	}
 
 	public static function refresh() {
-		$enabled = get_option( 'shieldcore_ip_blocklist_sources', ShieldCore_IP_Blocklist_Fetcher::DEFAULT_ENABLED );
+		// No DEFAULT_ENABLED fallback here on purpose: activate() always
+		// sets this option to an explicit array() before this can run, so
+		// falling back to DEFAULT_ENABLED would only ever matter if the
+		// option was deleted out from under an active install — and doing
+		// so should mean "nothing selected", not "silently re-enable the
+		// suggested sources with no admin action". DEFAULT_ENABLED still
+		// drives the settings page's pre-checked checkboxes below.
+		$enabled = get_option( 'shieldcore_ip_blocklist_sources', array() );
 		$ranges  = ShieldCore_IP_Blocklist_Fetcher::fetch_all( $enabled );
 		$stats   = ShieldCore_IP_Blocklist_Compiler::compile( $ranges );
 
@@ -107,6 +117,11 @@ class ShieldCore_Module_IP_Blocklist {
 		$posted_sources = isset( $_POST['sources'] ) ? (array) wp_unslash( $_POST['sources'] ) : array();
 		$sources        = array_values( array_intersect( $posted_sources, array_keys( ShieldCore_IP_Blocklist_Fetcher::SOURCES ) ) );
 		update_option( 'shieldcore_ip_blocklist_sources', $sources );
+
+		// This save is the admin's explicit opt-in — the first real fetch
+		// happens right here, not silently before they ever touched this
+		// page (see activate()).
+		self::refresh();
 
 		wp_safe_redirect( add_query_arg( 'saved', '1', wp_get_referer() ) );
 		exit;
