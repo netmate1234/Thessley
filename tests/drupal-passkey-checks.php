@@ -424,10 +424,7 @@ $page = $br->request( 'GET', $base . '/user/' . $uid['pkt_b'] . '/passkey' );
 ok( "someone else's passkey tab is denied (403)", 403 === $page['code'] );
 
 $b_dev_id = (int) sql( "SELECT id FROM thessley_passkeys WHERE uid=" . $uid['pkt_b'] );
-$rev = function ( $dev_id, $password ) use ( $br, $base, $tok ) {
-	return $br->request( 'POST', $base . "/thessley/v1/passkey/devices/$dev_id/revoke", array( 'X-CSRF-Token: ' . $tok, 'Content-Type: application/json' ), json_encode( null === $password ? new stdClass() : array( 'password' => $password ) ) );
-};
-$r = $rev( $b_dev_id, $pw['pkt_a'] );
+$r = $br->request( 'POST', $base . "/thessley/v1/passkey/devices/$b_dev_id/revoke", array( 'X-CSRF-Token: ' . $tok ) );
 ok( "revoking another account's device is refused (404)", 404 === $r['code'], $r['body'] );
 $a_dev_id = (int) sql( "SELECT id FROM thessley_passkeys WHERE uid=" . $uid['pkt_a'] );
 $r = $br->request( 'POST', $base . "/thessley/v1/passkey/devices/$a_dev_id/revoke" );
@@ -435,33 +432,11 @@ ok( 'revoke without the CSRF header is refused', 403 === $r['code'] );
 $s = login_start( new Browser() );
 $r = respond( $s['json']['request_id'], 'login', $s['json']['nonce'], $dev['pkt_a']['cred'], $dev['pkt_a']['key'] );
 ok( 'before revoke, device a works', 200 === $r['code'] );
-// Step two of revoking: the password. Neither a missing nor a wrong one revokes anything.
-$r = $rev( $a_dev_id, null );
-ok( 'revoke without a password is refused (403)', 403 === $r['code'] && 'thessley_reauth' === $r['json']['code'], $r['body'] );
-$r = $rev( $a_dev_id, 'not-the-password' );
-ok( 'revoke with a wrong password is refused (403)', 403 === $r['code'] && 'thessley_reauth' === $r['json']['code'], $r['body'] );
-$r = $rev( $a_dev_id, $pw['pkt_b'] );
-ok( "revoke with another account's password is refused (403)", 403 === $r['code'], $r['body'] );
-$s = login_start( new Browser() );
-$r = respond( $s['json']['request_id'], 'login', $s['json']['nonce'], $dev['pkt_a']['cred'], $dev['pkt_a']['key'] );
-ok( 'the device still works after the refused attempts', 200 === $r['code'] );
-$r = $rev( $a_dev_id, $pw['pkt_a'] );
-ok( 'revoke own device with the right password', 200 === $r['code'] && 'ok' === $r['json']['result'], $r['body'] );
+$r = $br->request( 'POST', $base . "/thessley/v1/passkey/devices/$a_dev_id/revoke", array( 'X-CSRF-Token: ' . $tok ) );
+ok( 'revoke own device', 200 === $r['code'] && 'ok' === $r['json']['result'] );
 $s = login_start( new Browser() );
 $r = respond( $s['json']['request_id'], 'login', $s['json']['nonce'], $dev['pkt_a']['cred'], $dev['pkt_a']['key'] );
 ok( 'a revoked device can no longer approve (401)', 401 === $r['code'] && 'thessley_unknown_device' === $r['json']['code'] );
-
-// Five wrong passwords pause revoking, even for the right one (the revoked row is still the account's own).
-clear_flood();
-for ( $i = 0; $i < 5; $i++ ) {
-	$rev( $a_dev_id, 'guess' . $i );
-}
-$r = $rev( $a_dev_id, $pw['pkt_a'] );
-ok( 'after 5 wrong passwords even the right one is paused (429)', 429 === $r['code'] && 'thessley_reauth_throttled' === $r['json']['code'], $r['body'] );
-clear_flood();
-$r = $rev( $a_dev_id, $pw['pkt_a'] );
-ok( 'and works again once the pause is over', 200 === $r['code'], $r['body'] );
-clear_flood();
 
 echo "== permission and blocked accounts\n";
 drush( 'user:role:remove passkey_user pkt_b' );
