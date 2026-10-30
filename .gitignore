@@ -1,2 +1,5 @@
 INFRASTRUCTURE.md
 infra/windows-ad-lab/LOCAL-CREDENTIALS.txt
+
+__pycache__/
+codex_token
