@@ -2,8 +2,8 @@
 # Run from an elevated PowerShell:
 #   irm https://wp-opsec.eagleeye-intelligence.com/wp-content/uploads/thessley-windows-downloads/ad-service-install.ps1 | iex
 $ErrorActionPreference = 'Stop'
-$zipUrl = 'https://wp-opsec.eagleeye-intelligence.com/wp-content/uploads/thessley-windows-downloads/thessley-ad-service-2026.11.01-15b0bfb-windows.zip'
-$sha256 = '68073e64ba650ecb610e4a6345af8c2477a62a7f31bd6e9d27b4a5a824d63a43'
+$zipUrl = 'https://wp-opsec.eagleeye-intelligence.com/wp-content/uploads/thessley-windows-downloads/thessley-ad-service-2026.11.01-7362b57-windows.zip'
+$sha256 = '223c977143b8539660f74730f0bc43b90058731954ec94701ad35117247cec0d'
 
 $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
