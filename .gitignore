@@ -3,3 +3,10 @@ infra/windows-ad-lab/LOCAL-CREDENTIALS.txt
 
 __pycache__/
 codex_token
+
+# Build artefacts are published to the site, not committed to GitLab.
+*.zip
+*.apk
+*.tar.gz
+*.tgz
+*.iso
