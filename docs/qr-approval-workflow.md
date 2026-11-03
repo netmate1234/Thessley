@@ -94,6 +94,36 @@ The request is valid **90 seconds**; the waiting session can stay open a few min
    ssh -tt -p 50022 ubuntu@192.168.1.200 "sudo thessley-pam passes"
    ```
 
+## WordPress login QR (real sign-in, verified)
+
+This is the one that has actually been taken end to end on `wp-opsec`:
+
+```sh
+scripts/qr-https-serve.py &          # loopback HTTPS on 127.0.0.1:8443
+scripts/qr-login.sh                  # mints the request, renders the QR, polls
+# open https://127.0.0.1:8443/qr.png (or /link.txt), scan, approve
+```
+
+What it does, and why each step matters:
+
+1. `POST /?rest_route=/thessley/v1/passkey/login/start` with `username=<user>` and a
+   cookie jar. With `mode=required` / `identify=1`, the username is mandatory.
+2. `app_link` from the JSON is the QR payload (`thessleypasskey://auth?…`), valid 120 s.
+3. `qrencode` it into the loopback directory; show `https://127.0.0.1:8443/qr.png`.
+4. Poll `/login/<id>/status` with **both** `-b jar` and `-c jar`. Reading with `-b`
+   alone does not save the `wordpress_logged_in` cookie the approval issues, so the
+   next `/wp-admin/` request bounces to the login screen and it looks broken.
+5. On `approved` the response carries `redirect_to`; the same jar can then load
+   `/wp-admin/` (200) — that is the proof of a real session.
+
+Approvals are single-use: a consumed request reports `expired` and needs a new QR.
+
+Observed success on `wp-opsec` (admin, 2026-11-03):
+
+```
+status=approved  redirect_to=https://wp-opsec.eagleeye-intelligence.com/wp-admin/
+```
+
 ## Gotchas learned the hard way
 
 - **Non-tty is refused** on the OPI5 even with a valid pass (`Permission denied
