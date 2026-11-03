@@ -8,6 +8,18 @@ Passwordless authentication for WordPress, Linux, Windows and Active Directory â
 
 **Full deck:** [13 slides on GitHub Pages](https://netmate1234.github.io/Thessley/) (arrow keys, or click the edges).
 
+## Quick start
+
+| Project | Install |
+| --- | --- |
+| WordPress hardening | `wp plugin install https://github.com/netmate1234/thessley-security-hardening/releases/latest/download/thessley-security-hardening-1.0.24.zip --activate` |
+| WordPress passkey | `wp plugin install https://github.com/netmate1234/thessley-passkey/releases/latest/download/thessley-passkey-1.0.0.zip --activate` |
+| PAM for Linux | `git clone https://github.com/netmate1234/thessley-pam-linux && cd thessley-pam-linux && sudo ./install.sh` |
+| PAM for Windows | `git clone https://github.com/netmate1234/thessley-pam-windows` then `install\install.ps1` as administrator |
+| Desktop approver | `git clone https://github.com/netmate1234/thessley-passkey-linux && cd thessley-passkey-linux && ./install.sh` |
+
+**Five-minute demo:** install the passkey plugin on a test WordPress, open your profile, add the phone, then sign in with the QR.
+
 ## The problem
 
 - **Passwords travel.** Typed into the wrong window, reused across sites, stored where the site can read them. One leak is enough.
