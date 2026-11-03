@@ -10,6 +10,11 @@
  * restored at the end, and outbound HTTP is short-circuited.
  */
 
+// Test scripts: run from WP-CLI or the command line, never from the web.
+if ( ! defined( 'ABSPATH' ) && 'cli' !== PHP_SAPI ) {
+	exit;
+}
+
 add_filter( 'pre_http_request', function () { return new WP_Error( 'blocked', 'no outbound HTTP in tests' ); }, 10, 1 );
 
 $bad = 0;

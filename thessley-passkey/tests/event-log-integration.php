@@ -20,6 +20,11 @@
  *    Revoke button's data-* attributes intact, and active content is stripped;
  *  - the browser-binding cookie check still accepts only the right token.
  */
+// Test scripts: run from WP-CLI or the command line, never from the web.
+if ( ! defined( 'ABSPATH' ) && 'cli' !== PHP_SAPI ) {
+	exit;
+}
+
 // FIRST line of defence: nothing may leave this box.
 $captured = array();
 add_filter( 'pre_http_request', function ( $pre, $args, $url ) use ( &$captured ) { $captured[] = array( $url, $args['body'] ?? '' ); return new WP_Error( 'x', 'blocked in test' ); }, 10, 3 );

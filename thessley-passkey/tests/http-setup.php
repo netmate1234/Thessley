@@ -5,6 +5,11 @@
  * Writes /tmp/opencode/pk-http.json for tests/http-flow.php.
  */
 
+// Test scripts: run from WP-CLI or the command line, never from the web.
+if ( ! defined( 'ABSPATH' ) && 'cli' !== PHP_SAPI ) {
+	exit;
+}
+
 wp_set_current_user( 1 );
 require_once ABSPATH . 'wp-admin/includes/user.php';
 

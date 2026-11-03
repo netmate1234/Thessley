@@ -106,7 +106,7 @@ class Thessley_Passkey_Login {
 	 * are real, so REMOTE_ADDR is the only value it can safely use.
 	 */
 	public static function client_ip() {
-		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
 		return filter_var( $ip, FILTER_VALIDATE_IP ) ? $ip : '0.0.0.0';
 	}
 
@@ -1819,7 +1819,7 @@ JS;
 
 			return new WP_Error(
 				'thessley_passkey_required',
-				__( '<strong>Password login is disabled for this account.</strong> Use the Thessley Passkey app to log in.', 'thessley-security-hardening' )
+				__( '<strong>Password login is disabled for this account.</strong> Use the Thessley Passkey app to log in.', 'thessley-passkey' )
 			);
 		}
 
@@ -1845,7 +1845,7 @@ JS;
 
 			return new WP_Error(
 				'thessley_passkey_2fa_required',
-				__( '<strong>This account requires confirmation with the Thessley Passkey app.</strong> Log in through the website and use the Thessley Passkey app to finish.', 'thessley-security-hardening' )
+				__( '<strong>This account requires confirmation with the Thessley Passkey app.</strong> Log in through the website and use the Thessley Passkey app to finish.', 'thessley-passkey' )
 			);
 		}
 

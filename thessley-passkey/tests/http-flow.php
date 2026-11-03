@@ -9,6 +9,11 @@
  * the Android app make. Run tests/http-setup.php (wp eval-file) first.
  */
 
+// Test scripts: run from WP-CLI or the command line, never from the web.
+if ( ! defined( 'ABSPATH' ) && 'cli' !== PHP_SAPI ) {
+	exit;
+}
+
 $base = rtrim( $argv[1] ?? 'http://127.0.0.1:8099', '/' );
 $info = json_decode( file_get_contents( '/tmp/opencode/pk-http.json' ), true );
 if ( ! $info ) {
