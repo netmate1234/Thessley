@@ -66,8 +66,16 @@ The request is valid **90 seconds**; the waiting session can stay open a few min
 
    ```sh
    sed -e 's/\x1b\[[0-9;?]*[a-zA-Z]//g' -e 's/\x1b\][^\x07]*\x07//g' /tmp/opencode/gate.log \
-     | grep -o 'thessleypam://[^ ]*' | head -1 > /tmp/opencode/link.txt
+     | grep -o 'thessleypam://[^ ]*' | head -1 | tr -d '\r\n' > /tmp/opencode/link.txt
    ```
+
+   **`tr -d '\r\n'` is not optional.** The terminal prints CRLF, `grep`
+   captures the `\r`, and `qrencode` faithfully encodes it: the app then sees
+   `api=ad\r\n`, the parser rejects the link, and it looks exactly like
+   "the app won't scan". The gate's own QR has no CR/LF, which is why scanning
+   its code works and scanning a re-rendered one did not. Verify with a decoder:
+   `python -c` + `zxingcpp` — the payload must equal the file byte for byte,
+   with no trailing control characters.
 
 3. Render it:
 
