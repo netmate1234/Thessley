@@ -39,7 +39,7 @@ require_once __DIR__ . '/class-tpm.php';
  * NOT YET DONE in this scaffold (follow-up work, not covered here):
  *  - Styling/placement on wp-login.php beyond a bare functional block.
  */
-class Thessley_Module_Passkey_Login {
+class Thessley_Passkey_Login {
 
 	const CRON_HOOK      = 'thessley_passkey_prune';
 	const LOGIN_TTL      = 120; // seconds a login QR/link stays valid
@@ -96,6 +96,33 @@ class Thessley_Module_Passkey_Login {
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'profile_page_assets' ) );
 
 		return __CLASS__;
+	}
+
+	/**
+	 * The caller's IP, used only for rate-limit buckets and the "this login
+	 * came from …" line in the approval request. Unlike the hardening
+	 * plugin's version this deliberately does not trust proxy headers: a
+	 * standalone plugin has no shared whitelist telling it which proxies
+	 * are real, so REMOTE_ADDR is the only value it can safely use.
+	 */
+	public static function client_ip() {
+		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+		return filter_var( $ip, FILTER_VALIDATE_IP ) ? $ip : '0.0.0.0';
+	}
+
+	/**
+	 * Records an audit event in Thessley Security Hardening's Event Log when
+	 * that plugin is active, and does nothing otherwise — this plugin must
+	 * work alone. Never lets a logging failure break a login.
+	 */
+	private static function log_event( $module, $event, $severity, $detail = '' ) {
+		if ( function_exists( 'thessley_log_event' ) ) {
+			thessley_log_event( $module, $event, $severity, $detail );
+			return;
+		}
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( sprintf( '[thessley-passkey] %s (%s): %s', $event, $severity, $detail ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- debug-only fallback.
+		}
 	}
 
 	/** No separate on/off switch — the three-way "Login method" setting is the only control; 'optional' is the no-op state. */
@@ -357,12 +384,12 @@ class Thessley_Module_Passkey_Login {
 		if ( ! wp_script_is( 'thessley-qrcode-generator', 'registered' ) ) {
 			// Versioned by file time so a change to just these files (e.g. the QR
 			// sizing) is not hidden behind a cached copy under the same ?ver=.
-			$gen_path = THESSLEY_PLUGIN_DIR . 'assets/vendor/qrcode-generator.js';
-			$qr_path  = THESSLEY_PLUGIN_DIR . 'assets/thessley-qr.js';
-			$gen_ver  = file_exists( $gen_path ) ? (string) filemtime( $gen_path ) : THESSLEY_VERSION;
-			$qr_ver   = file_exists( $qr_path ) ? (string) filemtime( $qr_path ) : THESSLEY_VERSION;
-			wp_register_script( 'thessley-qrcode-generator', THESSLEY_PLUGIN_URL . 'assets/vendor/qrcode-generator.js', array(), $gen_ver, true );
-			wp_register_script( 'thessley-qr', THESSLEY_PLUGIN_URL . 'assets/thessley-qr.js', array( 'thessley-qrcode-generator' ), $qr_ver, true );
+			$gen_path = THESSLEY_PASSKEY_DIR . 'assets/vendor/qrcode-generator.js';
+			$qr_path  = THESSLEY_PASSKEY_DIR . 'assets/thessley-qr.js';
+			$gen_ver  = file_exists( $gen_path ) ? (string) filemtime( $gen_path ) : THESSLEY_PASSKEY_VERSION;
+			$qr_ver   = file_exists( $qr_path ) ? (string) filemtime( $qr_path ) : THESSLEY_PASSKEY_VERSION;
+			wp_register_script( 'thessley-qrcode-generator', THESSLEY_PASSKEY_URL . 'assets/vendor/qrcode-generator.js', array(), $gen_ver, true );
+			wp_register_script( 'thessley-qr', THESSLEY_PASSKEY_URL . 'assets/thessley-qr.js', array( 'thessley-qrcode-generator' ), $qr_ver, true );
 		}
 	}
 
@@ -509,7 +536,7 @@ class Thessley_Module_Passkey_Login {
 	}
 
 	private static function rate_limited( $bucket ) {
-		$ip  = thessley_client_ip();
+		$ip  = self::client_ip();
 		$key = 'thessley_pk_rl_' . $bucket . '_' . md5( $ip );
 		$n   = (int) get_transient( $key );
 
@@ -642,7 +669,7 @@ class Thessley_Module_Passkey_Login {
 			// real browser still needs to be able to complete this on
 			// its own next poll.
 			if ( ! self::browser_matches_request( $id ) ) {
-				thessley_log_event( 'passkey-login', 'login_csrf_blocked', 'blocked', 'request ' . $id . ' — polled by a browser that never called *_start()' );
+				self::log_event( 'passkey-login', 'login_csrf_blocked', 'blocked', 'request ' . $id . ' — polled by a browser that never called *_start()' );
 
 				return rest_ensure_response( array( 'status' => 'pending' ) );
 			}
@@ -659,7 +686,7 @@ class Thessley_Module_Passkey_Login {
 			}
 			Thessley_Passkey_Store::consume_request( $id );
 
-			thessley_log_event( 'passkey-login', 'login_approved', 'noted', 'user #' . (int) $request->approver_user_id );
+			self::log_event( 'passkey-login', 'login_approved', 'noted', 'user #' . (int) $request->approver_user_id );
 
 			// Where wp-login.php would send this user after a password login. Running the same
 			// 'login_redirect' filter means plugins that route particular accounts elsewhere (a
@@ -720,7 +747,7 @@ class Thessley_Module_Passkey_Login {
 		// requester of 0 is the placeholder for a username that doesn't
 		// exist: no device belongs to account 0, so it can never resolve.
 		if ( null !== $request->requester_user_id && (int) $request->requester_user_id !== (int) $passkey->user_id ) {
-			thessley_log_event( 'passkey-login', 'signature_invalid', 'blocked', 'credential ' . $cred_id . ' tried to resolve another account\'s ' . $request->type . ' request' );
+			self::log_event( 'passkey-login', 'signature_invalid', 'blocked', 'credential ' . $cred_id . ' tried to resolve another account\'s ' . $request->type . ' request' );
 			return new WP_Error( 'thessley_wrong_account', 'This device belongs to a different account.', array( 'status' => 403 ) );
 		}
 
@@ -736,7 +763,7 @@ class Thessley_Module_Passkey_Login {
 		// *is*, not something to guard against.
 		if ( 'login' === $request->type && 'approve' === $action
 			&& '2fa' === self::effective_mode_for_user( (int) $passkey->user_id ) ) {
-			thessley_log_event( 'passkey-login', 'anonymous_login_blocked', 'blocked', 'credential ' . $cred_id . ' — account requires password first' );
+			self::log_event( 'passkey-login', 'anonymous_login_blocked', 'blocked', 'credential ' . $cred_id . ' — account requires password first' );
 			return new WP_Error(
 				'thessley_2fa_required',
 				'This account requires your password first — log in with it, then confirm with the Thessley Passkey app.',
@@ -747,7 +774,7 @@ class Thessley_Module_Passkey_Login {
 		$message = Thessley_Passkey_Crypto::canonical_string( $request->type, $id, home_url(), $request->nonce, $timestamp, $action );
 
 		if ( ! Thessley_Passkey_Crypto::verify( $passkey->public_key, $message, $signature ) ) {
-			thessley_log_event( 'passkey-login', 'signature_invalid', 'blocked', 'credential ' . $cred_id );
+			self::log_event( 'passkey-login', 'signature_invalid', 'blocked', 'credential ' . $cred_id );
 			return new WP_Error( 'thessley_bad_signature', 'Signature verification failed.', array( 'status' => 401 ) );
 		}
 
@@ -755,7 +782,7 @@ class Thessley_Module_Passkey_Login {
 
 		if ( 'deny' === $action ) {
 			Thessley_Passkey_Store::resolve_request( $id, 'denied', $passkey->user_id, self::passkey_row_id( $passkey ) );
-			thessley_log_event( 'passkey-login', 'login_denied', 'noted', 'user #' . $passkey->user_id . ' denied a login attempt not initiated by them' );
+			self::log_event( 'passkey-login', 'login_denied', 'noted', 'user #' . $passkey->user_id . ' denied a login attempt not initiated by them' );
 			return rest_ensure_response( array( 'result' => 'ok' ) );
 		}
 
@@ -879,7 +906,7 @@ class Thessley_Module_Passkey_Login {
 	}
 
 	private static function tpm_refused( $reason ) {
-		thessley_log_event( 'passkey-login', 'tpm_challenge_refused', 'blocked', $reason );
+		self::log_event( 'passkey-login', 'tpm_challenge_refused', 'blocked', $reason );
 		return new WP_Error( 'thessley_tpm_unverified', 'The TPM could not be verified: ' . $reason . '.', array( 'status' => 400 ) );
 	}
 
@@ -972,7 +999,7 @@ class Thessley_Module_Passkey_Login {
 		$message = Thessley_Passkey_Crypto::canonical_string( 'enroll', $id, home_url(), $request->nonce, $timestamp, 'register' );
 
 		if ( ! Thessley_Passkey_Crypto::verify( $public_key, $message, $proof ) ) {
-			thessley_log_event( 'passkey-login', 'signature_invalid', 'blocked', 'enroll proof-of-possession failed' );
+			self::log_event( 'passkey-login', 'signature_invalid', 'blocked', 'enroll proof-of-possession failed' );
 			return new WP_Error( 'thessley_bad_signature', 'Proof of possession failed.', array( 'status' => 401 ) );
 		}
 
@@ -984,7 +1011,7 @@ class Thessley_Module_Passkey_Login {
 			return new WP_Error( 'thessley_already_resolved', 'This request was already resolved.', array( 'status' => 409 ) );
 		}
 
-		thessley_log_event( 'passkey-login', 'enroll_approved', 'noted', 'user #' . (int) $request->requester_user_id . ' added device "' . sanitize_text_field( $label ) . '"' );
+		self::log_event( 'passkey-login', 'enroll_approved', 'noted', 'user #' . (int) $request->requester_user_id . ' added device "' . sanitize_text_field( $label ) . '"' );
 		self::notify_device_enrolled( (int) $request->requester_user_id, $label );
 		// `attestation` is the old field the desktop agents read (where the key
 		// is kept, as a storage name). `attestation_status` is the verdict the
@@ -998,13 +1025,13 @@ class Thessley_Module_Passkey_Login {
 			$result = self::verify_tpm( $id, $request->nonce, $public_key, $tpm );
 			if ( $result['ok'] ) {
 				Thessley_Passkey_Store::set_attestation_level( $row_id, 'tpm' );
-				thessley_log_event( 'passkey-login', 'attestation_verified', 'noted', 'device #' . $row_id . ': tpm (' . trim( $result['maker'] . ' ' . $result['model'] ) . ')' );
+				self::log_event( 'passkey-login', 'attestation_verified', 'noted', 'device #' . $row_id . ': tpm (' . trim( $result['maker'] . ' ' . $result['model'] ) . ')' );
 				$level      = 'tpm';
 				$att_status = 'verified_tpm';
 				$att_reason = 'hardware_attestation_valid';
 			} else {
 				Thessley_Passkey_Store::set_attestation_level( $row_id, null );
-				thessley_log_event( 'passkey-login', 'attestation_unverified', 'noted', 'device #' . $row_id . ': tpm: ' . $result['reason'] );
+				self::log_event( 'passkey-login', 'attestation_unverified', 'noted', 'device #' . $row_id . ': tpm: ' . $result['reason'] );
 				$att_reason = (string) $result['reason'];
 			}
 		} else {
@@ -1069,7 +1096,7 @@ class Thessley_Module_Passkey_Login {
 				sanitize_text_field( $label ),
 				$user->user_login,
 				home_url(),
-				thessley_client_ip()
+				self::client_ip()
 			)
 		);
 	}
@@ -1090,13 +1117,13 @@ class Thessley_Module_Passkey_Login {
 
 		if ( ! $result['ok'] ) {
 			Thessley_Passkey_Store::set_attestation_level( $row_id, null );
-			thessley_log_event( 'passkey-login', 'attestation_unverified', 'noted', 'device #' . $row_id . ': ' . $result['reason'] );
+			self::log_event( 'passkey-login', 'attestation_unverified', 'noted', 'device #' . $row_id . ': ' . $result['reason'] );
 			return array( 'level' => '', 'status' => 'unverified', 'reason' => (string) $result['reason'] );
 		}
 
 		$level = (string) $result['security_level_name'];
 		Thessley_Passkey_Store::set_attestation_level( $row_id, $level );
-		thessley_log_event( 'passkey-login', 'attestation_verified', 'noted', 'device #' . $row_id . ': ' . $level );
+		self::log_event( 'passkey-login', 'attestation_verified', 'noted', 'device #' . $row_id . ': ' . $level );
 		return array( 'level' => $level, 'status' => self::attestation_status( $level ), 'reason' => 'hardware_attestation_valid' );
 	}
 
@@ -1130,14 +1157,14 @@ class Thessley_Module_Passkey_Login {
 		wp_enqueue_script( 'thessley-qr' );
 		// Pulled in here too (normally only loaded on the plugin's own
 		// wp-thessley-* pages) so the device list below can use the same
-		// Thessley_UI::badge() house style as the rest of the plugin
+		// Thessley_Passkey_UI::badge() house style as the rest of the plugin
 		// instead of plain table text.
 		// Versioned by file time, like the plugin's own pages: with the plugin
 		// version alone a phone (or CDN) keeps serving a stale stylesheet after
 		// an update that only changed the CSS, e.g. the device cards.
-		$css_path = THESSLEY_PLUGIN_DIR . 'assets/admin.css';
-		$css_ver  = file_exists( $css_path ) ? (string) filemtime( $css_path ) : THESSLEY_VERSION;
-		wp_enqueue_style( 'thessley-admin', THESSLEY_PLUGIN_URL . 'assets/admin.css', array(), $css_ver );
+		$css_path = THESSLEY_PASSKEY_DIR . 'assets/admin.css';
+		$css_ver  = file_exists( $css_path ) ? (string) filemtime( $css_path ) : THESSLEY_PASSKEY_VERSION;
+		wp_enqueue_style( 'thessley-admin', THESSLEY_PASSKEY_URL . 'assets/admin.css', array(), $css_ver );
 	}
 
 	/**
@@ -1199,7 +1226,7 @@ class Thessley_Module_Passkey_Login {
 
 		self::register_qr_scripts();
 
-		wp_register_script( 'thessley-passkey-login', false, array( 'thessley-qr' ), THESSLEY_VERSION, true );
+		wp_register_script( 'thessley-passkey-login', false, array( 'thessley-qr' ), THESSLEY_PASSKEY_VERSION, true );
 		wp_enqueue_script( 'thessley-passkey-login' );
 
 		$config = array(
@@ -1460,21 +1487,21 @@ JS;
 		$mode     = self::mode();
 		$identify = (bool) get_option( 'thessley_passkey_identify', false ); // the saved choice, even while the current mode ignores it
 
-		Thessley_UI::open( 'passkey-login' );
+		Thessley_Passkey_UI::open( 'passkey-login' );
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only result flag set only by this module's own admin-post redirect, which already check_admin_referer()'d before redirecting.
 		if ( isset( $_GET['saved'] ) ) {
-			Thessley_UI::notice( 'success', 'Settings saved.' );
+			Thessley_Passkey_UI::notice( 'success', 'Settings saved.' );
 		}
 
-		Thessley_UI::section( 'Settings', 'admin-generic' );
+		Thessley_Passkey_UI::section( 'Settings', 'admin-generic' );
 		?>
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 			<?php wp_nonce_field( 'thessley_pk_save_settings' ); ?>
 			<input type="hidden" name="action" value="thessley_pk_save_settings">
 
 			<?php
-			Thessley_UI::row(
+			Thessley_Passkey_UI::row(
 				'Login method',
 				function () use ( $mode ) {
 					?>
@@ -1486,7 +1513,7 @@ JS;
 				'Applies to every account with a device enrolled. An account with no device yet always falls back to plain password — there is nothing to confirm with yet.'
 			);
 
-			Thessley_UI::row(
+			Thessley_Passkey_UI::row(
 				'Username prompt',
 				function () use ( $identify ) {
 					?>
@@ -1514,8 +1541,8 @@ JS;
 		}() );
 		</script>
 		<?php
-		Thessley_UI::section_end();
-		Thessley_UI::close();
+		Thessley_Passkey_UI::section_end();
+		Thessley_Passkey_UI::close();
 	}
 
 	// --- Profile page: per-user device list -------------------------------
@@ -1699,7 +1726,7 @@ JS;
 				<thead><tr><th>Label</th><th>Added</th><th>Last used</th><th>Status</th><th>Security</th><th>Score</th><th></th></tr></thead>
 				<tbody>
 				<?php
-				// [tone, dashicon, label] — tone feeds Thessley_UI::badge()'s
+				// [tone, dashicon, label] — tone feeds Thessley_Passkey_UI::badge()'s
 				// existing good/warn/bad/quiet palette, same as every other
 				// module's status badges.
 				$attestation_meta = array(
@@ -1725,8 +1752,8 @@ JS;
 							<td class="thessley-pk-name" data-label="Label"><?php echo esc_html( $d->label ?: 'Unnamed device' ); ?></td>
 							<td data-label="Added"><?php echo esc_html( mysql2date( 'M j, Y', $d->created_at ) ); ?></td>
 							<td data-label="Last used"><?php echo $d->last_used_at ? esc_html( mysql2date( 'M j, Y H:i', $d->last_used_at ) ) : '—'; ?></td>
-							<td data-label="Status"><?php Thessley_UI::badge( $d->revoked_at ? 'Revoked' : 'Active', $d->revoked_at ? 'bad' : 'good', $d->revoked_at ? 'dismiss' : 'yes-alt' ); ?></td>
-							<td data-label="Security"><?php Thessley_UI::badge( $att_label, $att_tone, $att_icon ); ?></td>
+							<td data-label="Status"><?php Thessley_Passkey_UI::badge( $d->revoked_at ? 'Revoked' : 'Active', $d->revoked_at ? 'bad' : 'good', $d->revoked_at ? 'dismiss' : 'yes-alt' ); ?></td>
+							<td data-label="Security"><?php Thessley_Passkey_UI::badge( $att_label, $att_tone, $att_icon ); ?></td>
 							<td data-label="Score"><?php echo $d->revoked_at ? '—' : esc_html( ( $attestation_score[ $d->attestation_level ?? '' ] ?? 20 ) . ' / 100' ); ?></td>
 							<td class="thessley-pk-actions">
 								<?php if ( ! $d->revoked_at && ( get_current_user_id() === (int) $user->ID || current_user_can( 'manage_options' ) ) ) : ?>
@@ -1760,7 +1787,7 @@ JS;
 		}
 
 		Thessley_Passkey_Store::revoke( $id, $target_user_id );
-		thessley_log_event( 'passkey-login', 'device_revoked', 'noted', 'device #' . $id . ' for user #' . $target_user_id );
+		self::log_event( 'passkey-login', 'device_revoked', 'noted', 'device #' . $id . ' for user #' . $target_user_id );
 
 		wp_safe_redirect( wp_get_referer() );
 		exit;
@@ -1788,7 +1815,7 @@ JS;
 		}
 
 		if ( 'required' === $mode ) {
-			thessley_log_event( 'passkey-login', 'password_login_blocked', 'blocked', 'user #' . $user->ID . ' — passkey-only' );
+			self::log_event( 'passkey-login', 'password_login_blocked', 'blocked', 'user #' . $user->ID . ' — passkey-only' );
 
 			return new WP_Error(
 				'thessley_passkey_required',
@@ -1814,7 +1841,7 @@ JS;
 		// the login form; everything else gets a plain rejection instead,
 		// same shape as 'required' mode's.
 		if ( 'wp-login.php' !== $GLOBALS['pagenow'] ) {
-			thessley_log_event( 'passkey-login', 'password_login_blocked', 'blocked', 'user #' . $user->ID . ' — 2fa required, non-browser login context' );
+			self::log_event( 'passkey-login', 'password_login_blocked', 'blocked', 'user #' . $user->ID . ' — 2fa required, non-browser login context' );
 
 			return new WP_Error(
 				'thessley_passkey_2fa_required',
@@ -1826,7 +1853,7 @@ JS;
 
 		self::bind_browser_to_request( $result['request_id'] );
 
-		thessley_log_event( 'passkey-login', 'password_step_ok', 'noted', 'user #' . $user->ID . ' — awaiting Thessley Passkey app confirmation' );
+		self::log_event( 'passkey-login', 'password_step_ok', 'noted', 'user #' . $user->ID . ' — awaiting Thessley Passkey app confirmation' );
 
 		wp_safe_redirect( self::auth_url( '2fa', $result['request_id'] ) );
 		exit;
