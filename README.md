@@ -2,7 +2,7 @@
 
 Passwordless authentication for WordPress, Linux, Windows and Active Directory — plus the security-hardening plugins and infrastructure behind it.
 
-**Full deck:** [13 slides on GitHub Pages](https://netmate1234.github.io/thessley-presentations/thessley/) (arrow keys, or click the edges).
+**Full deck:** [13 slides on GitHub Pages](https://netmate1234.github.io/Thessley/) (arrow keys, or click the edges).
 
 ## The problem
 
