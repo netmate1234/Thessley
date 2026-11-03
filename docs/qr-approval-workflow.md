@@ -122,7 +122,11 @@ Observed success on `wp-opsec` (admin, 2026-11-03):
 
 ```
 status=approved  redirect_to=https://wp-opsec.eagleeye-intelligence.com/wp-admin/
+wp-admin: 200    <title>Dashboard ‹ Thessley Security Projects — WordPress</title>
 ```
+
+That second line is the point: with the cookie jar written as well as read, the
+approved request turns into a real signed-in session, not just an approved row.
 
 ## Gotchas learned the hard way
 
