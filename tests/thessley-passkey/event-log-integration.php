@@ -4,7 +4,7 @@
  * Hardening. Requires BOTH plugins active (it exercises the hardening
  * plugin's early-gate event pipeline) and a real WordPress, so run it on a DEV site:
  *
- *   wp --path=/var/www/<dev-site> eval-file wp-content/plugins/thessley-passkey/tests/event-log-integration.php
+ *   wp --path=/var/www/<dev-site> eval-file tests/thessley-passkey/event-log-integration.php
  *
  * Safe to run next to a live unwantedip key: the very first thing it does is
  * short-circuit every outbound HTTP request (pre_http_request), so nothing

@@ -2,7 +2,7 @@
 /**
  * Behavioural checks for the standalone Thessley Passkey plugin.
  *
- *   wp --path=/tmp/opencode/wp/wordpress eval-file tests/standalone-checks.php
+ *   wp --path=/tmp/opencode/wp/wordpress eval-file tests/thessley-passkey/standalone-checks.php
  *
  * Runs against a throwaway WordPress with ONLY this plugin active, which is
  * the point of the split: nothing here may depend on Thessley Security
@@ -76,7 +76,7 @@ function pk_test_rest( $method, $route, $params = array(), $headers = array() ) 
 /* ---------- bootstrap ---------- */
 
 echo "== bootstrap\n";
-$ok( 'both tables exist', 2 === count( $wpdb->get_col( "SHOW TABLES LIKE '%thessley_passkey%'" ) ) );
+$ok( 'both tables exist', $wpdb->get_var( 'SHOW TABLES LIKE \'' . $passkeys_table . '\'' ) === $passkeys_table && $wpdb->get_var( 'SHOW TABLES LIKE \'' . $requests_table . '\'' ) === $requests_table );
 $ok( 'prune cron is scheduled', false !== wp_next_scheduled( Thessley_Passkey_Login::CRON_HOOK ) );
 $ok( 'activation version stored', (int) get_option( 'thessley_passkey_db_version' ) === Thessley_Passkey_Store::DB_VERSION );
 $ok( 'wp-login hooks registered', false !== has_action( 'login_footer', array( 'Thessley_Passkey_Login', 'login_form_markup' ) ) );
@@ -270,7 +270,7 @@ $ok( 'revoke button keeps its data attributes', false !== strpos( $kses, 'data-i
 echo "== deactivate / reactivate\n";
 Thessley_Passkey_Login::deactivate();
 $ok( 'deactivation clears the prune cron', false === wp_next_scheduled( Thessley_Passkey_Login::CRON_HOOK ) );
-$ok( 'deactivation keeps the tables', 2 === count( $wpdb->get_col( "SHOW TABLES LIKE '%thessley_passkey%'" ) ) );
+$ok( 'deactivation keeps the tables', $wpdb->get_var( 'SHOW TABLES LIKE \'' . $passkeys_table . '\'' ) === $passkeys_table && $wpdb->get_var( 'SHOW TABLES LIKE \'' . $requests_table . '\'' ) === $requests_table );
 Thessley_Passkey_Login::activate();
 $ok( 'reactivation restores the cron', false !== wp_next_scheduled( Thessley_Passkey_Login::CRON_HOOK ) );
 

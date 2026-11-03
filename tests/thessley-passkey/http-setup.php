@@ -1,8 +1,8 @@
 <?php
 /**
  * Prepares the HTTP flow test: one user with one enrolled EC-P256 device.
- * Run with: wp --path=<wordpress> eval-file tests/http-setup.php
- * Writes /tmp/opencode/pk-http.json for tests/http-flow.php.
+ * Run with: wp --path=<wordpress> eval-file tests/thessley-passkey/http-setup.php
+ * Writes /tmp/opencode/pk-http.json for tests/thessley-passkey/http-flow.php.
  */
 
 // Test scripts: run from WP-CLI or the command line, never from the web.
