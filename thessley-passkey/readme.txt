@@ -53,6 +53,16 @@ Deleting it (not just deactivating) drops the two passkey tables and their optio
 
 * QR code generation (rendered as inline SVG), [kazuhikoarase/qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator), MIT License — see assets/vendor/qrcode-generator.LICENSE.txt.
 
+== Privacy ==
+
+This plugin keeps everything on your own site. It makes no outbound requests when someone signs in, and it sends no data to Thessley or any third party.
+
+* **Devices**: the account they belong to, a label, the EC public key, an optional attestation result (TEE / StrongBox / TPM / software) and first/last-used timestamps.
+* **Pending login requests**: a random request id, a nonce and the requester's IP address, kept for 120 seconds and then pruned hourly. The IP is only used to rate-limit abuse and to show where the login came from.
+* **Settings**: one login-method option and one username-prompt option.
+
+Deactivating the plugin keeps this data; deleting it from the Plugins screen removes the two tables, the options and the scheduled cleanup.
+
 == Changelog ==
 
 = 1.0.0 =
