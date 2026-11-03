@@ -54,7 +54,7 @@ Put the key on the phone and ask the person.
 | **[PAM for Windows](https://github.com/netmate1234/thessley-pam-windows)** | Windows OpenSSH has no PAM, so a `ForceCommand` gate plus a SYSTEM service run the same protocol after the password. |
 | **[Passkey for Linux](https://github.com/netmate1234/thessley-passkey-linux)** | The desktop approver: TPM, FIDO2 or PIN, for any Thessley site. |
 | **[Passkey for Drupal](https://github.com/netmate1234/thessley-passkey-drupal)** | QR / one-tap login for Drupal 10.6 and 11, plus the Windows access module. |
-| **[Passkey server](https://github.com/netmate1234/thessley-passkey-server)** | The PHP protocol: WordPress reference implementation and a standalone Drupal module. |
+| **[Passkey protocol](https://github.com/netmate1234/thessley-passkey-server)** | The wire format: `PROTOCOL.md` and implementer notes. Code lives in the WordPress and Drupal repos. |
 | **[Security Hardening](https://github.com/netmate1234/thessley-security-hardening)** | Twenty-odd WordPress modules with one Event Log: perimeter, request inspection, detection, hardening, alerts. |
 
 ## Security model
