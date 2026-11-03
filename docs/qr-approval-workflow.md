@@ -75,11 +75,13 @@ The request is valid **90 seconds**; the waiting session can stay open a few min
    qrencode -l M -s 8 -m 2 -o /tmp/opencode/qr.png < /tmp/opencode/link.txt
    ```
 
-4. **Always post the PNG inline in chat** — the decoded image itself, not just a
-   path or a URL. That is the user's standing instruction; a link alone is a failure.
-   Then, secondarily, give the same `thessleypam://…` string as a clickable link and
-   a fenced copy for the app's “Paste a link” box. State the account/host and that it
-   expires in 90 s.
+4. **Post the PNG inline in chat — and nothing else.** The QR image is the agreed
+   delivery; do not substitute a path, a URL, or a clickable line, and do not add a
+   tap link unless the user explicitly asks for one. One line of context is enough:
+   account, host, expiry.
+
+   Exception only on request: if the user asks for the link, give the same
+   `thessleypam://…` string then.
 
 5. Optional local surface, loopback only:
 
