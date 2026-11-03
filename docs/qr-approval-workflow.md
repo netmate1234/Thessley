@@ -75,9 +75,11 @@ The request is valid **90 seconds**; the waiting session can stay open a few min
    qrencode -l M -s 8 -m 2 -o /tmp/opencode/qr.png < /tmp/opencode/link.txt
    ```
 
-4. Show `/tmp/opencode/qr.png` in chat (the image is the primary delivery), and give
-   the same `thessleypam://…` string as a clickable link plus a fenced copy for the
-   app's “Paste a link” box. State the account/host and that it expires in 90 s.
+4. **Always post the PNG inline in chat** — the decoded image itself, not just a
+   path or a URL. That is the user's standing instruction; a link alone is a failure.
+   Then, secondarily, give the same `thessleypam://…` string as a clickable link and
+   a fenced copy for the app's “Paste a link” box. State the account/host and that it
+   expires in 90 s.
 
 5. Optional local surface, loopback only:
 
@@ -141,6 +143,11 @@ approved request turns into a real signed-in session, not just an approved row.
 - The OPI5 gate advertises `h=192.168.1.200:47810`, which is LAN/VPN-only. If the
   phone is on mobile data, the approval cannot arrive — check that first when
   approvals “do nothing”.
+- Build the Android app from `/home/ubuntu/wp_opsec/thessley-passkey-android` (0.1.40+,
+  AD/`api=ad` support). `/home/ubuntu/thessley-passkey-android` is a stale 0.1.12 clone
+  and will silently drop Windows/AD links.
+- AD/DC links need `api=ad` + `pv=2`: the app hashes `sid`, signs the
+  `thessley_win_pam_v2` string and POSTs `/thessley-ad/v1/requests/respond`.
 - `sshtest@orangepi5` authenticates with `~/.ssh/thessley_sshtest` (not `id_ed25519`)
   and is a good account for testing without touching `ubuntu`.
 - The Windows VM and the domain controller take their own passes: a pass approved
