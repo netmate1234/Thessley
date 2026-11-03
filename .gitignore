@@ -10,3 +10,6 @@ codex_token
 *.tar.gz
 *.tgz
 *.iso
+
+# Build artefacts are published as GitHub Releases.
+dist/
