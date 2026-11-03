@@ -152,6 +152,23 @@ ls -lt ~/Pictures/Screenshots | head -3
 
 Then open it with the image reader and reason from the actual pixels.
 
+## The working recipe (proven 2026-11-03, DC SSH)
+
+1. Start the gate session with the auto-Enter helper and keep it open.
+2. Pull the link out **with the newline stripped**:
+   `grep -o 'thessleypam://[^ ]*' | head -1 | tr -d '\r\n'`
+3. Render `qrencode -l M -s 14 -m 4 -o qr.png`; for a TUI also
+   `qrencode -t UTF8 -m 2 -l M`.
+4. **Verify before posting**:
+   `zxingcpp.read_barcodes(...)` and assert `text == file` and no `\r`/`\n`
+   in the payload.
+5. Post the PNG (desktop client) or the UTF8 block (TUI) promptly — 90 s window.
+6. The user scans and approves; the gate then writes a 4-hour pass.
+
+App requirement: build from `/home/ubuntu/wp_opsec/thessley-passkey-android`
+(0.1.40+), where the scanner binds the camera once and the parser accepts
+`api=ad` and mixed-case usernames.
+
 ## Terminal rendering (TUI) — the good fallback
 
 OpenCode's terminal client does not render image attachments; the desktop/web
