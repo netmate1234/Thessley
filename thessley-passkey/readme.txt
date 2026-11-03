@@ -1,5 +1,5 @@
 === Thessley Passkey ===
-Contributors: martinlundstrom, thessleysecurity
+Contributors: thessleysecurity
 Tags: passkey, passwordless, two-factor, login, qr
 Requires at least: 6.0
 Tested up to: 7.1
