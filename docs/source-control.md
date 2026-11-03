@@ -12,6 +12,7 @@ every project except the Android app, which stays on GitLab.
 | [`thessley-pam-windows`](https://github.com/netmate1234/thessley-pam-windows) | GitHub + GitLab mirror | merged history |
 | [`thessley-passkey-linux`](https://github.com/netmate1234/thessley-passkey-linux) | GitHub + GitLab mirror | merged history |
 | [`thessley-passkey-server`](https://github.com/netmate1234/thessley-passkey-server) | GitHub + GitLab mirror | merged history |
+| [`thessley-passkey-drupal`](https://github.com/netmate1234/thessley-passkey-drupal) | GitHub | Drupal modules, release `1.0.0` |
 | [`thessley-infra`](https://github.com/netmate1234/thessley-infra) | GitHub | lab credentials stay local and ignored |
 | [`thessley-site`](https://github.com/netmate1234/thessley-site) | GitHub | publishing scripts |
 | `thessley-passkey-android` | GitLab only | intentionally not moved |
