@@ -1,6 +1,6 @@
 # Thessley
 
-[![Thessley — sign in without the password](docs/preview/slide-1.png)](https://netmate1234.github.io/thessley-presentations/thessley/)
+[![Thessley — 13-slide deck, playing](docs/preview/deck.gif)](https://netmate1234.github.io/thessley-presentations/thessley/)
 
 **Interactive deck:** [netmate1234.github.io/thessley-presentations/thessley](https://netmate1234.github.io/thessley-presentations/thessley/) — 13 slides, arrow keys or click the edges.
 
