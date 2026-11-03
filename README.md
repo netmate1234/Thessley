@@ -4,6 +4,8 @@
 
 Passwordless authentication for WordPress, Linux, Windows and Active Directory — plus the security-hardening plugins and infrastructure behind it.
 
+[![Thessley](docs/preview/hero.png)](https://netmate1234.github.io/Thessley/)
+
 **Full deck:** [13 slides on GitHub Pages](https://netmate1234.github.io/Thessley/) (arrow keys, or click the edges).
 
 ## The problem
@@ -29,7 +31,7 @@ Put the key on the phone and ask the person.
 4. The server verifies the signature against the enrolled key and the origin.
 5. The browser that started the request gets the session; the request is consumed.
 
-![Architecture: phone, signed request, WordPress, Linux PAM, Windows/AD, AD service](docs/preview/slide-4.png)
+![Architecture: phone, signed request, WordPress, Linux PAM, Windows/AD, AD service](docs/preview/architecture.png)
 
 ## Products
 
