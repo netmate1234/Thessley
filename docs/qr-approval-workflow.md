@@ -132,6 +132,23 @@ wp-admin: 200    <title>Dashboard ‹ Thessley Security Projects — WordPress</
 That second line is the point: with the cookie jar written as well as read, the
 approved request turns into a real signed-in session, not just an approved row.
 
+## Terminal rendering (TUI) — the good fallback
+
+OpenCode's terminal client does not render image attachments; the desktop/web
+client does. When the session is in a TUI, render the code as terminal blocks:
+
+```sh
+qrencode -t UTF8 -m 2 -l L -o /tmp/opencode/qr.txt < /tmp/opencode/link.txt
+cat /tmp/opencode/qr.txt        # paste into the reply, 73 columns x 37 lines
+```
+
+It scans well from the terminal (the user asked for this to be kept). Rules:
+
+- TUI → terminal QR block in the reply **and** the PNG at the loopback URL.
+- Desktop/web → the PNG inline, as before.
+- If the user is reading chat **on the phone**, a QR is useless (same screen):
+  give the `thessleypam://` link to paste, and say why.
+
 ## Gotchas learned the hard way
 
 - **Non-tty is refused** on the OPI5 even with a valid pass (`Permission denied
