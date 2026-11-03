@@ -1,4 +1,0 @@
-#include "resource.h"
-
-IDB_BRAND_IMAGE BITMAP DISCARDABLE "brand-small.bmp"
-IDI_THESSLEY ICON DISCARDABLE "thessley.ico"
