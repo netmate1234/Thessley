@@ -7,7 +7,7 @@ every project except the Android app, which stays on GitLab.
 | --- | --- | --- |
 | [`Thessley`](https://github.com/netmate1234/Thessley) | GitHub | umbrella: docs, presentations, scripts, site content, infra |
 | [`thessley-security-hardening`](https://github.com/netmate1234/thessley-security-hardening) | GitHub | release `1.0.24` |
-| [`thessley-passkey`](https://github.com/netmate1234/thessley-passkey) | GitHub | release `1.0.0` |
+| [`thessley-passkey-wordpress`](https://github.com/netmate1234/thessley-passkey-wordpress) | GitHub | release `1.0.0` |
 | [`thessley-pam-linux`](https://github.com/netmate1234/thessley-pam-linux) | GitHub + GitLab mirror | merged history |
 | [`thessley-pam-windows`](https://github.com/netmate1234/thessley-pam-windows) | GitHub + GitLab mirror | merged history |
 | [`thessley-passkey-linux`](https://github.com/netmate1234/thessley-passkey-linux) | GitHub + GitLab mirror | merged history |

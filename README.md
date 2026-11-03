@@ -13,7 +13,7 @@ Passwordless authentication for WordPress, Linux, Windows and Active Directory â
 | Project | Install |
 | --- | --- |
 | WordPress hardening | `wp plugin install https://github.com/netmate1234/thessley-security-hardening/releases/latest/download/thessley-security-hardening-1.0.24.zip --activate` |
-| WordPress passkey | `wp plugin install https://github.com/netmate1234/thessley-passkey/releases/latest/download/thessley-passkey-1.0.0.zip --activate` |
+| WordPress passkey | `wp plugin install https://github.com/netmate1234/thessley-passkey-wordpress/releases/latest/download/thessley-passkey-1.0.0.zip --activate` |
 | PAM for Linux | `git clone https://github.com/netmate1234/thessley-pam-linux && cd thessley-pam-linux && sudo ./install.sh` |
 | PAM for Windows | `git clone https://github.com/netmate1234/thessley-pam-windows` then `install\install.ps1` as administrator |
 | Desktop approver | `git clone https://github.com/netmate1234/thessley-passkey-linux && cd thessley-passkey-linux && ./install.sh` |
@@ -49,7 +49,7 @@ Put the key on the phone and ask the person.
 
 | Project | What it does |
 |---|---|
-| **[Passkey (WordPress)](https://github.com/netmate1234/thessley-passkey)** | QR or one-tap sign-in for `wp-login.php`: optional, password-then-app, or app-only. Per-user device list, attestation, revocation. |
+| **[Passkey (WordPress)](https://github.com/netmate1234/thessley-passkey-wordpress)** | QR or one-tap sign-in for `wp-login.php`: optional, password-then-app, or app-only. Per-user device list, attestation, revocation. |
 | **[PAM for Linux](https://github.com/netmate1234/thessley-pam-linux)** | `sudo`, GNOME login and lock, SSH, keyring, admin web and VPN â€” approved from the phone. One approval covers 4 hours per user, service and address. |
 | **[PAM for Windows](https://github.com/netmate1234/thessley-pam-windows)** | Windows OpenSSH has no PAM, so a `ForceCommand` gate plus a SYSTEM service run the same protocol after the password. |
 | **[Passkey for Linux](https://github.com/netmate1234/thessley-passkey-linux)** | The desktop approver: TPM, FIDO2 or PIN, for any Thessley site. |
