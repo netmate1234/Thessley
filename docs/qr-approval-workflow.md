@@ -132,6 +132,18 @@ wp-admin: 200    <title>Dashboard ‹ Thessley Security Projects — WordPress</
 That second line is the point: with the cookie jar written as well as read, the
 approved request turns into a real signed-in session, not just an approved row.
 
+## The user's screenshots
+
+When the user mentions a screenshot, or reports something visual (a QR that won't
+scan, a broken page, an app screen), **look in `~/Pictures/Screenshots` first** —
+read the newest file by modification time, no need to ask:
+
+```sh
+ls -lt ~/Pictures/Screenshots | head -3
+```
+
+Then open it with the image reader and reason from the actual pixels.
+
 ## Terminal rendering (TUI) — the good fallback
 
 OpenCode's terminal client does not render image attachments; the desktop/web
