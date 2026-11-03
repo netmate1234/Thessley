@@ -63,6 +63,21 @@ add_action(
 			'dashicons-smartphone',
 			58
 		);
+
+		// When Thessley Security Hardening is also installed, link the same
+		// screen from its menu as well. Passkey login used to be a tab under
+		// its Perimeter cluster, so that is where existing admins look first;
+		// the page itself stays owned by this plugin either way.
+		if ( class_exists( 'Thessley_Module_Loader' ) ) {
+			add_submenu_page(
+				'wp-thessley',
+				'Thessley Passkey',
+				'Thessley Passkey',
+				'manage_options',
+				'thessley-passkey',
+				array( 'Thessley_Passkey_Login', 'render_page' )
+			);
+		}
 	}
 );
 
