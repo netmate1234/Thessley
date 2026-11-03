@@ -1,5 +1,7 @@
 # Thessley
 
+![License](https://img.shields.io/badge/license-GPL--2.0--or--later-7c6cf0?style=flat-square) ![Projects](https://img.shields.io/badge/projects-9-7c6cf0?style=flat-square) ![Decks](https://img.shields.io/badge/decks-5-35d0c0?style=flat-square)
+
 Passwordless authentication for WordPress, Linux, Windows and Active Directory — plus the security-hardening plugins and infrastructure behind it.
 
 **Full deck:** [13 slides on GitHub Pages](https://netmate1234.github.io/Thessley/) (arrow keys, or click the edges).

@@ -13,3 +13,24 @@ codex_token
 
 # Build artefacts are published as GitHub Releases.
 dist/
+
+# Local working copies, scratch files and tokens (never part of this repo)
+codex_token
+opencode_token
+installed-before.apk
+VM-NETWORK-NOTES.md
+ssh-auth-policy.patch
+opi5-ssh-login-qr.png
+thessley-passkey-*.png
+thessley-passkey-feature-graphic.png
+docs/vm-spice-copy-paste.md
+passkey-app-change/
+thessley-ad-dc-ssh-qr/
+thessley-pam-linux-edit/
+thessley-pam-linux-vpn-fix/
+thessley-pam-windows-update/
+thessley-passkey-android/
+thessley-passkey-linux/
+thessley-passkey-server/
+thessley-ssh-android/
+tmp/
