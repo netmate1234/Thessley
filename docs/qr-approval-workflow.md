@@ -13,12 +13,28 @@ Follow this instead of inventing a new delivery mechanism each time.
   shown directly in chat.
 - Show the PNG; a clickable link is a convenience, not a replacement.
 
-## Hosts and gates
+## Applies to every gate, not just the OPI5
 
-| Host | SSH | Gate |
+Same recipe for all of them: a pty session, read the `Link:` line, `qrencode`,
+show the PNG. Only the ssh command differs.
+
+| Target | Command | What the gate asks |
 | --- | --- | --- |
-| OPI5 (`orangepi5`) | `ssh -p 50022 ubuntu@192.168.1.200` | Thessley PAM on sshd, QR per login, 4 h pass per user+service+client IP |
-| Windows VM | `ssh -i ~/.ssh/thessley-vm-debug ... Administrator@lab.thessley.test 192.168.122.127` | AD SSH gate, QR + pass |
+| OPI5 (`orangepi5`) | `ssh -tt -p 50022 ubuntu@192.168.1.200` | `thessleypam://sudo?…&s=sshd` |
+| OPI5 test account | `ssh -tt -p 50022 -i ~/.ssh/thessley_sshtest sshtest@192.168.1.200` | same, `u=sshtest` |
+| Windows VM (AD-joined PC) | `ssh -tt -i ~/.ssh/thessley-vm-debug -F /dev/null -l Administrator@lab.thessley.test 192.168.122.127` | AD SSH gate, `thessleypam://…&ctx=ssh&api=ad` |
+| Domain controller | `ssh -tt -i ~/.ssh/thessley-vm-debug -F /dev/null -l Administrator 192.168.122.98` | AD SSH gate, per-user |
+| AD web admin / SSH service | any `thessleypam://login?…` printed by the service | `thessleypam://login?…` |
+| WordPress passkey login | QR on `wp-login.php`, or `/?rest_route=/thessley/v1/passkey/login/start` | `thessleypasskey://auth?type=login&…` |
+
+The gate prints the same shape everywhere:
+
+```
+Approve <service> for <user> on <host> with Thessley Passkey (scan within 90 s):
+Link: thessleypam://…  (or thessleypasskey://auth?…)
+[ASCII QR]
+Approve on your phone, then press Enter:
+```
 
 The gate prints, on a pty:
 
@@ -33,7 +49,8 @@ The request is valid **90 seconds**; the waiting session can stay open a few min
 
 ## Steps
 
-1. Start the session with the auto-Enter helper (presses Enter while the gate waits):
+1. Start the session with the auto-Enter helper (presses Enter while the gate waits).
+   Substitute the ssh command for whichever target is being approved:
 
    ```sh
    rm -f /tmp/opencode/gate.log
@@ -41,6 +58,9 @@ The request is valid **90 seconds**; the waiting session can stay open a few min
      ssh -tt -p 50022 -o LogLevel=ERROR ubuntu@192.168.1.200 "echo PASS-GRANTED" >/dev/null 2>&1 &
    sleep 7
    ```
+
+   The `echo PASS-GRANTED` is just a marker that the session got through; any harmless
+   command works, and it must be a `-tt` session.
 
 2. Take the link **from the terminal output**, do not rebuild it:
 
@@ -89,3 +109,7 @@ The request is valid **90 seconds**; the waiting session can stay open a few min
   approvals “do nothing”.
 - `sshtest@orangepi5` authenticates with `~/.ssh/thessley_sshtest` (not `id_ed25519`)
   and is a good account for testing without touching `ubuntu`.
+- The Windows VM and the domain controller take their own passes: a pass approved
+  on the Pi does not open them, and vice versa. Approve per target.
+- Web logins (`thessleypasskey://auth?…`) go through the same rendering step; there
+  is no terminal session to keep alive, only the request's 120 s window.
