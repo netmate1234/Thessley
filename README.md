@@ -61,13 +61,13 @@ Put the key on the phone and ask the person.
 
 ## Sign-in screens
 
-**WordPress:** this screenshot shows the passkey step with a clearly labeled inactive demo QR. It encodes only an invalid example address and cannot approve a login.
+**WordPress:** passkey sign-in with an inactive demo QR. The QR encodes an invalid example address and cannot approve a login.
 
-<img src="docs/preview/screenshots/wordpress-passkey-login.png" width="340" alt="Thessley-enabled WordPress login screen asking for a username before continuing">
+<a href="docs/preview/screenshots/wordpress-passkey-login.png"><img src="docs/preview/screenshots/wordpress-passkey-login.png" width="340" alt="Thessley-enabled WordPress passkey login with inactive demo QR"></a>
 
-**Windows / Active Directory:** this lab capture shows the Windows sign-in screen waiting for phone approval. A visible, clearly labeled inactive demo QR replaces the real one-time code; it cannot approve a login.
+**Windows / Active Directory:** this lab capture shows the sign-in screen waiting for phone approval, with an inactive demo QR replacing the real one-time code. It cannot approve a login.
 
-<img src="docs/preview/screenshots/windows-phone-approval.png" width="500" alt="Windows sign-in screen with Thessley phone approval pending; account and QR redacted">
+<a href="docs/preview/screenshots/windows-phone-approval.png"><img src="docs/preview/screenshots/windows-phone-approval.png" width="500" alt="Windows sign-in screen with inactive demo QR"></a>
 
 ## Use cases
 
