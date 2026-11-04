@@ -8,6 +8,8 @@ Passwordless authentication for WordPress, Linux, Windows and Active Directory â
 
 **Full deck:** [13 slides on GitHub Pages](https://netmate1234.github.io/Thessley/) (arrow keys, or click the edges).
 
+**Who it is for:** [Use cases and service packages](docs/use-cases.md) for WordPress agencies, small organizations, and site administrators.
+
 ## Quick start
 
 | Project | Install |
@@ -56,6 +58,30 @@ Put the key on the phone and ask the person.
 | **[Passkey for Drupal](https://github.com/netmate1234/thessley-passkey-drupal)** | QR / one-tap login for Drupal 10.6 and 11, plus the Windows access module. |
 | **[Passkey protocol](https://github.com/netmate1234/thessley-passkey-server)** | The wire format: `PROTOCOL.md` and implementer notes. Code lives in the WordPress and Drupal repos. |
 | **[Security Hardening](https://github.com/netmate1234/thessley-security-hardening)** | Twenty-odd WordPress modules with one Event Log: perimeter, request inspection, detection, hardening, alerts. |
+
+## Sign-in screens
+
+**WordPress:** the live `wp-login.php` flow identifies the account first; an enrolled account can then continue with the site's configured passkey mode.
+
+<img src="docs/preview/screenshots/wordpress-passkey-login.png" width="340" alt="Thessley-enabled WordPress login screen asking for a username before continuing">
+
+**Windows / Active Directory:** this lab capture shows the Windows sign-in screen waiting for phone approval. The account name and one-time QR have been redacted.
+
+<img src="docs/preview/screenshots/windows-phone-approval.png" width="500" alt="Windows sign-in screen with Thessley phone approval pending; account and QR redacted">
+
+## Use cases
+
+Start with the problem the site owner has, then choose the smallest product that addresses it. Thessley is not a substitute for hosting security, backups, patching, or an independent penetration test.
+
+| Situation | Practical starting point | What to demonstrate |
+|---|---|---|
+| A WordPress agency needs a repeatable baseline across client sites | Security Hardening on one pilot site | Before/after settings, a sample event log, and a documented rollout/rollback |
+| A small organization has a few administrators sharing or reusing passwords | Security Hardening plus optional Passkey for WordPress for administrator sign-in | Admin enrollment, device revocation, and the recovery path if a phone is lost |
+| A store or membership site wants to reduce risk to its WordPress admin area | Protect the staff `wp-login.php` path with the hardening and passkey products | Clearly distinguish administrator login protection from customer checkout/account security |
+| A site owner needs help understanding suspicious activity | Review the Security Hardening event log and configuration | A concise findings report with evidence, limits, and prioritized next actions; do not promise every attack will be detected |
+| A business needs phone approval for infrastructure administrators | Assess Linux/Windows access separately with the corresponding PAM project | A scoped lab demo, recovery/rollback plan, and compatibility review before production |
+
+For packaging ideas, pilot scope, and partner-led referrals, see [Use cases and service packages](docs/use-cases.md).
 
 ## Security model
 
