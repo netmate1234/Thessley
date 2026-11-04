@@ -61,11 +61,11 @@ Put the key on the phone and ask the person.
 
 ## Sign-in screens
 
-**WordPress:** the live `wp-login.php` flow identifies the account first; an enrolled account can then continue with the site's configured passkey mode.
+**WordPress:** this screenshot shows the passkey step with a clearly labeled inactive demo QR. It encodes only an invalid example address and cannot approve a login.
 
 <img src="docs/preview/screenshots/wordpress-passkey-login.png" width="340" alt="Thessley-enabled WordPress login screen asking for a username before continuing">
 
-**Windows / Active Directory:** this lab capture shows the Windows sign-in screen waiting for phone approval. The account name and one-time QR have been redacted.
+**Windows / Active Directory:** this lab capture shows the Windows sign-in screen waiting for phone approval. A visible, clearly labeled inactive demo QR replaces the real one-time code; it cannot approve a login.
 
 <img src="docs/preview/screenshots/windows-phone-approval.png" width="500" alt="Windows sign-in screen with Thessley phone approval pending; account and QR redacted">
 
