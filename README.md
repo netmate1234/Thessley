@@ -1,6 +1,6 @@
 # Thessley
 
-![License](https://img.shields.io/badge/license-GPL--2.0--or--later-7c6cf0?style=flat-square) ![Projects](https://img.shields.io/badge/projects-9-7c6cf0?style=flat-square) ![Decks](https://img.shields.io/badge/decks-5-35d0c0?style=flat-square)
+![License](https://img.shields.io/badge/license-GPL--2.0--or--later-7c6cf0?style=flat-square) ![Projects](https://img.shields.io/badge/projects-12-7c6cf0?style=flat-square) ![Decks](https://img.shields.io/badge/decks-5-35d0c0?style=flat-square)
 
 Passwordless authentication for WordPress, Linux, Windows and Active Directory — plus the security-hardening plugins and infrastructure behind it.
 
@@ -16,11 +16,16 @@ Passwordless authentication for WordPress, Linux, Windows and Active Directory �
 | --- | --- |
 | WordPress hardening | `wp plugin install https://github.com/netmate1234/thessley-security-hardening/releases/latest/download/thessley-security-hardening-1.0.24.zip --activate` |
 | WordPress passkey | `wp plugin install https://github.com/netmate1234/thessley-passkey-wordpress/releases/latest/download/thessley-passkey-1.0.0.zip --activate` |
+| Android companion app (source) | See the [Android project README](https://github.com/martin.lundstrom/thessley-passkey-android) for development-build instructions; no Play Store release is documented yet. |
 | PAM for Linux | `git clone https://github.com/netmate1234/thessley-pam-linux && cd thessley-pam-linux && sudo ./install.sh` |
 | PAM for Windows | `git clone https://github.com/netmate1234/thessley-pam-windows` then `install\install.ps1` as administrator |
 | Desktop approver | `git clone https://github.com/netmate1234/thessley-passkey-linux && cd thessley-passkey-linux && ./install.sh` |
 
 **Five-minute demo:** install the passkey plugin on a test WordPress, open your profile, add the phone, then sign in with the QR.
+
+> **Before enabling either WordPress plugin on a live site:** use staging or a low-risk pilot, take and verify a restorable backup, and confirm hosting/SSH recovery access. Never make Thessley the only administrator login or recovery route. Follow the [safe installation and lockout recovery guide](docs/wordpress-safe-install.md).
+
+For non-WordPress Thessley installations, use the [cross-project installation and recovery standard](docs/installation-recovery.md) and the product-specific recovery procedure before changing any login, PAM, SSH, VPN, or Windows sign-in policy.
 
 ## The problem
 
@@ -54,10 +59,12 @@ Put the key on the phone and ask the person.
 | **[Passkey (WordPress)](https://github.com/netmate1234/thessley-passkey-wordpress)** | QR or one-tap sign-in for `wp-login.php`: optional, password-then-app, or app-only. Per-user device list, attestation, revocation. |
 | **[PAM for Linux](https://github.com/netmate1234/thessley-pam-linux)** | `sudo`, GNOME login and lock, SSH, keyring, admin web and VPN — approved from the phone. One approval covers 4 hours per user, service and address. |
 | **[PAM for Windows](https://github.com/netmate1234/thessley-pam-windows)** | Windows OpenSSH has no PAM, so a `ForceCommand` gate plus a SYSTEM service run the same protocol after the password. |
+| **[Passkey for Android](https://github.com/martin.lundstrom/thessley-passkey-android)** | Phone app for QR/link sign-in and Thessley PAM approvals, protected by Android device authentication. Development source; check its README for current release status. |
 | **[Passkey for Linux](https://github.com/netmate1234/thessley-passkey-linux)** | The desktop approver: TPM, FIDO2 or PIN, for any Thessley site. |
 | **[Passkey for Drupal](https://github.com/netmate1234/thessley-passkey-drupal)** | QR / one-tap login for Drupal 10.6 and 11, plus the Windows access module. |
-| **[Passkey protocol](https://github.com/netmate1234/thessley-passkey-server)** | The wire format: `PROTOCOL.md` and implementer notes. Code lives in the WordPress and Drupal repos. |
 | **[Security Hardening](https://github.com/netmate1234/thessley-security-hardening)** | Twenty-odd WordPress modules with one Event Log: perimeter, request inspection, detection, hardening, alerts. |
+
+Supporting repositories: [infrastructure and AD services](https://github.com/netmate1234/thessley-infra), the [passkey protocol reference](https://github.com/netmate1234/thessley-passkey-server), [site content and publishing tools](https://github.com/netmate1234/thessley-site), and [product presentations](https://github.com/netmate1234/thessley-presentations). This overview is the twelfth repository.
 
 ## Sign-in screens
 
