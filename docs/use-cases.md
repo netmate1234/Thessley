@@ -8,7 +8,7 @@ Use this page to guide discovery calls and demos. Start by identifying the site,
 
 **Need:** a consistent security baseline and an explainable record of important security events across client sites.
 
-**Pilot:** choose one low-risk client site, document its current configuration, install Thessley Security Hardening, configure only the modules appropriate to that site, and review the resulting event log with the client.
+**Pilot:** choose one low-risk client site, document its current configuration, install Thessley Security Hardening, configure only the modules appropriate to that site, and review the resulting event log with the client. Use the [safe WordPress installation and recovery checklist](wordpress-safe-install.md) before changing enforcement or login settings.
 
 **Potential paid work:** initial assessment and setup, a written handover, then recurring configuration reviews and maintenance. The agency can provide the service directly or refer the owner to a Thessley deployment partner.
 
@@ -20,7 +20,7 @@ Use this page to guide discovery calls and demos. Start by identifying the site,
 
 **Pilot:** review administrator accounts and recovery procedures; deploy hardening first; optionally enroll one or two administrators in Thessley Passkey for WordPress.
 
-**Demo proof:** enrollment, a normal sign-in, device revocation, and a tested recovery route. Keep a working break-glass administrator until recovery has been proven.
+**Demo proof:** enrollment, a normal sign-in, device revocation, and a tested recovery route. Keep a separate working break-glass administrator until recovery has been proven; use the [safe installation and lockout recovery guide](wordpress-safe-install.md).
 
 ### 3. WooCommerce, membership, and content sites
 
